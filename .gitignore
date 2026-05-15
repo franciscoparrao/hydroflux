@@ -1,0 +1,61 @@
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock  # se versiona solo en binarios finales, no en libs
+
+# Python (cuando aparezca)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Datos pesados (referenciar paths externos, no copiar)
+data/
+*.tif
+*.tiff
+*.nc
+*.h5
+*.hdf5
+*.zarr
+*.parquet
+*.shp
+*.shx
+*.dbf
+*.prj
+*.gpkg
+
+# Outputs de simulación
+results/
+runs/
+*.vts
+*.vtu
+*.vtm
+
+# Logs y outputs temporales
+*.log
+logs/
+tmp/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# LaTeX (cuando se escriban papers en docs/ o papers/)
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fdb_latexmk
+*.fls
+
+# Notebooks profundos (preservar el .ipynb pero no checkpoints)
+.ipynb_checkpoints/

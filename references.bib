@@ -1,0 +1,177 @@
+% =============================================================================
+% references.bib — hydroflux research line
+% Última actualización: 2026-05-15
+% Mantener ordenado alfabéticamente por clave. Comentar entradas que aún no se
+% han leído. Las claves siguen el patrón "AutorAño" o "AutorEtAlAño".
+% =============================================================================
+
+% =============================================================================
+% 1. NUMÉRICO — SHALLOW WATER EQUATIONS
+% =============================================================================
+
+@book{Toro2009,
+  author    = {Toro, Eleuterio F.},
+  title     = {Riemann Solvers and Numerical Methods for Fluid Dynamics},
+  edition   = {3rd},
+  publisher = {Springer},
+  year      = {2009},
+  note      = {Referencia canónica para esquemas FV en shallow water.
+               Toro test cases (5 problemas 1D) son benchmark estándar.}
+}
+
+@article{Bermudez1994,
+  author  = {Berm\'udez, Alfredo and V\'azquez, M.E.},
+  title   = {Upwind methods for hyperbolic conservation laws with source terms},
+  journal = {Computers \& Fluids},
+  volume  = {23},
+  number  = {8},
+  pages   = {1049--1071},
+  year    = {1994},
+  note    = {Tratamiento del término fuente para well-balanced schemes
+             (preservar lake-at-rest). Cita obligada en methods paper.}
+}
+
+@article{MacDonald1997,
+  author  = {MacDonald, Ian and Baines, Mark and Nichols, Nancy and Samuels, Peter},
+  title   = {Analytic Benchmark Solutions for Open-Channel Flows},
+  journal = {Journal of Hydraulic Engineering},
+  volume  = {123},
+  number  = {11},
+  pages   = {1041--1045},
+  year    = {1997},
+  note    = {Soluciones analíticas para flujo en canal con fricción.
+             Benchmark estándar para validar steady-state 1D.}
+}
+
+@article{Stoker1957,
+  author  = {Stoker, J.J.},
+  title   = {Water Waves: The Mathematical Theory with Applications},
+  journal = {Interscience Publishers},
+  year    = {1957},
+  note    = {Solución analítica del dam break en canal seco/húmedo.
+             Test 1 para validar Riemann solvers.}
+}
+
+% =============================================================================
+% 2. FLOOD MODELING — SOLVERS
+% =============================================================================
+
+@article{BatesDeRoo2000,
+  author  = {Bates, P.D. and De Roo, A.P.J.},
+  title   = {A simple raster-based model for flood inundation simulation},
+  journal = {Journal of Hydrology},
+  volume  = {236},
+  number  = {1-2},
+  pages   = {54--77},
+  year    = {2000},
+  note    = {Paper original de LISFLOOD-FP. Inertial approximation.}
+}
+
+@article{Neal2012,
+  author  = {Neal, J. and Schumann, G. and Bates, P.},
+  title   = {A subgrid channel model for simulating river hydraulics
+             and floodplain inundation over large and data sparse areas},
+  journal = {Water Resources Research},
+  volume  = {48},
+  number  = {W11506},
+  year    = {2012}
+}
+
+@techreport{NeelzPender2013,
+  author      = {N\'eelz, S. and Pender, G.},
+  title       = {Benchmarking the Latest Generation of 2D Hydraulic Modelling Packages},
+  institution = {UK Environment Agency},
+  year        = {2013},
+  note        = {UK EA benchmark suite (6 casos). Estándar para validar solvers 2D.
+                 Imprescindible para el methods paper de 2027.}
+}
+
+@book{Hervouet2007,
+  author    = {Hervouet, Jean-Michel},
+  title     = {Hydrodynamics of Free Surface Flows: Modelling with the Finite Element Method},
+  publisher = {Wiley},
+  year      = {2007},
+  note      = {Libro base de TELEMAC. Referencia FE en hidráulica fluvial.}
+}
+
+@article{Roberts2015,
+  author  = {Roberts, Stephen and Nielsen, Ole and Gray, Duncan and Sexton, Jane and Davies, Gareth},
+  title   = {ANUGA User Manual},
+  journal = {Geoscience Australia},
+  year    = {2015},
+  note    = {Documentación ANUGA. Solver 2D unstructured Python/C.}
+}
+
+@misc{Brunner2020,
+  author       = {Brunner, Gary W.},
+  title        = {{HEC-RAS, River Analysis System Hydraulic Reference Manual}},
+  organization = {US Army Corps of Engineers, Hydrologic Engineering Center},
+  year         = {2020},
+  note         = {Manual de referencia técnica de HEC-RAS.}
+}
+
+% =============================================================================
+% 3. COUPLED HAZARDS — LANDSLIDE PROPAGATION
+% =============================================================================
+
+@article{Iverson2000,
+  author  = {Iverson, Richard M.},
+  title   = {Landslide triggering by rain infiltration},
+  journal = {Water Resources Research},
+  volume  = {36},
+  number  = {7},
+  pages   = {1897--1910},
+  year    = {2000},
+  note    = {Acoplamiento físico lluvia → estabilidad → trigger. Base teórica
+             para el coupling Years 4-6.}
+}
+
+@article{Hungr2005,
+  author  = {Hungr, Oldrich},
+  title   = {Classification and terminology},
+  journal = {Debris-Flow Hazards and Related Phenomena},
+  pages   = {9--23},
+  year    = {2005},
+  note    = {Clasificación canónica de remociones en masa.}
+}
+
+@article{HungrMcDougall2009,
+  author  = {Hungr, O. and McDougall, S.},
+  title   = {Two numerical models for landslide dynamic analysis},
+  journal = {Computers \& Geosciences},
+  volume  = {35},
+  number  = {5},
+  pages   = {978--992},
+  year    = {2009},
+  note    = {DAN3D, modelo de propagación. Referencia para coupling.}
+}
+
+% =============================================================================
+% 4. DIFFERENTIABLE HYDROLOGY / SCIENTIFIC ML
+% =============================================================================
+
+% Pendiente: confirmar refs exactas de:
+% - Andreadis et al. 2022, 2023 sobre differentiable distributed hydrology
+% - JAX-Hydro / Adler et al. SWE differentiable
+% - Recent NeurIPS / ICML workshops on Climate / Geoscience differentiable models
+
+@unpublished{Andreadis2023placeholder,
+  author = {Andreadis, K.M. and others},
+  title  = {Differentiable parameter estimation for distributed hydrological models},
+  year   = {2023},
+  note   = {PLACEHOLDER — confirmar cita exacta. Probablemente WRR 2023.}
+}
+
+% =============================================================================
+% 5. RUST / SCIENTIFIC COMPUTING ECOSYSTEM
+% =============================================================================
+
+% Pendiente: refs específicas si aparece literatura sobre solver implementations en Rust
+% (probablemente blog posts más que papers, no citables formalmente).
+
+% =============================================================================
+% 6. CHILE — DATOS Y CONTEXTO
+% =============================================================================
+
+% Pendiente: refs de inventarios SERNAGEOMIN, DGA, eventos catastróficos chilenos
+% (Maule 2010, Atacama 2015, etc.).
