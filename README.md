@@ -13,6 +13,10 @@ HEC-RAS es estándar regulatorio mundial pero arcaico operacionalmente: archivos
 
 ## El wedge
 
+**hydroflux es el solver acoplado de peligros hidrometeorológicos que aún no existe**: integra lluvia → falla de ladera → propagación granular → inundación en un mismo engine numérico, diferenciable de extremo a extremo para calibración por gradiente y problemas inversos, ejecutado nativamente sobre GPU desde el primer commit (Rust + wgpu/CUDA), escalable a las 15 cuencas BNA continentales chilenas sobre cluster, y trazable bit a bit gracias a project files de texto plano versionables con Git y CI/CD. La defensibilidad del wedge no está en ninguna de esas cinco dimensiones por separado — cada una ya existe parcialmente en algún solver — sino en su **intersección**: ningún proyecto vigente puede pivotar a cubrirla sin reescribir su núcleo numérico en un lenguaje moderno con ergonomía de autograd, y ningún proyecto en lenguaje moderno tiene la madurez numérica de HEC-RAS, BASEMENT o TELEMAC. Esa estrechez es precisamente el espacio que hydroflux ocupa por construcción.
+
+*Versión canónica en `outline.md` § "Wedge en un párrafo". Desglose por eje:*
+
 | Eje | Diferenciador |
 |---|---|
 | Acoplamiento | Lluvia → landslide → flujo de detritos → inundación en un único engine (no pipeline de archivos entre tools separadas) |

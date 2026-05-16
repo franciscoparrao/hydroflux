@@ -52,6 +52,54 @@
              Test 1 para validar Riemann solvers.}
 }
 
+@article{Roe1981,
+  author  = {Roe, P.L.},
+  title   = {Approximate Riemann solvers, parameter vectors, and difference schemes},
+  journal = {Journal of Computational Physics},
+  volume  = {43},
+  number  = {2},
+  pages   = {357--372},
+  year    = {1981},
+  note    = {Riemann solver lineralizado de Roe. Base de TELEMAC, Iber, SRH-2D y
+             múltiples otros solvers FV. Referencia obligada para esquema 1D.}
+}
+
+@article{Toro1994,
+  author  = {Toro, E.F. and Spruce, M. and Speares, W.},
+  title   = {Restoration of the contact surface in the {HLL}-{R}iemann solver},
+  journal = {Shock Waves},
+  volume  = {4},
+  pages   = {25--34},
+  year    = {1994},
+  note    = {Paper original del esquema HLLC. Mejora HLL preservando contacto.
+             Decisión Q3 2026 entre HLL/Roe/HLLC para solver-1d.}
+}
+
+@article{Audusse2004,
+  author  = {Audusse, E. and Bouchut, F. and Bristeau, M.-O. and Klein, R. and Perthame, B.},
+  title   = {A fast and stable well-balanced scheme with hydrostatic reconstruction
+             for shallow water flows},
+  journal = {SIAM Journal on Scientific Computing},
+  volume  = {25},
+  number  = {6},
+  pages   = {2050--2065},
+  year    = {2004},
+  note    = {Hydrostatic reconstruction — el truco para que well-balanced funcione
+             con topografía discontinua. Imprescindible para el solver 2D.}
+}
+
+@article{KurganovPetrova2007,
+  author  = {Kurganov, A. and Petrova, G.},
+  title   = {A second-order well-balanced positivity preserving central-upwind scheme
+             for the {S}aint-{V}enant system},
+  journal = {Communications in Mathematical Sciences},
+  volume  = {5},
+  number  = {1},
+  pages   = {133--160},
+  year    = {2007},
+  note    = {Esquema central-upwind, base de ANUGA y otros. Alternativa Riemann-free.}
+}
+
 % =============================================================================
 % 2. FLOOD MODELING — SOLVERS
 % =============================================================================
@@ -110,6 +158,76 @@
   note         = {Manual de referencia técnica de HEC-RAS.}
 }
 
+@article{Bates2010,
+  author  = {Bates, P.D. and Horritt, M.S. and Fewtrell, T.J.},
+  title   = {A simple inertial formulation of the shallow water equations for
+             efficient two-dimensional flood inundation modelling},
+  journal = {Journal of Hydrology},
+  volume  = {387},
+  number  = {1-2},
+  pages   = {33--45},
+  year    = {2010},
+  note    = {Formulación inercial de LISFLOOD-FP — descarta el término convectivo.
+             Cita clave en gap final para señalar limitación de flujo transcrítico.}
+}
+
+@article{Blade2014,
+  author  = {Blad\'e, E. and Cea, L. and Corestein, G. and Escolano, E. and Puertas, J.
+             and V\'azquez-Cend\'on, M.E. and Dolz, J. and Coll, A.},
+  title   = {{I}ber: herramienta de simulaci\'on num\'erica del flujo en r\'ios},
+  journal = {Revista Internacional de M\'etodos Num\'ericos para C\'alculo
+             y Dise\~no en Ingenier\'ia},
+  volume  = {30},
+  number  = {1},
+  pages   = {1--10},
+  year    = {2014},
+  note    = {Paper de presentación de Iber. Referencia oficial del solver español.}
+}
+
+@article{Lai2010,
+  author  = {Lai, Yong G.},
+  title   = {Two-dimensional depth-averaged flow modeling with an unstructured hybrid mesh},
+  journal = {Journal of Hydraulic Engineering},
+  volume  = {136},
+  number  = {1},
+  pages   = {12--23},
+  year    = {2010},
+  note    = {Paper técnico de SRH-2D (USBR). Implicit time stepping en mesh híbrida.}
+}
+
+@article{LeVeque2011,
+  author  = {LeVeque, R.J. and George, D.L. and Berger, M.J.},
+  title   = {Tsunami modelling with adaptively refined finite volume methods},
+  journal = {Acta Numerica},
+  volume  = {20},
+  pages   = {211--289},
+  year    = {2011},
+  note    = {Paper canónico de GeoClaw. AMR + augmented Riemann solver well-balanced.}
+}
+
+@article{Lesser2004,
+  author  = {Lesser, G.R. and Roelvink, J.A. and van Kester, J.A.T.M. and Stelling, G.S.},
+  title   = {Development and validation of a three-dimensional morphological model},
+  journal = {Coastal Engineering},
+  volume  = {51},
+  number  = {8-9},
+  pages   = {883--915},
+  year    = {2004},
+  note    = {Paper técnico de Delft3D-FLOW y morfología. Referencia core del solver Deltares.}
+}
+
+@manual{Vetsch2020,
+  author       = {Vetsch, D. and Siviglia, A. and Bacigaluppi, P. and B\"urgler, M.
+                  and Caponi, F. and Conde, D. and Gerber, M. and others},
+  title        = {{BASEMENT — Basic Simulation Environment for Computation of
+                   Environmental Flow and Natural Hazard Simulation, v3.x —
+                   System Manuals}},
+  organization = {Laboratory of Hydraulics, Hydrology and Glaciology (VAW), ETH Z\"urich},
+  year         = {2020},
+  note         = {Manual de referencia técnica de BASEMENT v3.x.
+                  PLACEHOLDER — verificar versión exacta y lista canónica de autores.}
+}
+
 % =============================================================================
 % 3. COUPLED HAZARDS — LANDSLIDE PROPAGATION
 % =============================================================================
@@ -146,20 +264,107 @@
   note    = {DAN3D, modelo de propagación. Referencia para coupling.}
 }
 
+@article{Christen2010,
+  author  = {Christen, M. and Kowalski, J. and Bartelt, P.},
+  title   = {{RAMMS}: Numerical simulation of dense snow avalanches in
+             three-dimensional terrain},
+  journal = {Cold Regions Science and Technology},
+  volume  = {63},
+  number  = {1-2},
+  pages   = {1--14},
+  year    = {2010},
+  note    = {Paper técnico de RAMMS (WSL/SLF). El módulo DEBRIS-FLOW comparte engine.
+             Referencia para el lado "propagación granular" del coupling.}
+}
+
+@article{Mergili2017,
+  author  = {Mergili, M. and Fischer, J.-T. and Krenn, J. and Pudasaini, S.P.},
+  title   = {{r.avaflow} v1, an advanced open-source computational framework for
+             the propagation and interaction of two-phase mass flows},
+  journal = {Geoscientific Model Development},
+  volume  = {10},
+  number  = {2},
+  pages   = {553--569},
+  year    = {2017},
+  note    = {Modelo open-source de propagación de mass flows en GRASS GIS.
+             Alternativa abierta a RAMMS, citada en el gap final como ejemplo
+             del pipeline file-based actual.}
+}
+
+@article{Montgomery1994,
+  author  = {Montgomery, D.R. and Dietrich, W.E.},
+  title   = {A physically based model for the topographic control on shallow landsliding},
+  journal = {Water Resources Research},
+  volume  = {30},
+  number  = {4},
+  pages   = {1153--1171},
+  year    = {1994},
+  note    = {SHALSTAB — modelo de susceptibilidad físicamente basado. Primer eslabón
+             del pipeline lluvia → falla → propagación → inundación.}
+}
+
+@techreport{Pack1998,
+  author      = {Pack, R.T. and Tarboton, D.G. and Goodwin, C.N.},
+  title       = {{Terrain Stability Mapping with SINMAP, Technical Description and
+                  Users Guide for Version 1.00}},
+  institution = {Terratech Consulting Ltd., Salmon Arm, BC, Canada},
+  year        = {1998},
+  note        = {SINMAP — alternativa probabilística a SHALSTAB. Eslabón susceptibilidad
+                 del pipeline coupling actual.}
+}
+
 % =============================================================================
 % 4. DIFFERENTIABLE HYDROLOGY / SCIENTIFIC ML
 % =============================================================================
 
 % Pendiente: confirmar refs exactas de:
-% - Andreadis et al. 2022, 2023 sobre differentiable distributed hydrology
 % - JAX-Hydro / Adler et al. SWE differentiable
 % - Recent NeurIPS / ICML workshops on Climate / Geoscience differentiable models
+% - Andreadis et al. — verificar cita exacta de differentiable distributed hydrology
 
-@unpublished{Andreadis2023placeholder,
-  author = {Andreadis, K.M. and others},
-  title  = {Differentiable parameter estimation for distributed hydrological models},
-  year   = {2023},
-  note   = {PLACEHOLDER — confirmar cita exacta. Probablemente WRR 2023.}
+@article{Tsai2021,
+  author  = {Tsai, W.-P. and Feng, D. and Pan, M. and Beck, H. and Lawson, K.
+             and Yang, Y. and Liu, J. and Shen, C.},
+  title   = {From calibration to parameter learning: Harnessing the scaling effects
+             of big data in geoscientific modeling},
+  journal = {Nature Communications},
+  volume  = {12},
+  number  = {5988},
+  year    = {2021},
+  note    = {Paper seminal de differentiable parameter learning aplicado a modelos
+             hidrológicos distribuidos. Cita transversal en el gap final.}
+}
+
+@article{Feng2022,
+  author  = {Feng, D. and Liu, J. and Lawson, K. and Shen, C.},
+  title   = {Differentiable, learnable, regionalized process-based models with
+             multiphysical outputs can approach state-of-the-art hydrologic
+             prediction accuracy},
+  journal = {Water Resources Research},
+  volume  = {58},
+  number  = {10},
+  year    = {2022},
+  note    = {Differentiable PB hydrology. Demuestra que el approach diferenciable
+             alcanza accuracy state-of-the-art en streamflow. Citar en review paper.}
+}
+
+@article{Shen2023,
+  author  = {Shen, C. and Appling, A.P. and Gentine, P. and Bandai, T. and Gupta, H.
+             and Tartakovsky, A. and Baity-Jesi, M. and Fenicia, F. and Kifer, D.
+             and Li, L. and Liu, X. and Ren, W. and Zheng, Y. and Harman, C.J.
+             and Clark, M. and Farthing, M. and Feng, D. and Kumar, P. and Aboelyazeed, D.
+             and Rahmani, F. and Song, Y. and Beck, H.E. and Bindas, T. and Dwivedi, D.
+             and Fang, K. and Höge, M. and Rackauckas, C. and Mohanty, B. and Roy, T.
+             and Xu, C. and Lawson, K.},
+  title   = {Differentiable modelling to unify machine learning and physical models
+             for geosciences},
+  journal = {Nature Reviews Earth \& Environment},
+  volume  = {4},
+  number  = {8},
+  pages   = {552--567},
+  year    = {2023},
+  note    = {Review de differentiable modeling en geosciences. Marco conceptual del
+             wedge "diferenciable" de hydroflux. Cita obligada en sección 3 del review.}
 }
 
 % =============================================================================

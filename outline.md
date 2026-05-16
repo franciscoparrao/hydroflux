@@ -19,6 +19,14 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 
 ---
 
+## Wedge en un párrafo
+
+> *Versión canónica del wedge — citable directamente en README, intro de papers, propuestas Fondecyt. Cambios sustantivos a este párrafo deben propagarse en paralelo a `README.md` y `state-of-the-art.md` (gap final).*
+
+**hydroflux es el solver acoplado de peligros hidrometeorológicos que aún no existe**: integra lluvia → falla de ladera → propagación granular → inundación en un mismo engine numérico, diferenciable de extremo a extremo para calibración por gradiente y problemas inversos, ejecutado nativamente sobre GPU desde el primer commit (Rust + wgpu/CUDA), escalable a las 15 cuencas BNA continentales chilenas sobre cluster, y trazable bit a bit gracias a project files de texto plano versionables con Git y CI/CD. La defensibilidad del wedge no está en ninguna de esas cinco dimensiones por separado — cada una ya existe parcialmente en algún solver — sino en su **intersección**: ningún proyecto vigente puede pivotar a cubrirla sin reescribir su núcleo numérico en un lenguaje moderno con ergonomía de autograd, y ningún proyecto en lenguaje moderno tiene la madurez numérica de HEC-RAS, BASEMENT o TELEMAC. Esa estrechez es precisamente el espacio que hydroflux ocupa por construcción.
+
+---
+
 ## Arco multi-año
 
 ### Año 1 — 2026 (durante postdoc DICYT, fase actual)
@@ -141,3 +149,4 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 | Fecha | Cambio |
 |---|---|
 | 2026-05-15 | Outline inicial creado. Decisiones: vinculado al postdoc (sí), nombre tentativo (hydroflux), wedge (acoplado + diferenciable + GPU + escala). |
+| 2026-05-16 | Cierre fase 2026 Q2: state-of-the-art.md con 12 fichas + síntesis gap final + cross-link; references.bib con 30 entries; wedge canónico en 1 párrafo añadido (replicado en README). Próxima fase activa: 2026 Q3 (prototipo Saint-Venant 1D). |
