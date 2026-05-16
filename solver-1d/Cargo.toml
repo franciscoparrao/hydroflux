@@ -1,0 +1,11 @@
+[package]
+name = "hydroflux-solver-1d"
+version = "0.1.0-dev"
+edition.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+ndarray.workspace = true
+
+[dev-dependencies]
+approx.workspace = true

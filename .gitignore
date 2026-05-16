@@ -1,7 +1,10 @@
 # Rust
 target/
 **/*.rs.bk
-Cargo.lock  # se versiona solo en binarios finales, no en libs
+# Cargo.lock: ignorar mientras el workspace sea una librería de investigación.
+# Cuando aparezca un binario final (CLI runner, benchmark fijo), versionarlo
+# para reproducibilidad. Decidir caso por caso en el primer release público.
+Cargo.lock
 
 # Python (cuando aparezca)
 __pycache__/

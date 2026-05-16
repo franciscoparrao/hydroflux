@@ -1,0 +1,18 @@
+# hydroflux workspace
+#
+# Cada componente del solver (1D, 2D, coupling, …) es su propio crate.
+# Ver outline.md § "Convenciones" en CLAUDE.md.
+
+[workspace]
+resolver = "3"
+members = [
+    "solver-1d",
+]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+
+[workspace.dependencies]
+ndarray = "0.16"
+approx  = "0.5"
