@@ -187,12 +187,214 @@ problems and issues a community invitation. Section 6 concludes.
 
 # 2 — The open-source landscape
 
-*(Pendiente — usar las 12 fichas de `state-of-the-art.md` y la tabla
-maestra como Figura 1. Estructurar por familias: legacy FORTRAN-based
-(HEC-RAS, TELEMAC, Delft3D, GeoClaw), C++ FV/FE (LISFLOOD-FP, BASEMENT,
-Iber, SRH-2D, MIKE, TUFLOW, Kratos), and Python-orchestrated (ANUGA).
-Discuss each across the same axes: numerical scheme, parallelism,
-license, regulatory acceptance, extensibility.)*
+We survey twelve solvers spanning the regulatory, academic and
+commercial tracks of two-dimensional flood and shallow-water modelling.
+Table 1 (Figure 1) consolidates the comparison across eight axes;
+the discussion below organises them into three lineages whose distinct
+design philosophies illuminate what the landscape collectively solves
+and what it collectively misses. Each ficha was assembled from the
+solver's primary documentation, the foundational paper or papers, and
+cross-checked against the most recent published applications we could
+locate; uncertainties on version numbers and feature availability are
+flagged in the project's `state-of-the-art.md` companion document.
+
+**Table 1. Twelve representative shallow-water solvers across eight
+structural axes.** Lic. = license; Reg. = regulatory acceptance;
+Coup. = native coupling to non-hydraulic hazards (sediment or
+landslide).
+
+| Solver | Language | Scheme | Dim | GPU | Diff. | Lic. | Reg. | Coup. |
+|---|---|---|---|---|---|---|---|---|
+| HEC-RAS | FORTRAN + C# | FV / FD | 1D, 2D | partial | — | free, closed | FEMA, DGA, EU | — |
+| LISFLOOD-FP | C++ | inertial FV | 2D | CUDA | — | GPL | UK EA | — |
+| BASEMENT | C++ | FV well-balanced HLLC | 2D, (3D) | — | — | free, closed | academic | sediment |
+| TELEMAC-MASCARET | FORTRAN | FE | 1D, 2D, 3D | — | — | LGPL | EDF / EU | — |
+| ANUGA | Python + C | FV central-upwind | 2D | — | — | GPL | partial (AU) | — |
+| Iber | C++ | FV upwind | 2D | recent | — | free, closed | España / LATAM | — |
+| SRH-2D | C++ | implicit FV | 2D | — | — | free, closed | USBR / FEMA | sediment |
+| MIKE 21 / Flood | C++ | FD/FV (ADI, FM) | 2D, (3D) | yes | — | commercial | global | sediment, waves |
+| TUFLOW (HPC, FV) | C++ | FV explicit | 2D | CUDA mature | — | commercial | AU, UK, US | — |
+| Delft3D | FORTRAN + C++ | FD/FV (ADI, FM) | 2D, 3D | partial | — | LGPL | NL / global | sediment, waves |
+| GeoClaw | FORTRAN + Python | FV Godunov + AMR | 2D | — | — | BSD | tsunami benchmarks | — |
+| Kratos SW app | C++ + Python | FE | 2D, 3D | partial | — | BSD | academic | multiphysics |
+
+## 2.1 The regulatory FORTRAN heritage
+
+Four of the twelve solvers carry their numerical kernels in FORTRAN,
+the legacy of computational hydraulics through the 1970s and 1980s.
+**HEC-RAS** [@Brunner2020] is the regulatory anchor: a 1D unsteady
+Saint-Venant solver based on the implicit Preissmann box scheme,
+augmented since version 5 with a 2D module using an implicit
+finite-volume discretisation with sub-grid bathymetry. The user faces a
+Windows-only GUI and binary project files; the FORTRAN core is closed
+and OpenCL GPU acceleration was added in version 6.x for the 2D module
+[verify exact version]. HEC-RAS's strengths are real — FEMA approval
+for FIRM mapping in the US, broad LATAM adoption including in Chile,
+deep integration with HEC-HMS for hydrology — but its lineage forecloses
+the modernisation paths discussed in §1.
+
+**TELEMAC-MASCARET** [@Hervouet2007], maintained by an opensource
+consortium led by Électricité de France, is a finite-element suite
+across 1D (MASCARET), 2D and 3D, with companion modules for sediment
+(SISYPHE / GAIA), waves (TOMAWAC), and water quality (WAQTEL). Its
+unstructured triangular meshes scale to massive MPI parallelism on
+CPU clusters; FORTRAN 90/95 with Python build scripts hold the system
+together. LGPL licensing has allowed academic forks and reproducible
+applications, especially in French and EU regulatory contexts, but
+contributing to the core remains demanding because of the build system
+fragility and the cognitive overhead of legacy FORTRAN.
+
+**Delft3D** [@Lesser2004] from Deltares occupies the riverine-to-
+coastal continuum. The classical Delft3D-FLOW uses a finite-difference
+ADI scheme on curvilinear structured grids; the newer D-Flow FM module
+uses a finite-volume formulation on unstructured flexible meshes. The
+suite is famous for its module ecosystem — D-Morphology for sediment,
+SWAN coupling for waves, D-WAQ for water quality, D-PART for Lagrangian
+tracers, D-Ecology for ecological modelling — and for its size: the
+learning curve is the dominant adoption cost for new groups. Opensource
+under LGPL since 2011, GPU acceleration remains partial and confined to
+specific components.
+
+**GeoClaw** [@LeVeque2011], part of the Clawpack family from the
+University of Washington, brings a different design priority: adaptive
+mesh refinement (AMR) on block-structured Cartesian grids, driven by a
+Godunov-type augmented Riemann solver well-balanced with respect to
+lake-at-rest over arbitrary topography. The package is optimised for
+tsunami propagation and inundation, validated against the NTHMP
+benchmark suite, and used in hindcast and forecast work for the 2004
+Indian Ocean, 2010 Chile, and 2011 Tōhoku events. GeoClaw is BSD-
+licensed, FORTRAN-driven, and lacks first-class GPU support; CUDA forks
+have appeared but are not part of the canonical release.
+
+This first family — HEC-RAS, TELEMAC, Delft3D, GeoClaw — shares a
+common architectural debt: the numerical work happens in FORTRAN, the
+orchestration is bolted on in higher languages, and any modern
+extension (GPU, autograd, plugin coupling) collides with a build chain
+that nobody refactors lightly. Where the family has invested heavily,
+the depth is genuine; where it has not, the gap is structural.
+
+## 2.2 The C++ finite-volume mainstream
+
+A second family — six of the twelve solvers — was built more recently
+on C++ finite-volume foundations. The architectural choice opened up
+clearer paths to GPU acceleration and modular extensibility, but came
+with its own constraints around openness and ergonomics.
+
+**LISFLOOD-FP** [@BatesDeRoo2000; @Bates2010; @Neal2012] from the
+University of Bristol pioneered the inertial-approximation scheme: a
+deliberate simplification of the shallow-water momentum equation that
+discards the convective term, sacrificing transcritical accuracy for
+dramatic gains in stability and computational cost. The simplification
+made continental-scale 2D flood simulation tractable (CAMA-Flood and
+similar applications followed), and a mature CUDA implementation
+delivers GPU acceleration on structured raster grids. The sub-grid
+channel model [@Neal2012] addresses the under-resolution problem of
+coarse DEMs. GPLv3 since 2013, LISFLOOD-FP is one of the two open-
+source solvers in the survey with production-grade GPU. Its
+limitations are precisely the physics it traded away: dam break,
+debris flow front propagation, and other transcritical regimes are
+outside its domain of validity.
+
+**BASEMENT** [@Vetsch2020] from VAW / ETH Zürich is the methodological
+counterpoint: a well-balanced HLLC Riemann solver on unstructured
+triangular meshes, with robust wetting-drying treatment, a mature
+sediment-morphodynamics coupling, and a Qt-based GUI for setup and a
+companion BASEmesh utility for mesh generation. The numerics are
+production quality and the Swiss alpine validation corpus is
+unmatched. Critically, the source code is *not* publicly available:
+binary distribution under a free-academic-use licence is the norm,
+which limits forking and extension by external groups.
+
+**Iber** [@Blade2014], developed by a consortium of Galician (GEAMA-
+UDC), Catalan (Flumen-UPC) and Spanish (CEDEX) groups, offers an
+upwind FV scheme on unstructured triangular meshes with extensive
+modules for transport, ecology, and rainfall-runoff. It has wide
+adoption in Spanish-speaking communities, including substantial use in
+Chile, Argentina and Mexico. Like BASEMENT, Iber is free but closed-
+source; its Windows-bound GUI further constrains scripting workflows.
+
+**SRH-2D** [@Lai2010] from the US Bureau of Reclamation uses a point-
+implicit FV scheme on hybrid quad/triangle meshes — the implicit time
+stepping permits larger time steps for slow river flow at the cost of
+more expensive per-step solves. SRH-2D is free to use but requires
+Aquaveo's SMS as a commercial pre- and post-processor, complicating
+unattended scripting. It is FEMA-acceptable for regulatory mapping.
+
+The **commercial pair** — **MIKE 21 / MIKE Flood** from DHI and
+**TUFLOW** from BMT — represents the enterprise tier of the C++ FV
+mainstream. Both are closed-source, both carry licence fees of order
+USD 5,000–10,000 per seat per year, and both have substantial GPU
+investments — TUFLOW HPC in particular has the most mature CUDA-based
+flood solver in commercial practice. They are widely regulator-
+accepted and supported by professional services. Their closure to
+forking and inspection is the structural blocker for the open-science
+agenda articulated in §1.
+
+The C++ FV mainstream solved the *language-modernisation* problem of
+the FORTRAN heritage and, in the LISFLOOD-FP and TUFLOW HPC cases,
+the *GPU-acceleration* problem. It did not solve the *openness* problem
+(BASEMENT, Iber, SRH-2D, MIKE and TUFLOW are closed), nor the
+*autodifferentiability* problem (no solver in the family ships
+gradients), nor the *coupling* problem (sediment is the deepest
+non-hydraulic coupling available, and only in BASEMENT, Delft3D and
+MIKE — landslide propagation remains entirely outside the engine).
+
+## 2.3 Python orchestration and multiphysics frameworks
+
+Two solvers represent design experiments away from the monolithic
+compiled-kernel pattern. **ANUGA** [@Roberts2015] from Geoscience
+Australia uses Python for orchestration and Cython-wrapped C for the
+hot inner loops of an unstructured-triangular FV scheme with a
+Kurganov–Petrova-type central-upwind discretisation
+[@KurganovPetrova2007]. The Python orchestration layer makes ANUGA the
+most pedagogically accessible solver in the survey: full setups fit in
+a Jupyter notebook, and the entry barrier for graduate students is the
+lowest. The cost is performance: Python overhead dominates wall time
+on small problems and the parallelisation story is limited.
+Surprisingly, despite its Python frontend, ANUGA does not integrate
+with JAX or PyTorch for autograd — the C-extension kernel is not
+designed for transparent gradient flow.
+
+**Kratos Multiphysics** from CIMNE Barcelona is not a flood solver per
+se but a multiphysics framework with a `ShallowWaterApplication`
+module among many others (CFD, structural, FSI, contact, sediment).
+The framework is BSD-licensed, actively developed, and engineered for
+extensibility through a plugin architecture — features that make it
+uniquely suited to *experimental* coupling between regimes. Its
+shallow-water module is not production-grade for regulatory inundation
+modelling, however; the cost of generality is the absence of focused
+optimisation that the dedicated solvers benefit from.
+
+## 2.4 Synthesis: what the landscape solves and what it doesn't
+
+Read across families, the survey produces a clear pattern. The mature
+*numerical* work is done: well-balanced finite-volume schemes
+[@Audusse2004], HLL and HLLC Riemann solvers [@Toro2009; @Toro1994],
+robust wetting-drying, and sub-grid representations of unresolved
+features (channels, buildings, vegetation) are all available in
+production codes. The infrastructure for *regulatory adoption* is also
+in place: HEC-RAS, MIKE, TUFLOW, SRH-2D, BASEMENT and Iber together
+cover the regulatory and consultancy markets in most flood-prone
+jurisdictions. The community has *open-source representatives* in
+LISFLOOD-FP, TELEMAC, Delft3D, ANUGA and GeoClaw.
+
+What the landscape does *not* yet have is a single solver — in any
+licence — that crosses four further thresholds simultaneously:
+
+1. an **open codebase auditable and forkable** by any user, with
+   text-based project files that can be diffed, versioned and reviewed;
+2. a **modern host language** in which gradient-flow autodifferentiation
+   and modern parallelism are first-class rather than retrofitted;
+3. **GPU as a first-class execution target**, not as an afterthought
+   bolted on after a CPU-first design;
+4. **native coupling** to the non-hydraulic regimes of the
+   hydrometeorological hazard cascade — slope failure, granular
+   propagation — in a single conservative engine rather than across
+   file-based handoffs.
+
+Section 3 develops these four thresholds as the structural gaps that
+define the opening for the next generation of solvers, and the
+opportunity space for hydroflux.
 
 # 3 — Four unresolved gaps
 
