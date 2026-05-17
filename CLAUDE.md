@@ -113,4 +113,11 @@ Si llegás aquí en sesión nueva:
 
 ## Memoria persistente
 
-El estado del proyecto se sincroniza con el contexto persistente del postdoc en `~/.claude/session_state/postdoc.json` cuando trabajés acá. Comando: `guarda el contexto` desde una sesión dentro de este directorio.
+El estado del proyecto vive en su **propio** contexto persistente: `~/.claude/session_state/hydroflux.json`. **No se mezcla con `postdoc.json`** — esta línea sobrevive al postdoc (sigue activa hasta Fondecyt Regular 2032+) y sus decisiones técnicas (Riemann solvers, releases, benchmarks numéricos) diluirían el contexto del postdoc, que está enfocado en Paper 1 BEGE y obligaciones DICYT.
+
+Comandos desde una sesión dentro de este directorio:
+- `restaura el contexto` — cargar estado de `hydroflux.json`
+- `guarda el contexto` — merge incremental con `hydroflux.json`
+- `muestra el contexto` — ver contenido actual
+
+Si tocás temas que afectan al postdoc como un todo (e.g., un paper de hydroflux cuenta como obligación DICYT, o se decide reasignar tiempo entre líneas), reflejarlo también en `postdoc.json` desde una sesión en el directorio padre.
