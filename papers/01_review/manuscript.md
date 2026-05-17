@@ -36,26 +36,154 @@ keywords: [shallow water equations, finite volume, well-balanced,
 
 # 1 — Introduction
 
-*(Pendiente — primer draft próxima sesión.)*
+Flood hazard modelling sits in a peculiar position. The dominant solver
+in regulatory practice — the US Army Corps of Engineers' HEC-RAS
+[@Brunner2020] — has not fundamentally changed since the 1990s: a
+FORTRAN computational kernel wrapped in a Windows GUI, project files in
+proprietary binaries, no native GPU, no automatic differentiation, no
+mechanism for coupling to non-hydraulic hazards. Around it, the wider
+scientific computing landscape has been rebuilt twice over. The first
+rebuild brought general-purpose GPUs and high-level parallel
+programming; the second is bringing differentiable programming as a
+first-class citizen, with reverse-mode automatic differentiation
+flowing transparently through tens of thousands of lines of physical
+code. Hydraulics has watched both rebuilds happen elsewhere.
 
-Pillars to argue in this section:
+This paper argues that the conjunction of these two unbridged
+transitions, together with two further structural gaps — the absence of
+truly *coupled* hydrometeorological hazard simulation in a single
+engine, and the legacy-language ceiling on extensibility — defines a
+narrow but well-shaped opening for the next decade of open-source flood
+science.
 
-- The regulatory dominance of HEC-RAS as both an enabler (universal
-  reference) and a constraint (Windows binaries, no autograd, no
-  coupling). Cite @Brunner2020 for the manual.
-- Why open-source matters beyond ideology: reproducibility (the science
-  reproducibility crisis), customisation (research extensions can be
-  forked), and ML integration (autograd-friendly hooks).
-- Why coupled hazards matter, with Chile-specific examples: Atacama
-  2015, Maule 2010 co-seismic landslides, Huasco episodic debris flows.
-  These cannot be modelled by either a flood solver or a landslide
-  solver alone — the coupling is the science.
-- Why differentiability matters: calibration by gradient (Manning
-  field, infiltration parameters), inverse problems (rainfall from
-  inundation footprints), and surrogate ML models trained against the
-  physical solver. Cite @Tsai2021, @Feng2022, @Shen2023 for the
-  differentiable hydrology lineage.
-- The outline of this paper.
+## 1.1 The regulatory and the open-source tracks have diverged
+
+HEC-RAS is the regulatory anchor of riverine flood modelling in the
+United States and a *de facto* reference in many other jurisdictions —
+the Chilean Dirección General de Aguas (DGA), the European Floods
+Directive workflows, and most engineering consultancy practice
+worldwide. Its strengths are real: a decades-long calibration record
+against documented floods, deep integration with HEC-HMS for rainfall-
+runoff and with HEC-GeoRAS / RAS Mapper for geospatial pre- and post-
+processing, and a body of authoritative documentation. But the same
+properties that consolidated its dominance — Windows-only binaries,
+proprietary project formats, a closed kernel — make it a poor
+substrate for modern computational science. Reproducibility (binary
+artefacts that cannot be diffed, versioned, or audited), customisation
+(no path for a research group to add a non-Newtonian sediment routine),
+and machine-learning integration (no gradients to back-propagate
+through) are blocked at the file format and language level, not by
+choice but by lineage.
+
+An open-source track has developed in parallel over the past two
+decades. LISFLOOD-FP [@BatesDeRoo2000; @Bates2010] from the University
+of Bristol, BASEMENT [@Vetsch2020] from ETH Zürich, TELEMAC-MASCARET
+[@Hervouet2007] from EDF, ANUGA [@Roberts2015] from Geoscience
+Australia, Iber [@Blade2014] from a Galician–Catalan consortium, SRH-2D
+[@Lai2010] from the US Bureau of Reclamation, Delft3D [@Lesser2004]
+from Deltares, GeoClaw [@LeVeque2011] from the University of
+Washington, and Kratos Multiphysics from CIMNE Barcelona — together
+with the proprietary-but-comparable MIKE 21 from DHI and TUFLOW from
+BMT — span the regulatory and research tracks across most of the
+problem space. Each solved part of the modernisation problem (TUFLOW
+HPC delivered mature GPU acceleration; ANUGA put a Python orchestration
+layer on top of compiled kernels; LISFLOOD-FP and Delft3D released
+their cores under permissive licences). None, to our knowledge, has
+delivered the conjunction of automatic differentiability, GPU-native
+execution, and physical coupling to landslide and debris-flow processes
+that the next decade of flood science will need.
+
+## 1.2 Three orthogonal motivations converge
+
+**Open-source as scientific infrastructure.** The reproducibility
+crisis in computational science is by now well documented; binary,
+GUI-mediated workflows fail every column of the FAIR data principles
+[@WilkinsonFAIR2016] *(TODO confirm exact citation in bib)* and almost
+every clause of the principles for FAIR software. The science published
+on top of HEC-RAS is not less rigorous than the science published on
+top of LISFLOOD-FP, but it is structurally less *auditable*: a
+reviewer cannot diff two `.prj` files in a meaningful way, nor can a
+graduate student fork a regulator's friction parameterisation to test a
+hypothesis. The shift toward open solvers is not ideological; it is the
+quiet completion of a methodological transition that biology and
+astronomy completed a decade earlier.
+
+**Coupled hazards as the actual phenomenology.** Real natural-hazard
+cascades do not partition themselves along the lines of our model
+codes. The 2015 Atacama event in northern Chile started as anomalous
+warm-front rainfall over a previously dry semiarid basin, triggered
+hundreds of shallow landslides on slopes whose pore pressure had
+adjusted to a different climate regime [@Wilcox2016AtacamaFlash]
+*(TODO confirm bib)*, mobilised debris flows down ephemeral channels,
+and produced flash inundation in towns sited along outwash fans. The
+2010 Maule earthquake triggered an immediate co-seismic landslide
+inventory of more than one thousand documented features
+[@Serey2019MauleInventory] *(TODO confirm bib)*, many of which
+subsequently re-mobilised under the post-seismic precipitation regime.
+Episodic debris flows in the Huasco basin have been the subject of
+recurrent civil-protection events through the 2010s. In each case the
+hazard chain crosses three or four constitutive regimes — Richards-type
+infiltration, slope stability, granular propagation, shallow-water
+inundation — that today are simulated by entirely distinct code
+families with file-based handoffs between them. The handoffs lose
+conservation, lose synchronisation, and lose gradient information.
+
+**Differentiable physics as the connecting tissue.** Differentiable
+modelling has consolidated rapidly in hydrology over the past five
+years, from the differentiable parameter-learning approach of
+@Tsai2021 to the regionalised process-based learners of @Feng2022 and
+the unifying review of @Shen2023. The pattern is unambiguous: where
+gradient information is available through a physical model, calibration
+becomes orders of magnitude cheaper than gradient-free alternatives,
+inverse problems become tractable, and hybrid models that combine
+physical constraints with neural-network corrections become a default
+rather than an experiment. The shallow-water flood community has been
+mostly absent from this lineage — not because flood physics is harder
+to differentiate (the operators are local and explicit, an easier case
+than Richards-type infiltration), but because no production-grade flood
+solver was written in a language whose autograd story is mature. The
+absence is now structurally consequential: ML-physics hybrid models in
+hydrology converge faster than physics-only ones, and the flood
+community cannot join the consolidation without rebuilding from the
+language up.
+
+## 1.3 What this paper does — and does not — do
+
+The contribution of this paper is in three layers. *First*, we offer a
+structured comparative survey of twelve representative
+two-dimensional shallow-water solvers (§2) drawn from regulatory,
+academic and commercial practice; we read each across nine consistent
+axes (numerical scheme, parallelism, openness, regulatory acceptance,
+extensibility, *inter alia*). *Second*, we use the survey to identify
+four convergent gaps in the open-source landscape — compromised
+openness, legacy languages, GPU as exception, and the absence of
+single-engine coupling — together with a cross-cutting fifth: the
+absence of native differentiability across the whole set (§3). *Third*,
+we propose a research roadmap (§4) anchored in a 1D building block
+already in working order and validated against analytical references,
+and we close with a list of open research problems for which we invite
+external collaboration (§5).
+
+We are deliberate about what this paper is *not*. It is not a
+benchmarking study against HEC-RAS or any single commercial competitor:
+no calibrated comparison is offered, and none of the validation
+exercises here purport to replace the regulatory acceptance that those
+solvers have accumulated over decades. It is not a software user
+manual; that role is filled by the repository documentation. It is not
+a synthesis of the literature on each individual hazard regime — we
+draw on those literatures, but our object of study is the *space
+between* the constitutive families. It is best read as an opinionated
+roadmap document for the open-source flood community over the second
+half of the 2020s.
+
+The remainder of the paper is structured as follows. Section 2 surveys
+the twelve solvers and presents the comparative master table (Figure
+1). Section 3 articulates the four gaps. Section 4 lays out the
+hydroflux roadmap together with the validation evidence for its first
+1D building block, including a flagship demonstration on two
+contrasting Chilean Andean reaches (Río Maule, Mediterranean-temperate;
+Río Huasco, semiarid Andean). Section 5 lists the open research
+problems and issues a community invitation. Section 6 concludes.
 
 # 2 — The open-source landscape
 
