@@ -13,6 +13,7 @@
 pub mod boundary;
 pub mod flux;
 pub mod geometry;
+pub mod io;
 pub mod riemann;
 pub mod source;
 pub mod state;
@@ -24,6 +25,7 @@ pub const GRAVITY: f64 = 9.81;
 pub use boundary::{Boundaries, Boundary, Side, ghost_cell};
 pub use flux::Flux;
 pub use geometry::Channel1D;
+pub use io::{IoError, read_channel, write_bed, write_depth, write_discharge};
 pub use riemann::hll_flux;
 pub use source::manning_friction_step;
 pub use state::{Conserved, Primitive};
