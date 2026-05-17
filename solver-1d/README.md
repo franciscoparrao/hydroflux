@@ -16,7 +16,9 @@ Prototipo en construcción — ver `outline.md` § "Plan Año 1 Fase 2".
 - [x] Source terms — bed slope well-balanced (Audusse 2004) integrado en `update.rs`; Manning friction semi-implícita en `source.rs` como operator-split fractional step
 - [x] Tests well-balanced: lake-at-rest preservado sobre bed inclinado linealmente y sobre bed con Gaussian bump (η constante, u=0)
 - [x] Dam break wet-wet (Stoker 1957) — `tests/dam_break.rs`. L1(h) ≈ 4e-3 a n=400; convergencia empírica ~0.81 (esperado para HLL+1er orden con shock). Resultados completos en `../benchmarks/dam-break-results.md`.
-- [ ] Test MacDonald steady-state con fricción (valida operator splitting completo en steady-state)
+- [x] MacDonald uniform-flow steady-state — `tests/macdonald_uniform.rs`. Valida que bed slope (Audusse) + Manning friction cancelan al `h_n` analítico, drift ~1e-5/1e-4 en (h,u) sobre 5 s en el slab interior. Limitación documentada: la falta de inflow BC genera capa límite upstream que se propaga downstream a velocidad de onda; assertion restringida al slab central. Resultados completos en `../benchmarks/macdonald-uniform-results.md`.
+- [ ] Inflow/outflow BCs (`Boundary::Discharge(q)` upstream + `Boundary::Depth(h)` o `::Critical` downstream)
+- [ ] MacDonald con `h(x)` variable (requiere las BCs anteriores)
 - [ ] Toro 1-5 1D (incluye casos con bed seco → requiere two-rarefaction wave-speed estimate, Toro 2009 §10.5.4)
 - [ ] I/O DEM 1D vía SurtGIS → GeoTIFF de outputs
 
