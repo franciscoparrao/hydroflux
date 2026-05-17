@@ -15,9 +15,9 @@ Prototipo en construcción — ver `outline.md` § "Plan Año 1 Fase 2".
 - [x] Tests de invariantes: lake-at-rest bit-exact, conservación de masa con walls, no-explosión con transmissive
 - [x] Source terms — bed slope well-balanced (Audusse 2004) integrado en `update.rs`; Manning friction semi-implícita en `source.rs` como operator-split fractional step
 - [x] Tests well-balanced: lake-at-rest preservado sobre bed inclinado linealmente y sobre bed con Gaussian bump (η constante, u=0)
-- [ ] Test dam break analítico wet bed (Stoker 1957)
-- [ ] Test MacDonald steady-state con fricción
-- [ ] Toro 1-5 1D
+- [x] Dam break wet-wet (Stoker 1957) — `tests/dam_break.rs`. L1(h) ≈ 4e-3 a n=400; convergencia empírica ~0.81 (esperado para HLL+1er orden con shock). Resultados completos en `../benchmarks/dam-break-results.md`.
+- [ ] Test MacDonald steady-state con fricción (valida operator splitting completo en steady-state)
+- [ ] Toro 1-5 1D (incluye casos con bed seco → requiere two-rarefaction wave-speed estimate, Toro 2009 §10.5.4)
 - [ ] I/O DEM 1D vía SurtGIS → GeoTIFF de outputs
 
 ## Decisiones tomadas (2026-05-16)
