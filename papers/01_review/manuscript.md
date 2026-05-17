@@ -398,18 +398,165 @@ opportunity space for hydroflux.
 
 # 3 — Four unresolved gaps
 
-*(Pendiente — expandir el "gap final" canónico de `state-of-the-art.md`.
-Cada gap como subsección con ejemplos concretos de las 12 fichas:)*
+The twelve-solver survey of §2 lets us articulate four convergent gaps
+in the contemporary shallow-water landscape, together with a fifth
+that cuts across all four. None of the gaps is a flaw of any individual
+solver; each is a structural property of the *intersection* of design
+choices that the field has made — the inheritance of regulatory
+adoption, language choice, hardware era and disciplinary boundary —
+over the last three decades. We articulate them here as the design
+constraints that the next generation of solvers must address.
 
-## 3.1 Apertura comprometida
+## 3.1 Compromised openness
 
-## 3.2 Lenguaje legacy
+The solvers that dominate regulatory practice are predominantly
+closed or proprietary: HEC-RAS, MIKE, TUFLOW, SRH-2D, Iber and
+BASEMENT together account for the great majority of regulator-accepted
+flood mapping workflows worldwide, yet not one of them allows a
+research group to audit, fork or extend the numerical core. The
+solvers that *are* open under permissive or copyleft licences —
+TELEMAC, Delft3D, ANUGA, GeoClaw and Kratos — carry compensating
+constraints: FORTRAN build systems whose maintenance has been
+characterised in the literature as a barrier to entry [@verify
+reference], curve-of-learning issues for the multiphysics frameworks,
+and (in ANUGA's case) cadence of releases that has not kept pace with
+the contemporary research literature.
 
-## 3.3 GPU as exception
+The cost of compromised openness is twofold. Scientifically, the
+ability to *diff* two simulation setups — to test, in a pull-request
+discussion, what one parameter change does — is unavailable in any
+GUI-binary workflow; this collides directly with the principles for
+FAIR research software [@WilkinsonFAIR2016]. Practically, regulatory
+science loses an entire layer of external review: a flood map filed
+with HEC-RAS .prj and .g0X files is opaque to any auditor without
+HEC-RAS installed, and a methodological objection cannot be expressed
+through a code patch. Open codebases with text-based project files are
+the precondition for treating flood modelling as part of normal
+scientific infrastructure rather than as engineering deliverable.
+
+## 3.2 Legacy languages
+
+Without exception across the twelve solvers, the production numerical
+kernel is written in FORTRAN or C++. FORTRAN dominates the regulatory-
+heritage family (HEC-RAS, TELEMAC, Delft3D-FLOW, GeoClaw); C++ holds
+the FV mainstream (LISFLOOD-FP, BASEMENT, Iber, SRH-2D, MIKE, TUFLOW,
+Kratos); ANUGA orchestrates from Python but the inner loops are
+Cython-wrapped C. No solver in the survey is written in a language
+that delivers memory safety by construction, ergonomic gradient flow
+through the entire program, or first-class integration with the
+contemporary scientific computing stack (Rust, Julia, Mojo).
+
+This is a deeper constraint than language preference. Memory-safety
+bugs in production hydraulic codes have historically been treated as
+implementation quality issues; the more interesting cost is the *path
+not taken* into automatic differentiation. Reverse-mode autograd is
+trivial in JAX, PyTorch, Flux.jl, and Burn (Rust); it is a major
+research undertaking when retrofitted onto a FORTRAN or pre-2017 C++
+codebase. The pattern in mature scientific software is that
+differentiability is a property of the host language and runtime, not
+of the application code, and that retrofitting it across millions of
+lines of legacy is more expensive than rewriting from scratch in a
+language where it is given. The flood community has not yet faced this
+trade-off explicitly because no working group has paid the rewriting
+cost; §4 argues that the cost is now justified.
+
+## 3.3 GPU as the exception
+
+Two of the twelve solvers in the survey have production-grade GPU
+acceleration: TUFLOW HPC, which is commercial; and the CUDA build of
+LISFLOOD-FP, which is operating on the inertial approximation of the
+shallow-water equations and therefore restricted to subcritical and
+mildly transcritical regimes. The remaining ten solvers either lack
+GPU support entirely (BASEMENT, TELEMAC, ANUGA, SRH-2D, Iber, GeoClaw,
+Kratos), maintain partial GPU acceleration confined to specific modules
+(Delft3D, MIKE), or treat GPU as an opt-in afterthought (HEC-RAS 6.x).
+
+The cost is concentration of computational capacity. Continental-scale
+flood studies — basin-by-basin coverage of a country, or comparative
+hindcasting across climate scenarios — are computationally feasible
+today only in the two solver tracks where GPU is mature, both of which
+are gated either commercially (TUFLOW) or scientifically (LISFLOOD-FP
+inertial). Research groups without supercomputing-class CPU resources
+are effectively excluded from continental flood science with full
+shallow-water physics. A modern solver designed GPU-first from the
+first commit removes this gate; the path requires either CUDA (NVIDIA
+lock-in but mature) or a portable abstraction such as `wgpu` (Vulkan,
+Metal, DirectX, WebGPU at the cost of NVIDIA-specific optimisations).
 
 ## 3.4 No physical coupling in a single engine
 
+The hazard chain *rainfall → slope failure → granular propagation →
+inundation* is implemented in current practice as a pipeline of three
+or four distinct codes that exchange data through files on disk.
+Susceptibility is computed by SHALSTAB [@Montgomery1994], SINMAP
+[@Pack1998] or one of their successors, often as a static map.
+Triggered failures are propagated downslope by DAN3D
+[@HungrMcDougall2009], RAMMS [@Christen2010] or the open-source
+alternative r.avaflow [@Mergili2017], each with its own rheological
+parameterisation. The output debris fan is then handed off to a flood
+solver (one of the twelve in our survey) as a boundary condition or as
+an initial inundation depth.
+
+The losses across each handoff are structural. Conservation of mass
+and momentum is not enforced across the file interface: a slug of
+debris arriving at the floodplain may have a depth and velocity that
+the inundation solver rounds, regrids, or simply ignores. Gradient
+information is lost: even if each individual model were differentiable
+in isolation, the chain rule cannot propagate across a CSV file
+boundary. Temporal synchronisation is approximate: each solver runs at
+its own time-step cadence and synchronises at coarse output intervals,
+which is acceptable for steady analyses but discards the fast
+transients that often define the destructive phase of a debris-flow
+event. The science that needs full-chain coupling — what infiltration
+fraction triggers a debris flow that produces inundation of magnitude
+*M*? — is not asked, because the pipeline cannot answer it. Cite
+@Iverson2000 for the physical triggering picture and @Hungr2005 for
+the classification of regimes that the engine would have to span.
+
 ## 3.5 Cross-cutting: the absence of native differentiability
+
+The four gaps above are independent constraints, but they share a
+common cross-cutting absence: no solver in the survey ships native
+automatic differentiation. Differentiable modelling has consolidated
+rapidly in the adjacent literature of hydrology over the past five
+years — from the differentiable parameter-learning approach of
+@Tsai2021 to the process-based regionalised models of @Feng2022 and
+the synthesising review of @Shen2023 — but the lineage is anchored in
+hydrological response units and conceptual models, not in
+shallow-water finite-volume solvers. The flood community is *absent*
+from this consolidation, not because flood physics is harder to
+differentiate (the operators are local and explicit, easier than
+Richards-type infiltration), but because no production-grade flood
+solver has been written in a language whose autograd story is mature.
+
+The science that this absence forecloses is broad. Calibration of a
+spatially-distributed Manning roughness field across a continental
+basin is a high-dimensional inverse problem that gradient-free methods
+(grid search, Bayesian samplers) handle only at extreme computational
+cost; differentiable solvers reduce it to a stochastic-gradient-descent
+exercise. Inversion of rainfall fields from observed inundation
+footprints — a question that becomes operational when satellite SAR
+imagery is the only forcing constraint — is structurally an adjoint
+problem, intractable without gradient flow. ML-physics hybrid
+architectures, in which a neural-network correction is trained against
+the residuals of a physical model, require gradient information from
+the physical model and are now standard in adjacent fields (subsurface
+hydrology, atmospheric science, glaciology) but absent from flood
+modelling.
+
+## 3.6 The intersection is the gap
+
+These five gaps are not independent design choices that could be
+plugged one by one. They are the consequence of the language, hardware
+era, and disciplinary boundaries that the field inherited. No existing
+solver can pivot to cover the intersection — open and forkable, in a
+modern host language with ergonomic autograd, GPU-first, with native
+coupling to non-hydraulic hazards — without rewriting its numerical
+core. The intersection is narrow precisely because each gap, taken
+alone, would already represent a substantial engineering effort;
+taken jointly, they define a coherent technical agenda whose
+boundaries can be drawn cleanly. Section 4 traces that agenda
+beginning from a 1D building block already in working order.
 
 # 4 — A roadmap: hydroflux
 
