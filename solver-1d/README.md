@@ -18,8 +18,8 @@ Prototipo en construcción — ver `outline.md` § "Plan Año 1 Fase 2".
 - [x] Dam break wet-wet (Stoker 1957) — `tests/dam_break.rs`. L1(h) ≈ 4e-3 a n=400; convergencia empírica ~0.81 (esperado para HLL+1er orden con shock). Resultados completos en `../benchmarks/dam-break-results.md`.
 - [x] MacDonald uniform-flow steady-state — `tests/macdonald_uniform.rs`. Valida que bed slope (Audusse) + Manning friction cancelan al `h_n` analítico, drift ~1e-5/1e-4 en (h,u) sobre 5 s en el slab interior. Limitación inicial documentada: la falta de inflow BC genera capa límite upstream. Resultados completos en `../benchmarks/macdonald-uniform-results.md`.
 - [x] Inflow/outflow BCs — `Boundary::Discharge { q }` y `Boundary::Depth { h }` con bed extendido linealmente. Whole-domain drift cae 3 órdenes de magnitud (4.9% → 9e-5). Nuevo test `uniform_flow_preserved_whole_domain_with_inflow_outflow_bcs`.
-- [ ] `Boundary::Critical` downstream (caso supercrítico)
-- [ ] MacDonald con `h(x)` variable usando las nuevas BCs
+- [x] MacDonald con `h(x) = h_base + amp·sin(2πx/L)` variable — `tests/macdonald_variable.rs`. Valida ciclo Q3 completo (Audusse + Manning + Discharge/Depth). Orden empírico **1.03 limpio** (vs 0.81 del dam break con shock). L1 relativo 0.18 % a n=200. Resultados completos en `../benchmarks/macdonald-variable-results.md`.
+- [ ] `Boundary::Critical` downstream (caso supercrítico / transcrítico)
 - [ ] Toro 1-5 1D (incluye casos con bed seco → requiere two-rarefaction wave-speed estimate, Toro 2009 §10.5.4)
 - [ ] I/O DEM 1D vía SurtGIS → GeoTIFF de outputs
 
