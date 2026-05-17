@@ -787,17 +787,51 @@ implementation is the conversation.
 
 # 6 — Conclusion
 
-*(Pendiente — primer draft próxima sesión.)*
+Twelve representative shallow-water solvers, spanning regulatory,
+academic, and commercial practice, share four convergent structural
+gaps: compromised openness, legacy host languages, GPU as exception
+rather than norm, and the absence of single-engine coupling between
+the hydraulic, slope-stability and granular-propagation regimes that
+make up the actual phenomenology of hydrometeorological hazards.
+Underneath the four runs a cross-cutting fifth: native automatic
+differentiation is absent from every solver in the survey, while the
+adjacent differentiable-hydrology literature has consolidated rapidly
+over the past five years without the flood community on board.
 
-Compact restatement of:
+The gaps are not independent design choices. They are the inheritance
+of language eras, hardware generations and disciplinary boundaries
+that the field accepted three decades ago and has not since
+rearticulated. No single solver can pivot to cover their intersection
+without rewriting its numerical core; and no solver in a modern host
+language has yet accumulated the numerical maturity that the
+production codes carry. The intersection is therefore *narrow by
+construction* — a structural opportunity rather than a market that
+could be eroded incrementally.
 
-- The four gaps we identified (apertura, lenguaje, GPU, coupling) plus
-  the cross-cutting absence of differentiability.
-- The hydroflux wedge as the intersection of all five.
-- The validated 1D building block as evidence that the synthesis is
-  feasible rather than aspirational.
-- The community invitation: the benchmark suite is the standing
-  protocol.
+We have argued that this opportunity is now actionable. The 1D
+building block reported in §4 is not a proposal but a working artefact:
+HLL Riemann flux with Audusse hydrostatic reconstruction, semi-implicit
+Manning friction, physical inflow and outflow boundary conditions, and
+SurtGIS-backed GeoTIFF I/O, validated against three analytical
+references at first-order convergence on smooth flow and the expected
+shock-degraded order on the Stoker dam break, and demonstrated end-to-
+end on two contrasting Chilean Andean reaches. The 2D, GPU, and
+autodifferentiation layers of the multi-year roadmap rest on
+techniques that already exist in adjacent fields; the work is
+*assembly* under coherent design discipline, not discovery against
+unsolved physics.
+
+The deeper claim of this paper is collective rather than individual.
+The next decade of flood science needs an open, differentiable,
+GPU-native, coupled-hazard target that the community can converge on,
+fork, audit, contribute to, and benchmark against. We release
+hydroflux under a permissive licence as one such target. We do not
+claim it will be *the* target — competing implementations in Julia,
+Mojo, or post-2025 Rust dialects will be welcome and probably
+healthy. What we claim is that the *benchmark suite* shared in this
+paper, the *conceptual map of the four gaps* articulated in §3, and
+the *invitation to converge* extended in §5 are the standing protocol.
+The implementation is the conversation that follows.
 
 # Data and code availability
 
