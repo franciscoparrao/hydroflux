@@ -1,0 +1,6 @@
+# Regenerable outputs of this demo. Re-create with the pipeline in README.md.
+output/*.tif
+output/*.tiff
+
+# Keep figure.png and figure.pdf — they are the demo deliverable.
+# Keep centerline.csv — it documents the spatial path used.
