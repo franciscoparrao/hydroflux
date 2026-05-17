@@ -13,7 +13,8 @@ Prototipo en construcción — ver `outline.md` § "Plan Año 1 Fase 2".
 - [x] Boundary conditions: Transmissive + Wall (`boundary.rs`)
 - [x] Loop temporal forward Euler + CFL adaptivo (`update.rs`)
 - [x] Tests de invariantes: lake-at-rest bit-exact, conservación de masa con walls, no-explosión con transmissive
-- [ ] Source terms: bed slope (well-balanced) + Manning friction
+- [x] Source terms — bed slope well-balanced (Audusse 2004) integrado en `update.rs`; Manning friction semi-implícita en `source.rs` como operator-split fractional step
+- [x] Tests well-balanced: lake-at-rest preservado sobre bed inclinado linealmente y sobre bed con Gaussian bump (η constante, u=0)
 - [ ] Test dam break analítico wet bed (Stoker 1957)
 - [ ] Test MacDonald steady-state con fricción
 - [ ] Toro 1-5 1D

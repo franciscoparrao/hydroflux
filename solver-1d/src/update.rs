@@ -1,9 +1,10 @@
 //! Time-stepping for the 1D Saint-Venant solver.
 //!
 //! Explicit forward Euler in time, finite-volume in space, with the HLL
-//! interface flux. Source terms (bed slope, Manning friction) are deferred
-//! to a follow-up commit; this loop assumes a flat, frictionless prismatic
-//! channel.
+//! interface flux and the hydrostatic reconstruction of Audusse et al.
+//! (2004) for well-balanced treatment of the bed-slope source. Manning
+//! friction is applied separately as an operator-split fractional step
+//! (see [`crate::source`]).
 
 use crate::GRAVITY;
 use crate::boundary::{Boundaries, ghost_state};
@@ -40,7 +41,60 @@ pub fn cfl_time_step(states: &[Conserved], dx: f64, cfl: f64) -> f64 {
     }
 }
 
+/// Numerical fluxes at a single interface, in the well-balanced "two-sided"
+/// formulation. `minus` is consumed by the cell on the LEFT of the face;
+/// `plus` is consumed by the cell on the RIGHT. They share `mass` but
+/// differ in `momentum` by a hydrostatic-pressure correction term.
+#[derive(Debug, Clone, Copy)]
+struct FaceFluxes {
+    minus: Flux,
+    plus: Flux,
+}
+
+/// Audusse (2004) well-balanced face flux. Reconstructs the depths at the
+/// face using the higher of the two bed elevations as a virtual interface,
+/// computes the HLL flux on those reconstructed states, and adds the
+/// (`g/2`)(`h² − h*²`) pressure correction on each side.
+///
+/// On a flat bed (`z_left == z_right`) `h*_L = h_left` and `h*_R = h_right`,
+/// the correction vanishes, and the flux degenerates to the plain HLL flux
+/// of the original states — i.e. this generalises the flat-bed update.
+fn well_balanced_face(left: Conserved, z_left: f64, right: Conserved, z_right: f64) -> FaceFluxes {
+    let z_max = z_left.max(z_right);
+    let h_star_left = (left.h + z_left - z_max).max(0.0);
+    let h_star_right = (right.h + z_right - z_max).max(0.0);
+
+    // Reconstructed states carry the original velocities of each side.
+    let u_left = if left.h > 0.0 { left.hu / left.h } else { 0.0 };
+    let u_right = if right.h > 0.0 {
+        right.hu / right.h
+    } else {
+        0.0
+    };
+
+    let f_hll = hll_flux(
+        Conserved::new(h_star_left, h_star_left * u_left),
+        Conserved::new(h_star_right, h_star_right * u_right),
+    );
+
+    let half_g = 0.5 * GRAVITY;
+    FaceFluxes {
+        minus: Flux {
+            mass: f_hll.mass,
+            momentum: f_hll.momentum + half_g * (left.h * left.h - h_star_left * h_star_left),
+        },
+        plus: Flux {
+            mass: f_hll.mass,
+            momentum: f_hll.momentum + half_g * (right.h * right.h - h_star_right * h_star_right),
+        },
+    }
+}
+
 /// One forward-Euler update of the FV solution. Modifies `states` in place.
+///
+/// Includes the well-balanced bed-slope source via hydrostatic
+/// reconstruction. Friction is **not** included here — call
+/// [`crate::source::manning_friction_step`] before or after this step.
 ///
 /// Panics if `states.len() != channel.n_cells()`. The caller is responsible
 /// for keeping `dt` below the CFL bound (see [`cfl_time_step`]).
@@ -58,25 +112,42 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
         return;
     }
 
-    // n+1 interface fluxes: 1 left-boundary face + (n-1) internal faces +
-    // 1 right-boundary face.
-    let mut fluxes: Vec<Flux> = Vec::with_capacity(n + 1);
+    // n+1 face fluxes: face 0 is the left boundary, face n is the right.
+    // Ghost cells inherit the bed elevation of the neighbouring inner cell
+    // (zero-gradient extrapolation on z), so the reconstruction is trivial
+    // at the boundary and the BC reduces to the chosen ghost state.
+    let mut faces: Vec<FaceFluxes> = Vec::with_capacity(n + 1);
 
+    let z_first = channel.bed[0];
     let ghost_left = ghost_state(states[0], bcs.left);
-    fluxes.push(hll_flux(ghost_left, states[0]));
+    faces.push(well_balanced_face(ghost_left, z_first, states[0], z_first));
 
     for i in 0..n.saturating_sub(1) {
-        fluxes.push(hll_flux(states[i], states[i + 1]));
+        faces.push(well_balanced_face(
+            states[i],
+            channel.bed[i],
+            states[i + 1],
+            channel.bed[i + 1],
+        ));
     }
 
+    let z_last = channel.bed[n - 1];
     let ghost_right = ghost_state(states[n - 1], bcs.right);
-    fluxes.push(hll_flux(states[n - 1], ghost_right));
+    faces.push(well_balanced_face(
+        states[n - 1],
+        z_last,
+        ghost_right,
+        z_last,
+    ));
 
-    // FV update: U_i^{n+1} = U_i^n - (dt/dx)(F_{i+1/2} - F_{i-1/2}).
+    // FV update: U_i^{n+1} = U_i^n - (dt/dx)(F^-_{i+1/2} - F^+_{i-1/2}).
+    // Cell `i` consumes the `minus` of its right face and the `plus` of its
+    // left face. Mass is identical in both (no bed correction in continuity);
+    // momentum carries the hydrostatic balance term.
     let dt_dx = dt / channel.dx;
     for i in 0..n {
-        let f_left = fluxes[i];
-        let f_right = fluxes[i + 1];
+        let f_right = faces[i + 1].minus;
+        let f_left = faces[i].plus;
         states[i].h -= dt_dx * (f_right.mass - f_left.mass);
         states[i].hu -= dt_dx * (f_right.momentum - f_left.momentum);
     }
@@ -90,6 +161,29 @@ mod tests {
 
     fn flat_channel(n: usize, dx: f64) -> Channel1D {
         Channel1D::new(Array1::zeros(n), dx, 0.0)
+    }
+
+    fn sloped_channel(n: usize, dx: f64, slope: f64) -> Channel1D {
+        let bed = Array1::from_iter((0..n).map(|i| -(i as f64) * dx * slope));
+        Channel1D::new(bed, dx, 0.0)
+    }
+
+    fn bumpy_channel(n: usize, dx: f64, bump_amp: f64) -> Channel1D {
+        let center = (n as f64) / 2.0;
+        let width_sq = (n as f64).powi(2) / 25.0;
+        let bed = Array1::from_iter((0..n).map(|i| {
+            let x = i as f64;
+            bump_amp * (-((x - center).powi(2) / width_sq)).exp()
+        }));
+        Channel1D::new(bed, dx, 0.0)
+    }
+
+    fn lake_at_rest_on(channel: &Channel1D, eta: f64) -> Vec<Conserved> {
+        channel
+            .bed
+            .iter()
+            .map(|&z| Conserved::new(eta - z, 0.0))
+            .collect()
     }
 
     fn total_mass(states: &[Conserved], dx: f64) -> f64 {
@@ -116,7 +210,6 @@ mod tests {
 
     #[test]
     fn max_wave_speed_matches_textbook_formula() {
-        // h = 1, u = 2 → max signal speed = |u| + sqrt(g h) = 2 + sqrt(9.81).
         let states = [Conserved::new(1.0, 2.0)];
         let expected = 2.0 + (GRAVITY * 1.0).sqrt();
         assert_relative_eq!(max_wave_speed(&states), expected, epsilon = 1e-12);
@@ -130,10 +223,6 @@ mod tests {
 
     #[test]
     fn lake_at_rest_on_flat_bed_is_preserved_exactly() {
-        // Uniform depth, zero velocity, flat bed, transmissive BC: each
-        // interface flux equals F(U) (consistency of HLL), so all flux
-        // differences are exactly zero. Mass and momentum updates subtract
-        // 0.0, an exact IEEE operation. After N steps the state is bit-exact.
         let n = 20;
         let dx = 1.0;
         let h0 = 2.0;
@@ -151,10 +240,56 @@ mod tests {
     }
 
     #[test]
+    fn lake_at_rest_on_sloped_bed_is_preserved() {
+        // η = h + z = const, u = 0 on a linearly descending bed. With
+        // hydrostatic reconstruction the bed-slope source exactly cancels
+        // the hydrostatic-pressure flux, so the lake stays at rest.
+        let n = 30;
+        let dx = 1.0;
+        let slope = 0.05;
+        let eta = 5.0;
+        let channel = sloped_channel(n, dx, slope);
+        let initial = lake_at_rest_on(&channel, eta);
+        let mut states = initial.clone();
+
+        for _ in 0..200 {
+            let dt = cfl_time_step(&states, dx, 0.4);
+            forward_euler_step(&mut states, &channel, Boundaries::WALLS, dt);
+        }
+        for (i, s) in states.iter().enumerate() {
+            assert_relative_eq!(s.h, initial[i].h, epsilon = 1e-10);
+            assert_relative_eq!(s.hu, 0.0, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    fn lake_at_rest_on_bumpy_bed_is_preserved() {
+        // η = const above a fully-submerged Gaussian hill. Same test as
+        // above with a non-monotonic bed; catches asymmetric bugs in the
+        // reconstruction.
+        let n = 50;
+        let dx = 1.0;
+        let bump_amp = 1.5;
+        let eta = 3.0; // safely above max(bed)
+        let channel = bumpy_channel(n, dx, bump_amp);
+        let initial = lake_at_rest_on(&channel, eta);
+        let mut states = initial.clone();
+
+        for _ in 0..200 {
+            let dt = cfl_time_step(&states, dx, 0.4);
+            forward_euler_step(&mut states, &channel, Boundaries::WALLS, dt);
+        }
+        for (i, s) in states.iter().enumerate() {
+            assert_relative_eq!(s.h, initial[i].h, epsilon = 1e-10);
+            assert_relative_eq!(s.hu, 0.0, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
     fn mass_is_conserved_exactly_with_wall_boundaries() {
-        // Gaussian bump + walls: the wall HLL flux has F*.mass = 0 by
-        // anti-symmetry, so the telescoping sum over cells gives ΔM = 0
-        // per step (to roundoff).
+        // Re-asserted under the new well-balanced flux: the wall HLL
+        // mass flux is still 0 by anti-symmetry, so global mass is
+        // conserved to roundoff.
         let n = 50;
         let dx = 1.0;
         let cfl = 0.4;
@@ -172,9 +307,6 @@ mod tests {
 
     #[test]
     fn bump_remains_bounded_with_transmissive_bc() {
-        // Sanity: gaussian bump on flat bed, transmissive BC, many steps.
-        // Depths must remain finite and non-negative; momentum must stay
-        // finite. Mass leaves the domain so total mass is NOT conserved.
         let n = 50;
         let dx = 1.0;
         let cfl = 0.4;
@@ -197,8 +329,6 @@ mod tests {
 
     #[test]
     fn bump_propagates_outward_and_decays() {
-        // After enough time with transmissive BC, the central depth
-        // perturbation must decrease (waves carry mass away from center).
         let n = 50;
         let dx = 1.0;
         let cfl = 0.4;
@@ -213,14 +343,12 @@ mod tests {
             let dt = cfl_time_step(&states, dx, cfl);
             forward_euler_step(&mut states, &channel, Boundaries::TRANSMISSIVE, dt);
         }
-        // Central depth must have dropped from its initial peak.
         assert!(
             states[center].h < h_center_initial,
             "central depth did not decay: started {}, ended {}",
             h_center_initial,
             states[center].h
         );
-        // And must still be above the base (not yet fully drained).
         assert!(
             states[center].h > 0.0,
             "central depth went non-positive: {}",

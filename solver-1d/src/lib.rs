@@ -14,6 +14,7 @@ pub mod boundary;
 pub mod flux;
 pub mod geometry;
 pub mod riemann;
+pub mod source;
 pub mod state;
 pub mod update;
 
@@ -24,5 +25,6 @@ pub use boundary::{Boundaries, Boundary, ghost_state};
 pub use flux::Flux;
 pub use geometry::Channel1D;
 pub use riemann::hll_flux;
+pub use source::manning_friction_step;
 pub use state::{Conserved, Primitive};
 pub use update::{cfl_time_step, forward_euler_step, max_wave_speed};
