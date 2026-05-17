@@ -10,7 +10,10 @@ Prototipo en construcción — ver `outline.md` § "Plan Año 1 Fase 2".
 - [x] Flux físico SWE 1D (`flux.rs`)
 - [x] Riemann solver HLL con tests de consistencia (`riemann.rs`)
 - [x] Geometría de canal uniforme: bed, Δx, Manning (`geometry.rs`)
-- [ ] Loop temporal forward Euler + boundary conditions
+- [x] Boundary conditions: Transmissive + Wall (`boundary.rs`)
+- [x] Loop temporal forward Euler + CFL adaptivo (`update.rs`)
+- [x] Tests de invariantes: lake-at-rest bit-exact, conservación de masa con walls, no-explosión con transmissive
+- [ ] Source terms: bed slope (well-balanced) + Manning friction
 - [ ] Test dam break analítico wet bed (Stoker 1957)
 - [ ] Test MacDonald steady-state con fricción
 - [ ] Toro 1-5 1D

@@ -10,15 +10,19 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod boundary;
 pub mod flux;
 pub mod geometry;
 pub mod riemann;
 pub mod state;
+pub mod update;
 
 /// Standard gravity used throughout the solver, in m/s².
 pub const GRAVITY: f64 = 9.81;
 
+pub use boundary::{Boundaries, Boundary, ghost_state};
 pub use flux::Flux;
 pub use geometry::Channel1D;
 pub use riemann::hll_flux;
 pub use state::{Conserved, Primitive};
+pub use update::{cfl_time_step, forward_euler_step, max_wave_speed};
