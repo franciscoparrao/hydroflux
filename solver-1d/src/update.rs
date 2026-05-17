@@ -7,7 +7,7 @@
 //! (see [`crate::source`]).
 
 use crate::GRAVITY;
-use crate::boundary::{Boundaries, ghost_state};
+use crate::boundary::{Boundaries, Side, ghost_cell};
 use crate::flux::Flux;
 use crate::geometry::Channel1D;
 use crate::riemann::hll_flux;
@@ -113,14 +113,19 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
     }
 
     // n+1 face fluxes: face 0 is the left boundary, face n is the right.
-    // Ghost cells inherit the bed elevation of the neighbouring inner cell
-    // (zero-gradient extrapolation on z), so the reconstruction is trivial
-    // at the boundary and the BC reduces to the chosen ghost state.
+    // Ghost cell state and bed come from the boundary kind via `ghost_cell`:
+    // computational BCs (Transmissive, Wall) leave the bed flat across the
+    // boundary; physical BCs (Discharge, Depth) extend it linearly so the
+    // boundary face carries the same bed jump as interior faces.
     let mut faces: Vec<FaceFluxes> = Vec::with_capacity(n + 1);
 
-    let z_first = channel.bed[0];
-    let ghost_left = ghost_state(states[0], bcs.left);
-    faces.push(well_balanced_face(ghost_left, z_first, states[0], z_first));
+    let (ghost_left, z_ghost_left) = ghost_cell(channel, states[0], bcs.left, Side::Left);
+    faces.push(well_balanced_face(
+        ghost_left,
+        z_ghost_left,
+        states[0],
+        channel.bed[0],
+    ));
 
     for i in 0..n.saturating_sub(1) {
         faces.push(well_balanced_face(
@@ -131,13 +136,12 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
         ));
     }
 
-    let z_last = channel.bed[n - 1];
-    let ghost_right = ghost_state(states[n - 1], bcs.right);
+    let (ghost_right, z_ghost_right) = ghost_cell(channel, states[n - 1], bcs.right, Side::Right);
     faces.push(well_balanced_face(
         states[n - 1],
-        z_last,
+        channel.bed[n - 1],
         ghost_right,
-        z_last,
+        z_ghost_right,
     ));
 
     // FV update: U_i^{n+1} = U_i^n - (dt/dx)(F^-_{i+1/2} - F^+_{i-1/2}).

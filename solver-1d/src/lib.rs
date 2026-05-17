@@ -21,7 +21,7 @@ pub mod update;
 /// Standard gravity used throughout the solver, in m/s².
 pub const GRAVITY: f64 = 9.81;
 
-pub use boundary::{Boundaries, Boundary, ghost_state};
+pub use boundary::{Boundaries, Boundary, Side, ghost_cell};
 pub use flux::Flux;
 pub use geometry::Channel1D;
 pub use riemann::hll_flux;

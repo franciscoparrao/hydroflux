@@ -101,9 +101,35 @@ Quedan deferidos al commit siguiente (que agrega `Boundary::Discharge` y
 - **UK EA 2D benchmarks** (Néelz & Pender 2013) — exige el solver 2D
   (Q1–Q3 2027).
 
+## Update: las BCs físicas eliminan la capa límite
+
+Tras agregar `Boundary::Discharge { q }` (upstream con bed extendido
+linealmente, `z_ghost = 2·z_0 − z_1`) y `Boundary::Depth { h }`
+(downstream con bed extendido análogamente), el test de preservación
+ahora corre sobre el **dominio completo** (no sólo el slab interior).
+Comparación a igualdad de parámetros (`t_end = 5 s`, `dt ~ 0.025 s`,
+~200 pasos):
+
+| BC                   | whole-domain `max ∣Δh/h∣` | whole-domain `max ∣Δu/u∣` | interior slab `max ∣Δh/h∣` | cell 0 `Δh/h` |
+|----------------------|--------------------------:|--------------------------:|---------------------------:|--------------:|
+| Transmissive         |                  4.86e-2  |                  7.10e-2  |                    6.55e-6 |       −4.7e-2 |
+| Discharge + Depth    |                  9.37e-5  |                  2.24e-4  |                    8.21e-9 |       +9.4e-5 |
+
+Tres órdenes de magnitud de mejora en el peor caso. La causa estructural
+(la cara upstream sin bed jump) queda eliminada: con el bed extendido,
+cell 0 recibe la corrección Audusse igual que cualquier celda interior.
+El residual de 1e-4 en `u` es el operator-splitting error de 1er orden,
+ahora distribuido uniformemente en lugar de localizado al boundary.
+
+Test correspondiente: `uniform_flow_preserved_whole_domain_with_inflow_outflow_bcs`
+en `tests/macdonald_uniform.rs` (commit que agregó las BCs físicas).
+
 ## Historial
 
 - **2026-05-17** — Implementación inicial con BCs Transmissive/Wall.
   Documentación de la capa límite upstream/downstream como limitación
-  conocida. Test reducido al slab central interior. Commit asociado:
-  ver `git log -- benchmarks/macdonald-uniform-results.md`.
+  conocida. Test reducido al slab central interior.
+- **2026-05-17** — Agregadas `Boundary::Discharge { q }` y
+  `Boundary::Depth { h }` con bed extendido linealmente. Nuevo test
+  valida preservación sobre el dominio completo; drift cae 3 órdenes
+  de magnitud. Tabla comparativa añadida arriba.

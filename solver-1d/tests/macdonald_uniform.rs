@@ -38,7 +38,8 @@
 //! MacDonald with a varying `h(x)` profile.
 
 use hydroflux_solver_1d::{
-    Boundaries, Channel1D, Conserved, cfl_time_step, forward_euler_step, manning_friction_step,
+    Boundaries, Boundary, Channel1D, Conserved, cfl_time_step, forward_euler_step,
+    manning_friction_step,
 };
 use ndarray::Array1;
 
@@ -128,5 +129,62 @@ fn interior_preserves_uniform_flow_outside_upstream_boundary_layer() {
     assert!(
         max_dev_u < 1e-3,
         "interior velocity drifted {max_dev_u:.2e} — bed-source/friction balance is off"
+    );
+}
+
+#[test]
+fn uniform_flow_preserved_whole_domain_with_inflow_outflow_bcs() {
+    // Same uniform-flow setup as the previous test, but with the physical
+    // BCs that this module's docstring described as the fix: Discharge at
+    // upstream (with linearly-extended bed → cell 0 now receives the full
+    // Audusse source) and Depth at downstream (likewise for cell n-1).
+    //
+    // Expectation: drift collapses to the same O(dt²·t) splitting error as
+    // the interior — no more boundary layer. We assert preservation over
+    // the WHOLE domain, not just the central slab.
+    let slope = 0.005;
+    let manning = 0.03;
+    let q = 1.0;
+    let h_n = manning_normal_depth(q, slope, manning);
+    let u_n = q / h_n;
+    let dx = 0.25;
+    let n = 400;
+    let cfl = 0.4;
+    let t_end = 5.0;
+
+    let channel = sloped_channel(n, dx, slope, manning);
+    let mut states: Vec<Conserved> = vec![Conserved::new(h_n, q); n];
+
+    let bcs = Boundaries {
+        left: Boundary::Discharge { q },
+        right: Boundary::Depth { h: h_n },
+    };
+
+    let mut t = 0.0;
+    while t < t_end {
+        let dt = cfl_time_step(&states, dx, cfl).min(t_end - t);
+        forward_euler_step(&mut states, &channel, bcs, dt);
+        manning_friction_step(&mut states, manning, dt, 1e-9);
+        t += dt;
+    }
+
+    let mut max_dev_h = 0.0_f64;
+    let mut max_dev_u = 0.0_f64;
+    for s in &states {
+        let u = s.hu / s.h;
+        max_dev_h = max_dev_h.max((s.h - h_n).abs() / h_n);
+        max_dev_u = max_dev_u.max((u - u_n).abs() / u_n);
+    }
+    // Same bound as the interior-only test: the whole domain should now
+    // behave like the interior did. A failure here would mean either the
+    // extrapolated-bed convention is wrong or the prescribed-variable
+    // ghost state is inconsistent at the Manning equilibrium.
+    assert!(
+        max_dev_h < 1e-3,
+        "depth drifted {max_dev_h:.2e} on the whole domain with physical BCs"
+    );
+    assert!(
+        max_dev_u < 1e-3,
+        "velocity drifted {max_dev_u:.2e} on the whole domain with physical BCs"
     );
 }
