@@ -95,6 +95,10 @@ elevación) para reproducibilidad.
    pendiente local fuerte — consecuencia del bed slope source + Manning
    friction trabajando juntos.
 
-Esta es la figura tipo "Figure 5" del review paper Q4 2026: "open-source
-1D solver running on a real Chilean Andean basin", el contraste visual
-con HEC-RAS que cita la motivación del proyecto.
+Esta es una de las dos figuras tipo "Figure 5" del review paper Q4 2026.
+El segundo demo, `../huasco_reach_demo/`, corre el mismo solver sobre
+un tramo semiárido Andino (BNA #06, Río Huasco) y junto con éste
+constituyen el **par insignia** del paper: mismo solver, dos regímenes
+climáticos contrastantes. La figura composite vive en
+`../figures/maule_vs_huasco.png` (generada con
+`python3 ../composite_figure.py`).
