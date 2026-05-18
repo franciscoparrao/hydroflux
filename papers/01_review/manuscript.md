@@ -806,10 +806,10 @@ text.](figures/fig4_maule_huasco.pdf){#fig:flagship width=100%}
 
 | Year | Milestone | Output |
 |---|---|---|
-| 2026 | Review paper (this); v0.1 release with 1D solver | NHESS / ESR |
+| 2026 | Review paper (this); v0.1 release with 1D solver | AWR / C&G |
 | 2027 | 2D shallow water, GPU via wgpu, UK EA benchmark suite | Geosci. Model Dev. |
 | 2028 | Native autodifferentiation; gradient-based calibration | WRR / Nat. Comms. |
-| 2029–2031 | Coupled landslide–flood; continental scale | NHESS / JGR / HESS |
+| 2029–2031 | Coupled landslide–flood; continental scale | WRR / JGR / HESS |
 | 2032+ | 3D and sediment transport; operational deployment | Nature / Science Adv. |
 
 Releases follow semantic versioning with DOIs at Zenodo for every minor

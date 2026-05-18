@@ -37,7 +37,7 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 |---|---|
 | **2026 Q2** (ACTIVO) | Review vivo del state of the art (state-of-the-art.md). Bibliografía core en references.bib. Identificación clara del gap + statement del wedge. |
 | **2026 Q3** | Prototipo Saint-Venant 1D en Rust (solver-1d/). Validación contra solución analítica (dam break sin fricción, MacDonald 1997). Integración con SurtGIS para I/O. |
-| **2026 Q4** | Draft de review/positioning paper. Submit a Earth-Science Reviews o NHESS. Outreach inicial: emails a equipos de BASEMENT (ETH), LISFLOOD-FP (Bristol/UK EA), ANUGA (Geoscience Australia), círculo JAX-Hydro. |
+| **2026 Q4** | Draft de review/positioning paper. Submit a Advances in Water Resources (primary, subscription sin APC) o Computers & Geosciences (fallback). NHESS / ESR como contingencias si se confirma waiver. Outreach inicial: emails a equipos de BASEMENT (ETH), LISFLOOD-FP (Bristol/UK EA), ANUGA (Geoscience Australia), círculo JAX-Hydro. |
 
 **Output del año**: 1 review paper submitted + repo público v0.1 con 1D + 2-3 contactos internacionales activos.
 
@@ -117,7 +117,7 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
   3. Cuatro gaps no resueltos: acoplamiento, diferenciabilidad, GPU-first, reproducibilidad
   4. Proposed roadmap (lo que hydroflux va a hacer)
   5. Open challenges + invitación a la comunidad
-- [ ] **Submit** a Earth-Science Reviews (impact 12+) o NHESS (open access, geosciences).
+- [ ] **Submit** a Advances in Water Resources (Elsevier subscription, sin APC) como primary; Computers & Geosciences como fallback. Reconsiderar NHESS / ESR sólo si se confirma waiver de APC o acuerdo institucional USACH-Elsevier que cubra OA fees.
 - [ ] **Release público v0.1** en GitHub: repo con 1D + tests + docs básicos. DOI Zenodo.
 - [ ] **Outreach**: enviar los emails preparados en Q2 con link a release.
 
