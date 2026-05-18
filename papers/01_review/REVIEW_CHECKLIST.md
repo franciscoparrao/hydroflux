@@ -308,23 +308,24 @@ Pre-existentes:  5/10 resueltos (las 5 figuras + renumbering)
 TOTAL:          23/28 resueltos
 ```
 
-**Figuras: 4/4 generadas y cross-referenciadas** (renumbering consolidó
-"Figure 1 master table" como simplemente "Table 1", y la composite
-Maule/Huasco pasó de Figure 5 a Figure 4):
+**Figuras: 4/4 generadas, refactorizadas con paper-figures style, y
+cross-referenciadas** (renumbering consolidó "Figure 1 master table"
+como simplemente "Table 1"):
 
-- **Figure 1** (intersection diagram): radar 5 ejes con 5 solvers
-  representativos + hydroflux pentagon. Generado por
-  `figures/gen_fig1_intersection.py`. Referenciado en §3.6.
-- **Figure 2** (Stoker dam break): perfil n=400 vs analítico +
-  convergencia log-log con orden 0.80/0.81. Generado por
-  `figures/gen_fig2_stoker.py`. Referenciado en §4.3.1.
-- **Figure 3** (MacDonald variable): inverse design profile +
-  convergencia orden 1.04. Generado por `figures/gen_fig3_macdonald.py`.
-  Referenciado en §4.3.3 con cross-ref a Figure 2.
-- **Figure 4** (Maule/Huasco flagship): par insignia composite copiado
-  de `examples/figures/maule_vs_huasco.png` a
-  `papers/01_review/figures/fig4_maule_huasco.png`. Referenciado en
-  §4.4.
+- **`figures/style.py`** (nuevo): paleta Wong colorblind-safe, per-entity
+  `SOLVER_COLORS` y `BASIN_COLORS` para consistency cross-figura,
+  widths NHESS (88 mm SC, 170 mm DC), spines TBLR off, ticks inward,
+  grid sutil, helper `add_panel_label` para (a)/(b) bold top-left.
+- **Figure 1** (intersection): radar 5 ejes con Wong + callout
+  editorial "two-thirds score ≤0.3 on every axis". `gen_fig1_intersection.py`.
+- **Figure 2** (Stoker): perfil + convergencia con callout flecha sobre
+  el shock smearing "HLL signature". `gen_fig2_stoker.py`.
+- **Figure 3** (MacDonald variable): inverse design + convergencia con
+  inline note "Clean first-order: no shock to smear (cf. Fig. 2)" —
+  cross-ref a Figure 2 dentro de la figura. `gen_fig3_macdonald.py`.
+- **Figure 4** (par insignia Maule/Huasco): regenerada desde demos via
+  rasterio, con callout flecha apuntando al hallazgo contraintuitivo
+  Fr-Huasco-lower. `gen_fig4_maule_huasco.py`.
 
 **5 TODOs de producción restantes** (cosméticos pre-submit):
 

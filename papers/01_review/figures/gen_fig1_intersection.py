@@ -1,23 +1,14 @@
 """Figure 1 — The intersection is the gap.
 
-Five-axis radar (a.k.a. polar) plot. Each axis is one of the five gaps
-articulated in §3 of the paper:
-
-  1. Open auditable codebase
-  2. Modern host language with ergonomic autograd
-  3. GPU as first-class execution target
-  4. Native coupling to non-hydraulic hazards
-  5. Differentiable physics across the engine
+Five-axis radar (polar) plot. Each axis is one of the five structural
+gaps articulated in §3: Open, Modern language, GPU first-class, Native
+coupling, Differentiable physics.
 
 Five representative solvers are plotted as polygons whose vertices
 score each gap from 0 (does not address) to 1 (fully addresses). The
 hydroflux polygon is the full pentagon; every other solver is a strict
-sub-pentagon. The visual story: the intersection is exactly the
-hydroflux outline, and no existing solver reaches it.
-
-Scoring rationale documented inline. The scores are deliberately
-qualitative — the goal is to render the *shape* of the gap, not to
-rank solvers numerically.
+sub-pentagon. Per-entity colours come from `style.SOLVER_COLORS` for
+cross-figure consistency.
 """
 
 from __future__ import annotations
@@ -27,9 +18,11 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
+from style import FIG_W_SC, SOLVER_COLORS, setup
+
+setup()
 OUT_DIR = Path(__file__).parent
 
-# Axes in order: Open, Modern lang, GPU, Coupled, Differentiable.
 AXES = [
     "Open\nauditable",
     "Modern\nlanguage",
@@ -38,87 +31,84 @@ AXES = [
     "Differentiable\nphysics",
 ]
 
-# Scoring rationale per solver across the 5 axes.
-# 1.0 = fully addresses; 0.5 = partial; 0.0 = absent.
-# See REVIEW_CHECKLIST.md and state-of-the-art.md for justification.
+# Qualitative scores (0–1) per solver across the 5 axes. Justification
+# is in §3 of the manuscript and in state-of-the-art.md.
 SOLVERS = {
-    "HEC-RAS": {
-        "scores": [0.0, 0.0, 0.3, 0.0, 0.0],
-        "color": "#a04040",  # regulatory red
-    },
-    "LISFLOOD-FP": {
-        "scores": [1.0, 0.3, 1.0, 0.0, 0.0],
-        "color": "#5c8aab",  # open-source blue
-    },
-    "BASEMENT": {
-        "scores": [0.0, 0.3, 0.0, 0.5, 0.0],
-        "color": "#8b6a1a",  # closed-academic brown
-    },
-    "TELEMAC": {
-        "scores": [0.7, 0.0, 0.0, 0.5, 0.0],
-        "color": "#5c4630",  # legacy brown
-    },
-    "TUFLOW HPC": {
-        "scores": [0.0, 0.3, 1.0, 0.0, 0.0],
-        "color": "#5c5c5c",  # commercial grey
-    },
-    "hydroflux": {
-        "scores": [1.0, 1.0, 1.0, 1.0, 1.0],
-        "color": "#1a4a72",  # navy = the target
-    },
+    "HEC-RAS":     [0.0, 0.0, 0.3, 0.0, 0.0],
+    "LISFLOOD-FP": [1.0, 0.3, 1.0, 0.0, 0.0],
+    "BASEMENT":    [0.0, 0.3, 0.0, 0.5, 0.0],
+    "TELEMAC":     [0.7, 0.0, 0.0, 0.5, 0.0],
+    "TUFLOW HPC":  [0.0, 0.3, 1.0, 0.0, 0.0],
+    "hydroflux":   [1.0, 1.0, 1.0, 1.0, 1.0],
 }
 
 
 def main() -> None:
     n = len(AXES)
     angles = np.linspace(0, 2 * np.pi, n, endpoint=False).tolist()
-    angles += angles[:1]  # close the polygon
+    angles += angles[:1]
 
-    fig, ax = plt.subplots(
-        figsize=(7.5, 7.5),
-        subplot_kw={"projection": "polar"},
-    )
+    # Single-column figure, square aspect for radar legibility.
+    fig = plt.figure(figsize=(FIG_W_SC * 1.6, FIG_W_SC * 1.4))
+    ax = fig.add_subplot(111, projection="polar")
 
-    # Plot order: existing solvers first (lower alpha), hydroflux last
-    # (full opacity) so it sits on top.
-    for name, props in SOLVERS.items():
-        scores = props["scores"] + props["scores"][:1]
+    # Background "target" guide — full pentagon at radius 1.
+    ax.plot(angles, [1.0] * (n + 1),
+            color="#dddddd", lw=0.6, linestyle=":", zorder=0)
+
+    # Plot existing solvers first (low opacity), hydroflux on top.
+    for name, scores in SOLVERS.items():
         is_target = name == "hydroflux"
-        ax.plot(angles, scores,
-                color=props["color"],
-                lw=2.6 if is_target else 1.4,
-                linestyle="-" if is_target else "-",
+        closed = scores + scores[:1]
+        ax.plot(angles, closed,
+                color=SOLVER_COLORS[name],
+                lw=2.4 if is_target else 1.1,
+                zorder=3 if is_target else 1,
                 label=name)
-        ax.fill(angles, scores,
-                color=props["color"],
-                alpha=0.20 if is_target else 0.08)
+        ax.fill(angles, closed,
+                color=SOLVER_COLORS[name],
+                alpha=0.18 if is_target else 0.06,
+                zorder=2 if is_target else 0)
 
     # Axis ticks and labels.
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(AXES, fontsize=10)
-    ax.set_ylim(0, 1.0)
-    ax.set_yticks([0.25, 0.5, 0.75, 1.0])
-    ax.set_yticklabels(["", "0.5", "", "1.0"], fontsize=8)
+    ax.set_xticklabels(AXES, fontsize=8.5)
+    ax.set_ylim(0, 1.05)
+    ax.set_yticks([0.5, 1.0])
+    ax.set_yticklabels(["0.5", "1.0"], fontsize=7, color="#666666")
     ax.set_rlabel_position(72)
+    ax.tick_params(axis="x", pad=8)
+    ax.grid(True, color="#dddddd", linewidth=0.4, alpha=0.7)
+    ax.spines["polar"].set_color("#aaaaaa")
+    ax.spines["polar"].set_linewidth(0.6)
 
-    # Legend outside the plot.
+    # Legend outside-right.
     ax.legend(
         loc="upper right",
-        bbox_to_anchor=(1.30, 1.05),
+        bbox_to_anchor=(1.45, 1.10),
         frameon=False,
-        fontsize=10,
+        fontsize=8.5,
+        labelspacing=0.6,
     )
 
-    # Subtle annotation explaining the visual claim.
-    fig.text(
-        0.50, 0.02,
-        "Each axis: 0 = does not address, 1 = fully addresses. "
-        "The hydroflux pentagon is the intersection of all five gaps.",
-        ha="center", fontsize=9, style="italic", color="#444444",
+    # Editorial callout: arrow + caption pointing at the gap region.
+    # The gap = anywhere the hydroflux pentagon (outer) extends beyond
+    # the other polygons (clustered near the centre). Place a small
+    # annotation at the GPU axis, where TUFLOW & LISFLOOD reach 1 but
+    # everyone else is at 0–0.3.
+    ax.annotate(
+        "Two-thirds of the survey\n"
+        "score $\\leq 0.3$ on every axis;\n"
+        "only the hydroflux pentagon\n"
+        "spans all five.",
+        xy=(angles[3], 0.5),         # near "Native coupling" axis, mid-radius
+        xytext=(1.5 * np.pi, 1.55),    # outside, lower-left
+        fontsize=7.5, color="#444444", style="italic",
+        ha="center",
+        arrowprops=dict(arrowstyle="-", color="#888888", lw=0.5),
     )
 
-    fig.savefig(OUT_DIR / "fig1_intersection.png", dpi=220,
-                bbox_inches="tight")
+    fig.savefig(OUT_DIR / "fig1_intersection.png", dpi=300, bbox_inches="tight")
     fig.savefig(OUT_DIR / "fig1_intersection.pdf", bbox_inches="tight")
     print(f"Wrote {OUT_DIR / 'fig1_intersection.png'}")
 
