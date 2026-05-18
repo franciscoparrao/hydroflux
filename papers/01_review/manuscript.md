@@ -97,9 +97,9 @@ that the next decade of flood science will need.
 
 **Open-source as scientific infrastructure.** The reproducibility
 crisis in computational science is by now well documented; binary,
-GUI-mediated workflows fail every column of the FAIR data principles
-[@WilkinsonFAIR2016] *(TODO confirm exact citation in bib)* and almost
-every clause of the principles for FAIR software. The science published
+GUI-mediated workflows fail every column of the FAIR principles —
+*Findable, Accessible, Interoperable, Reusable* [@WilkinsonFAIR2016]
+— and almost every clause of their software-specific corollaries. The science published
 on top of HEC-RAS is not less rigorous than the science published on
 top of LISFLOOD-FP, but it is structurally less *auditable*: a
 reviewer cannot diff two `.prj` files in a meaningful way, nor can a
@@ -113,13 +113,13 @@ cascades do not partition themselves along the lines of our model
 codes. The 2015 Atacama event in northern Chile started as anomalous
 warm-front rainfall over a previously dry semiarid basin, triggered
 hundreds of shallow landslides on slopes whose pore pressure had
-adjusted to a different climate regime [@Wilcox2016AtacamaFlash]
-*(TODO confirm bib)*, mobilised debris flows down ephemeral channels,
-and produced flash inundation in towns sited along outwash fans. The
-2010 Maule earthquake triggered an immediate co-seismic landslide
-inventory of more than one thousand documented features
-[@Serey2019MauleInventory] *(TODO confirm bib)*, many of which
-subsequently re-mobilised under the post-seismic precipitation regime.
+adjusted to a different climate regime [@Wilcox2016AtacamaFlash],
+mobilised debris flows down ephemeral channels, and produced flash
+inundation in towns sited along outwash fans. The 2010 Maule
+earthquake triggered an immediate co-seismic landslide inventory of
+more than one thousand documented features
+[@Serey2019MauleInventory], many of which subsequently re-mobilised
+under the post-seismic precipitation regime.
 Episodic debris flows in the Huasco basin have been the subject of
 recurrent civil-protection events through the 2010s. In each case the
 hazard chain crosses three or four constitutive regimes — Richards-type
@@ -132,20 +132,26 @@ conservation, lose synchronisation, and lose gradient information.
 modelling has consolidated rapidly in hydrology over the past five
 years, from the differentiable parameter-learning approach of
 @Tsai2021 to the regionalised process-based learners of @Feng2022 and
-the unifying review of @Shen2023. The pattern is unambiguous: where
-gradient information is available through a physical model, calibration
-becomes orders of magnitude cheaper than gradient-free alternatives,
-inverse problems become tractable, and hybrid models that combine
-physical constraints with neural-network corrections become a default
-rather than an experiment. The shallow-water flood community has been
-mostly absent from this lineage — not because flood physics is harder
-to differentiate (the operators are local and explicit, an easier case
-than Richards-type infiltration), but because no production-grade flood
-solver was written in a language whose autograd story is mature. The
-absence is now structurally consequential: ML-physics hybrid models in
-hydrology converge faster than physics-only ones, and the flood
-community cannot join the consolidation without rebuilding from the
-language up.
+the unifying review of @Shen2023. *Reverse-mode autodifferentiation*
+— the backpropagation algorithm familiar from deep learning, applied
+here to physical solvers so that gradients of an output quantity with
+respect to every input parameter flow transparently through the model
+— is the technical primitive that closes the loop between physics and
+machine learning. The pattern in the differentiable-hydrology
+literature is consistent: where gradient information is available
+through a physical model, calibration becomes orders of magnitude
+cheaper than gradient-free alternatives, inverse problems become
+tractable, and hybrid models that combine physical constraints with
+neural-network corrections show competitive or improved skill in
+benchmark studies [@Feng2022; @Shen2023]. The shallow-water flood
+community has been mostly absent from this lineage — not because flood
+physics is harder to differentiate (the operators are local and
+explicit, an easier case than Richards-type infiltration), but because
+no production-grade flood solver was written in a language whose
+autograd story is mature. We argue in §3.2 that retrofitting autograd
+onto a legacy kernel is more expensive than rewriting in a language
+where it is built in; the flood community can therefore join the
+consolidation only by paying the rewriting cost.
 
 ## 1.3 What this paper does — and does not — do
 
@@ -416,11 +422,11 @@ flood mapping workflows worldwide, yet not one of them allows a
 research group to audit, fork or extend the numerical core. The
 solvers that *are* open under permissive or copyleft licences —
 TELEMAC, Delft3D, ANUGA, GeoClaw and Kratos — carry compensating
-constraints: FORTRAN build systems whose maintenance has been
-characterised in the literature as a barrier to entry [@verify
-reference], curve-of-learning issues for the multiphysics frameworks,
-and (in ANUGA's case) cadence of releases that has not kept pace with
-the contemporary research literature.
+constraints: FORTRAN build systems that the community routinely
+identifies as a barrier to first-time contribution, curve-of-learning
+issues for the multiphysics frameworks, and (in ANUGA's case) a
+release cadence that has not kept pace with the contemporary research
+literature.
 
 The cost of compromised openness is twofold. Scientifically, the
 ability to *diff* two simulation setups — to test, in a pull-request
@@ -509,9 +515,12 @@ which is acceptable for steady analyses but discards the fast
 transients that often define the destructive phase of a debris-flow
 event. The science that needs full-chain coupling — what infiltration
 fraction triggers a debris flow that produces inundation of magnitude
-*M*? — is not asked, because the pipeline cannot answer it. Cite
-@Iverson2000 for the physical triggering picture and @Hungr2005 for
-the classification of regimes that the engine would have to span.
+*M*? — is formulated in the literature [@Iverson2000] but not
+*answered with conservative rigour*, because the pipeline loses
+mass and momentum across each handoff and discards the fine-time
+synchronisation that the question demands. Iverson [@Iverson2000]
+gives the canonical triggering picture; Hungr [@Hungr2005] the
+classification of regimes that a unified engine would have to span.
 
 ## 3.5 Cross-cutting: the absence of native differentiability
 
@@ -562,9 +571,6 @@ beginning from a 1D building block already in working order.
 
 ## 4.1 The wedge
 
-> *Versión canónica del wedge — citar literal desde
-> [`outline.md` § "Wedge en un párrafo"](../../outline.md).*
-
 **hydroflux is the coupled hydrometeorological-hazards solver that does
 not yet exist**: it integrates rainfall → slope failure → granular
 propagation → inundation in a single numerical engine, end-to-end
@@ -607,10 +613,26 @@ The technology stack reflects the wedge:
   eliminating the upstream boundary-layer artefact that constant-bed
   ghosts produce on a sloped channel.
 - **GeoTIFF I/O** through SurtGIS [@SurtgisRef], a sibling
-  open-source raster library. Channels are stored as `1×N` rasters
-  whose `pixel_width` encodes the cell spacing `Δx`; outputs (depth,
-  unit discharge) inherit the input geotransform so QGIS aligns them
-  pixel-by-pixel for inspection and post-processing.
+  open-source raster library released alongside this work. Channels
+  are stored as `1×N` rasters whose `pixel_width` encodes the cell
+  spacing `Δx`; outputs (depth, unit discharge) inherit the input
+  geotransform so QGIS aligns them pixel-by-pixel for inspection and
+  post-processing.
+
+The choice of Rust over the contemporary alternatives (Julia, Mojo)
+deserves explicit defence: Julia carries the most mature scientific-
+computing ecosystem of any modern language and is a credible
+alternative, particularly for groups already invested in DifferentialEquations.jl
+or Flux.jl; Mojo at the time of writing is too young for a long-horizon
+commitment. We prefer Rust for three operational reasons: ahead-of-time
+compilation eliminates JIT warm-up for short-running benchmark tests,
+the borrow checker prevents data-race classes of bug that the
+shared-memory parallelism of FV stencils invites, and `wgpu`
+(Rust's portable GPU abstraction over Vulkan, Metal, DirectX and
+WebGPU) crosses NVIDIA / AMD / Apple silicon without per-vendor
+dialects. We do not argue Rust is uniquely correct — competing
+implementations in Julia would be welcome — only that it is *adequate
+and complete* for this design.
 
 ## 4.3 Validation against analytical benchmarks
 
@@ -690,18 +712,21 @@ to 1.50 m, velocity 0.97 to 1.38 m s⁻¹, and the Froude number remains
 between 0.26 and 0.49 — comfortably sub-critical despite the steeper
 terrain.
 
-The flagship comparison (Figure XX) reveals a counter-intuitive
+The flagship comparison (Figure 5) reveals a counter-intuitive
 finding: **Froude is lower in Huasco than in Maule despite Huasco's
-threefold steeper slope**. This is a closed-form consequence of the
+threefold steeper slope**. This is a clean algebraic consequence of the
 Manning normal-depth identity
 `Fr² = S₀ · h^(1/3) / (g n²)`: the rougher boulder bed of the
 semiarid Andean reach absorbs the extra slope through higher friction.
 The Maule reach, on a smoother substrate and at lower mean slope, is
 *more* sensitive to local slope variations and brushes critical
-behaviour in narrow patches. This emergent physical insight requires no
-parameter tuning beyond two values of Manning and one of `q` — exactly
-the regime where a clean open-source solver demonstrates its
-educational and explanatory value.
+behaviour in narrow patches. Both runs use literature-typical Manning
+values (0.04 for the Maule's rocky substrate, 0.06 for Huasco's boulder
+bed) and a single moderate-event unit discharge per reach; no
+calibration against observations is performed, and the demonstration is
+illustrative rather than predictive. Both pipelines are reproducible in
+`examples/maule_reach_demo/` and `examples/huasco_reach_demo/` of the
+repository.
 
 ## 4.5 Multi-year roadmap
 
@@ -724,16 +749,19 @@ than discovery: every individual piece exists elsewhere in some form.
 The challenges that remain are at the *seams* between pieces — places
 where assumptions made in isolation collide when joined.
 
-**Differentiability at scale.** Reverse-mode autodifferentiation through
-an explicit finite-volume solver scales linearly in memory with the
-number of time steps and cells. At continental scale — 15 basins,
+**Differentiability at scale.** Reverse-mode autodifferentiation
+through an explicit finite-volume solver scales linearly in memory with
+the number of time steps and cells. At continental scale — 15 basins,
 `O(10⁶)` cells each, `O(10⁴)` time steps per simulated month — the
 naïve gradient tape exceeds any reasonable GPU memory budget by orders
-of magnitude. Checkpointing schemes [@Griewank2008] reduce the cost to
-`O(log T)` recomputation with `O(√T)` memory, but their implementation
-inside a well-balanced FV update with operator-split friction is
-non-trivial. We treat this as an explicit research item rather than
-engineering work.
+of magnitude. *Checkpointing schemes* — memory-recomputation
+trade-offs that store the forward state only at selected time levels
+and re-evaluate the rest during backpropagation [@Griewank2008] —
+reduce the memory footprint to polylogarithmic or square-root of the
+time horizon at a constant-factor recomputation cost, but their
+implementation inside a well-balanced FV update with operator-split
+friction is non-trivial. We treat this as an explicit research item
+rather than engineering work.
 
 **GPU memory hierarchy and language choice.** Rust's `wgpu` backend
 abstracts over Vulkan, Metal, DirectX and WebGPU at the cost of losing
@@ -813,9 +841,10 @@ building block reported in §4 is not a proposal but a working artefact:
 HLL Riemann flux with Audusse hydrostatic reconstruction, semi-implicit
 Manning friction, physical inflow and outflow boundary conditions, and
 SurtGIS-backed GeoTIFF I/O, validated against three analytical
-references at first-order convergence on smooth flow and the expected
-shock-degraded order on the Stoker dam break, and demonstrated end-to-
-end on two contrasting Chilean Andean reaches. The 2D, GPU, and
+references — bit-near preservation of Manning normal flow,
+first-order convergence on the smooth MacDonald inverse-design profile,
+and the expected shock-degraded order (0.81) on the Stoker dam break —
+and demonstrated end-to-end on two contrasting Chilean Andean reaches. The 2D, GPU, and
 autodifferentiation layers of the multi-year roadmap rest on
 techniques that already exist in adjacent fields; the work is
 *assembly* under coherent design discipline, not discovery against

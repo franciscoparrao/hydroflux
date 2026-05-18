@@ -100,6 +100,20 @@
   note    = {Esquema central-upwind, base de ANUGA y otros. Alternativa Riemann-free.}
 }
 
+@article{Davis1988,
+  author  = {Davis, S.F.},
+  title   = {Simplified Second-Order {G}odunov-Type Methods},
+  journal = {SIAM Journal on Scientific and Statistical Computing},
+  volume  = {9},
+  number  = {3},
+  pages   = {445--473},
+  year    = {1988},
+  doi     = {10.1137/0909030},
+  note    = {Estimación de wave speeds para HLL Riemann solver:
+             S_L = min(u_L - c_L, u_R - c_R), S_R = max(u_L+c_L, u_R+c_R).
+             Convención usada en hydroflux-solver-1d (§4.2 del review).}
+}
+
 % =============================================================================
 % 2. FLOOD MODELING — SOLVERS
 % =============================================================================
@@ -368,15 +382,93 @@
 }
 
 % =============================================================================
-% 5. RUST / SCIENTIFIC COMPUTING ECOSYSTEM
+% 5. SCIENTIFIC COMPUTING ECOSYSTEM (FAIR, AD, Rust)
 % =============================================================================
 
-% Pendiente: refs específicas si aparece literatura sobre solver implementations en Rust
-% (probablemente blog posts más que papers, no citables formalmente).
+@article{WilkinsonFAIR2016,
+  author  = {Wilkinson, Mark D. and Dumontier, Michel and Aalbersberg, IJsbrand Jan
+             and Appleton, Gabrielle and Axton, Myles and Baak, Arie and Blomberg,
+             Niklas and Boiten, Jan-Willem and {da Silva Santos}, Luiz Bonino
+             and others},
+  title   = {The {FAIR} {G}uiding {P}rinciples for scientific data management
+             and stewardship},
+  journal = {Scientific Data},
+  volume  = {3},
+  pages   = {160018},
+  year    = {2016},
+  doi     = {10.1038/sdata.2016.18},
+  note    = {Principios FAIR (Findable, Accessible, Interoperable, Reusable).
+             Citado en §1.2 y §3.1 del review paper. Verificar lista completa
+             de autores con verify-refs antes de submit.}
+}
+
+@book{Griewank2008,
+  author    = {Griewank, Andreas and Walther, Andrea},
+  title     = {Evaluating Derivatives: Principles and Techniques of Algorithmic
+               Differentiation},
+  edition   = {2nd},
+  publisher = {SIAM},
+  year      = {2008},
+  series    = {Other Titles in Applied Mathematics},
+  isbn      = {978-0-89871-659-7},
+  doi       = {10.1137/1.9780898717761},
+  note      = {Textbook canónico de autodifferentiation. Cubre forward/reverse
+               mode, complejidad, checkpointing (Griewank-Walther revolve).
+               Citado en §5 del review paper como referencia primaria para
+               memory-recomputation trade-offs.}
+}
+
+@misc{SurtgisRef,
+  author       = {Parra, Francisco},
+  title        = {{SurtGIS}: A high-performance geospatial analysis library in {R}ust},
+  version      = {0.8.0},
+  year         = {2026},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.XXXXXXX},
+  url          = {https://github.com/franciscoparrao/surtgis},
+  note         = {PLACEHOLDER — actualizar DOI Zenodo y version al freeze del
+                  release acompañante a hydroflux v0.1. Sibling package del que
+                  hydroflux usa I/O raster (§4.2).}
+}
 
 % =============================================================================
 % 6. CHILE — DATOS Y CONTEXTO
 % =============================================================================
 
-% Pendiente: refs de inventarios SERNAGEOMIN, DGA, eventos catastróficos chilenos
-% (Maule 2010, Atacama 2015, etc.).
+@article{Wilcox2016AtacamaFlash,
+  author  = {Wilcox, Andrew C. and Escauriaza, Crist\'ian and Agredano, Roberto
+             and Mignot, Emmanuel and Zuazo, Vicente and Otarola, Sebasti\'an
+             and Castro, Luis and Gironas, Jorge and Cienfuegos, Rodrigo and
+             Mao, Luca},
+  title   = {An integrated analysis of the {M}arch 2015 {A}tacama floods},
+  journal = {Geophysical Research Letters},
+  volume  = {43},
+  number  = {15},
+  pages   = {8035--8043},
+  year    = {2016},
+  doi     = {10.1002/2016GL069751},
+  note    = {Evento de inundación catastrófica marzo 2015 en Atacama (norte
+             Chile). Análisis hidrometeorológico, transporte de sedimento,
+             impactos. Caso citado en §1.2 del review como ejemplo de cascade
+             rainfall→landslide→debris flow→inundation.
+             Verificar lista exacta de autores con verify-refs.}
+}
+
+@article{Serey2019MauleInventory,
+  author  = {Serey, Alejandra and Pi\~nero-Feliciangeli, Lorena and
+             Sep\'ulveda, Sergio A. and Poblete, Felipe and Petley,
+             David N. and Murphy, William},
+  title   = {Landslides induced by the 2010 {C}hile megathrust earthquake:
+             a comprehensive inventory and correlations with geological
+             and seismic factors},
+  journal = {Landslides},
+  volume  = {16},
+  number  = {6},
+  pages   = {1153--1165},
+  year    = {2019},
+  doi     = {10.1007/s10346-019-01150-6},
+  note    = {Inventario de landslides co-sísmicos del terremoto Maule 2010
+             (Mw 8.8). Más de 1000 features documentados. Citado en §1.2 del
+             review como ejemplo de cascade trigger.
+             Verificar lista de autores con verify-refs.}
+}

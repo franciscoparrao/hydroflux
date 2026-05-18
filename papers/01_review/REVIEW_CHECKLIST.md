@@ -15,28 +15,38 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #1 — `§1.2` claim "ML-physics hybrid converge faster" sin cita
 
-- [x] *Resolver*
+- [x] *Resuelto*
 - **Issue**: "ML-physics hybrid models in hydrology converge faster than
   physics-only ones" — claim cuantitativo sin citación.
 - **Fix propuesto**: o citar paper específico (Feng2022 sí muestra esto
   en streamflow), o cambiar a "have shown competitive or improved skill
   in benchmark studies".
-- **Resuelto**: *(pendiente)*
+- **Resuelto**: Cambiado a "show competitive or improved skill in
+  benchmark studies [@Feng2022; @Shen2023]". Además se agregó glosa
+  de *reverse-mode autodifferentiation* (bonus para issue #5) y se
+  reescribió el cierre del párrafo para que la causalidad
+  "rebuilding from language up" referencie explícitamente §3.2 (donde
+  está el soporte del argumento).
 
 ### #2 — `§3.4` tautología falsable "the question is not asked"
 
-- [x] *Resolver*
+- [x] *Resuelto*
 - **Issue**: "The science that needs full-chain coupling... is not
   asked, because the pipeline cannot answer it." La pregunta SÍ se hace
   (Iverson la formula explícitamente); el pipeline limita la rigurosidad
   de la respuesta, no impide formular la pregunta.
 - **Fix propuesto**: "is not answered with conservative rigor, because
   the pipeline loses conservation between stages."
-- **Resuelto**: *(pendiente)*
+- **Resuelto**: Cambiado a "is formulated in the literature
+  [@Iverson2000] but not *answered with conservative rigour*, because
+  the pipeline loses mass and momentum across each handoff and discards
+  the fine-time synchronisation that the question demands." Además se
+  arregló el cierre informal "Cite X for..." que era el bonus issue
+  #18 — ahora es prosa académica.
 
 ### #3 — `§4.4` contradicción "no parameter tuning beyond 2 values"
 
-- [x] *Resolver*
+- [x] *Resuelto*
 - **Issue**: Frase claims "no parameter tuning beyond two values of
   Manning and one of q" pero en realidad se usaron 4 parámetros
   distintos (manning_maule=0.04, manning_huasco=0.06, q_maule=3,
@@ -44,11 +54,18 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 - **Fix propuesto**: "with no calibration against observations; each
   reach uses literature-typical values of Manning and a single
   moderate-event unit discharge."
-- **Resuelto**: *(pendiente)*
+- **Resuelto**: Reescrito el párrafo: "Both runs use literature-typical
+  Manning values (0.04 for the Maule's rocky substrate, 0.06 for
+  Huasco's boulder bed) and a single moderate-event unit discharge per
+  reach; no calibration against observations is performed, and the
+  demonstration is illustrative rather than predictive." Además se
+  agregó pointer a `examples/{maule,huasco}_reach_demo/` para
+  reproducibilidad. "Figure XX" → "Figure 5". "emergent physical
+  insight" → "clean algebraic consequence" (bonus issue #15).
 
 ### #4 — `§6` "three analytical references at first-order convergence"
 
-- [x] *Resolver*
+- [x] *Resuelto*
 - **Issue**: §6 dice "validated against three analytical references at
   first-order convergence on smooth flow". MacDonald uniform NO es test
   de convergencia, es de preservation (drift bounded). Solo Stoker y
@@ -57,42 +74,59 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
   preservation of Manning normal flow, first-order convergence on smooth
   steady states, and the expected shock-degraded order on dam-break
   Riemann problems."
-- **Resuelto**: *(pendiente)*
+- **Resuelto**: Reemplazado por: "validated against three analytical
+  references — bit-near preservation of Manning normal flow, first-order
+  convergence on the smooth MacDonald inverse-design profile, and the
+  expected shock-degraded order (0.81) on the Stoker dam break".
+  Distingue los 3 tipos de test correctamente y agrega el número de
+  orden explícito.
 
 ### #5 — Términos técnicos sin glosa para audiencia NHESS
 
-- [x] *Resolver*
+- [x] *Resuelto*
 - **Issue**: NHESS readership es hidrología/hazards. Términos usados sin
   glosa que el lector probablemente NO conoce:
   - "reverse-mode autodifferentiation" (§1.2, §5)
   - "FAIR principles" (§1.2, §3.1)
   - "wgpu" (§4.2, §5)
   - "checkpointing schemes" (§5)
-- **Fix propuesto**: glosar al primer uso de cada término. E.g.:
-  - "*reverse-mode autodifferentiation* (the backpropagation algorithm
-    familiar from deep learning, applied here to physical solvers)"
-  - "FAIR principles (Findable, Accessible, Interoperable, Reusable)"
-  - "`wgpu` (Rust's portable GPU abstraction over Vulkan, Metal,
-    DirectX, WebGPU)"
-  - "checkpointing schemes (memory-recomputation trade-offs that
-    re-evaluate parts of the forward pass during backpropagation)"
-- **Resuelto**: *(pendiente)*
+- **Fix propuesto**: glosar al primer uso de cada término.
+- **Resuelto**: Las 4 glosas añadidas al primer uso:
+  - §1.2: "*reverse-mode autodifferentiation* — the backpropagation
+    algorithm familiar from deep learning, applied here to physical
+    solvers so that gradients of an output quantity with respect to
+    every input parameter flow transparently through the model"
+  - §1.2: "FAIR principles — *Findable, Accessible, Interoperable,
+    Reusable*"
+  - §4.2: "`wgpu` (Rust's portable GPU abstraction over Vulkan, Metal,
+    DirectX and WebGPU)"
+  - §5: "*Checkpointing schemes* — memory-recomputation trade-offs
+    that store the forward state only at selected time levels and
+    re-evaluate the rest during backpropagation"
 
 ### #6 — Citas TODO sin resolver en bib
 
-- [x] *Resolver*
-- **Issue**: 6 citas explícitamente flagueadas + 2 dudosas:
-  - `@WilkinsonFAIR2016` — FAIR principles
-  - `@Wilcox2016AtacamaFlash` — Atacama 2015 event
-  - `@Serey2019MauleInventory` — Maule 2010 inventory
-  - `@SurtgisRef` — SurtGIS self-citation
-  - `@Griewank2008` — checkpointing
-  - `@verify reference` (§3.1) — FORTRAN build complexity
-  - "Davis (1988)" en §4.2 sin estar en bib
-  - `@KurganovPetrova2007` en §2.3 — verificar que está en bib
-- **Fix propuesto**: ejecutar skill `verify-refs` sobre los existentes;
-  agregar manualmente los 6 nuevos al `references.bib`.
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto* (parcialmente; verificación de autorías queda como
+  sub-tarea para skill `verify-refs`)
+- **Issue**: 6 citas explícitamente flagueadas + 2 dudosas.
+- **Resuelto**:
+  - `@Davis1988` agregado (section 1 Numérico, DOI 10.1137/0909030)
+  - `@WilkinsonFAIR2016` agregado (section 5 nueva "Scientific
+    Computing Ecosystem", DOI 10.1038/sdata.2016.18)
+  - `@Griewank2008` agregado (section 5, ISBN + DOI SIAM book)
+  - `@SurtgisRef` agregado como `@misc` con DOI placeholder Zenodo (a
+    actualizar al freeze del release acompañante)
+  - `@Wilcox2016AtacamaFlash` agregado (section 6 Chile, DOI 10.1002/
+    2016GL069751, autorías reconstruidas — flag para verify-refs)
+  - `@Serey2019MauleInventory` agregado (section 6 Chile, DOI 10.1007/
+    s10346-019-01150-6, autorías reconstruidas — flag para verify-refs)
+  - `@KurganovPetrova2007` ya estaba en bib ✓
+  - `[@verify reference]` inline en §3.1 reescrito como prosa
+    autosuficiente ("FORTRAN build systems that the community routinely
+    identifies as a barrier to first-time contribution")
+- **Pendiente sub-tarea**: skill `verify-refs` sobre WilkinsonFAIR2016,
+  Wilcox2016, Serey2019 para confirmar listas exactas de autores y DOIs
+  contra OpenAlex/CrossRef antes de submit.
 
 ---
 
@@ -144,14 +178,20 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #11 — `§4.2` "Why Rust not Julia?" no defendido
 
-- [ ] *Resolver*
+- [x] *Resuelto* (como bonus durante resolución de #5)
 - **Issue**: Mencionas Julia y Mojo en §3.2 pero no defiendes la
-  elección Rust específicamente. Reviewer Julia-partisan preguntará.
-- **Fix propuesto**: en §4.2 primer bullet, una frase corta sobre AOT
-  compilation vs JIT, borrow checker para data-race prevention, y wgpu
-  cross-NVIDIA-AMD-Apple. Explicitar que no se argumenta Rust como
-  UNICAMENTE correcto, sólo *adecuado y completo* para el diseño.
-- **Resuelto**: *(pendiente)*
+  elección Rust específicamente.
+- **Fix propuesto**: AOT vs JIT, borrow checker, wgpu cross-platform.
+- **Resuelto**: Agregado párrafo cierre del §4.2: "The choice of Rust
+  over the contemporary alternatives (Julia, Mojo) deserves explicit
+  defence: ... We prefer Rust for three operational reasons: ahead-of-
+  time compilation eliminates JIT warm-up for short-running benchmark
+  tests, the borrow checker prevents data-race classes of bug that the
+  shared-memory parallelism of FV stencils invites, and `wgpu` crosses
+  NVIDIA / AMD / Apple silicon without per-vendor dialects. We do not
+  argue Rust is uniquely correct — competing implementations in Julia
+  would be welcome — only that it is *adequate and complete* for this
+  design."
 
 ### #12 — `§3.2` "Why not fork Delft3D LGPL?" no respondido
 
@@ -167,16 +207,14 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #13 — `§5` asintótica de checkpointing imprecisa
 
-- [ ] *Resolver*
-- **Issue**: §5 dice "O(log T) recomputation with O(√T) memory" para
-  checkpointing. Griewank-Walther 2000 clásico es **O(log² T) memory
-  con O(log T) recomputation** (binomial checkpointing); revolve es
-  O(√T)/O(√T). Vale revisar antes de citar.
-- **Fix propuesto**: consultar Griewank & Walther 2000 directamente o
-  hedgear: "checkpointing schemes reduce memory use to polylogarithmic
-  or square-root of the time horizon, at a constant-factor
-  recomputation cost."
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto* (como bonus durante #5)
+- **Issue**: "O(log T) recomputation with O(√T) memory" mezcla las
+  asintóticas de dos esquemas distintos.
+- **Fix propuesto**: hedgear a "polylogarithmic or square-root".
+- **Resuelto**: Reescrito a: "reduce the memory footprint to
+  polylogarithmic or square-root of the time horizon at a
+  constant-factor recomputation cost". Defendible contra cualquier
+  esquema específico (binomial, revolve, etc).
 
 ### #14 — `§5` sustainability single-author no abordado
 
@@ -195,13 +233,11 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #15 — `§4.4` "emergent physical insight" hiperbólico
 
-- [ ] *Resolver*
-- **Issue**: La frase "emergent physical insight requires no parameter
-  tuning" sobre-vende. Manning normal-depth identity es textbook
-  algebra, no emergente.
-- **Fix propuesto**: "a clean algebraic consequence of the Manning
-  normal-depth identity" en lugar de "emergent physical insight".
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto* (como bonus durante #3)
+- **Issue**: "emergent physical insight" sobre-vende textbook algebra.
+- **Fix propuesto**: "clean algebraic consequence of the Manning
+  normal-depth identity".
+- **Resuelto**: Aplicado.
 
 ### #16 — `§1` "twice over" no falsable
 
@@ -216,22 +252,19 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #17 — `§4.1` nota de proceso "versión canónica del wedge"
 
-- [ ] *Resolver*
-- **Issue**: Block-quote con "Versión canónica del wedge — citar literal
-  desde outline.md" es nota interna, no contenido del paper.
+- [x] *Resuelto*
+- **Issue**: Block-quote era nota interna leftover del scaffolding.
 - **Fix propuesto**: borrar.
-- **Resuelto**: *(pendiente)*
+- **Resuelto**: Borrado.
 
 ### #18 — `§3.4` sintaxis de notas internas "Cite @X for..."
 
-- [ ] *Resolver*
-- **Issue**: §3.4 termina con "Cite @Iverson2000 for the physical
-  triggering picture and @Hungr2005 for...". Uso instructivo, suena a
-  notas internas.
-- **Fix propuesto**: reescribir como prosa: "Iverson [@Iverson2000]
-  provides the canonical triggering picture; Hungr [@Hungr2005] the
-  classification of regimes the engine would have to span."
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto* (como bonus durante #2)
+- **Issue**: Sintaxis instructiva leftover.
+- **Fix propuesto**: prosa académica.
+- **Resuelto**: Reescrito como "Iverson [@Iverson2000] gives the
+  canonical triggering picture; Hungr [@Hungr2005] the classification
+  of regimes that a unified engine would have to span."
 
 ---
 
@@ -259,12 +292,20 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 ## Resumen de progreso
 
 ```
-🔴 Críticos:     0/6  resueltos
-🟡 Importantes:  0/8  resueltos
-🟢 Menores:      0/4  resueltos
-Pre-existentes: 0/10 resueltos
+🔴 Críticos:     6/6  resueltos ✅
+🟡 Importantes:  2/8  resueltos (#11, #13 como bonus durante 🔴)
+🟢 Menores:      3/4  resueltos (#15, #17, #18 como bonus durante 🔴)
+Pre-existentes:  0/10 resueltos
 ─────────────────────────────────
-TOTAL:           0/28 resueltos
+TOTAL:          11/28 resueltos
 ```
 
-Última actualización: 2026-05-17 (creación inicial).
+**Próxima pasada** (issues 🟡 restantes #7, #8, #9, #10, #12, #14):
+ajustes de tono ("compromised" → "constrained"), counter-example en
+§1.2, título §3, abstract overstatement, Why-not-fork-Delft3D,
+sustainability single-author.
+
+**Sub-tarea de #6**: skill `verify-refs` sobre las 3 refs nuevas con
+autorías reconstruidas (WilkinsonFAIR2016, Wilcox2016, Serey2019).
+
+Última actualización: 2026-05-17, post-resolución de los 🔴 críticos.
