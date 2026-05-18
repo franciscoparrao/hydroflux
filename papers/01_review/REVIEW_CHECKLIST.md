@@ -287,7 +287,13 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
       `license = "MIT OR Apache-2.0"`. Manuscript Data section + cover
       letter + README confirmados.
 - [ ] **DEM provenance** confirmar HydroSHEDS vs repositorio chileno
-- [ ] **HEC-RAS version** verificar release menor de OpenCL GPU (§2.1)
+- [x] **HEC-RAS version**: investigado vía documentación oficial USACE
+      (hec.usace.army.mil/confluence/hecras/latest/gpu-solver). Corrección
+      sustantiva al manuscript: NO era OpenCL en 6.x sino CUDA en
+      HEC-RAS 2025, y NO es del 2D FV implícito sino de un *solver
+      explícito separado* shippeado alongside. Esta corrección REFUERZA
+      el argumento de §3.3 (GPU as exception) — HEC-RAS recién en 2025
+      tiene GPU y solo como add-on de un código diferente.
 - [ ] **Figura 1**: master table como figura formateada (no markdown
   inline) para submission
 - [ ] **Figura 2**: intersection diagram de los 5 gaps (placeholder en
@@ -308,12 +314,13 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 🔴 Críticos:     6/6   resueltos ✅
 🟡 Importantes:  8/8   resueltos ✅
 🟢 Menores:      4/4   resueltos ✅
-Pre-existentes:  7/10  resueltos (5 figuras + GitHub URL + licencia)
+Pre-existentes:  8/10  resueltos (5 figuras + GitHub URL + licencia
+                                   + HEC-RAS version)
 Sub-tarea #6:   1/1   resuelto ✅ (verify-refs ejecutado)
 ─────────────────────────────────
-TOTAL:          26/29 resueltos
+TOTAL:          27/29 resueltos
 
-Restantes: ORCID, DEM provenance, HEC-RAS version exacta.
+Restantes: ORCID + DEM provenance (ambos requieren input del autor).
 ```
 
 **Figuras: 4/4 generadas, refactorizadas con paper-figures style, y
@@ -341,7 +348,8 @@ como simplemente "Table 1"):
 2. ✅ ~~GitHub URL~~: <https://github.com/franciscoparrao/hydroflux>
 3. ✅ ~~Licencia~~: **MIT OR Apache-2.0** dual
 4. ⏳ DEM provenance (HydroSHEDS vs Chilean repository)
-5. ⏳ HEC-RAS version menor (§2.1 "[verify exact version]")
+5. ✅ ~~HEC-RAS version~~: corregido a "HEC-RAS 2025 CUDA explicit
+   solver" (no OpenCL en 6.x — error sustantivo descubierto y arreglado)
 
 **Sub-tarea de #6: skill `verify-refs` ejecutado el 2026-05-18 sobre
 references.bib completo (36 entries).** Hallazgos:

@@ -244,11 +244,14 @@ the legacy of computational hydraulics through the 1970s and 1980s.
 Saint-Venant solver based on the implicit Preissmann box scheme,
 augmented since version 5 with a 2D module using an implicit
 finite-volume discretisation with sub-grid bathymetry. The user faces a
-Windows-only GUI and binary project files; the FORTRAN core is closed
-and OpenCL GPU acceleration was added in version 6.x for the 2D module
-[verify exact version]. HEC-RAS's strengths are real — FEMA approval
-for FIRM mapping in the US, broad LATAM adoption including in Chile,
-deep integration with HEC-HMS for hydrology — but its lineage forecloses
+Windows-only GUI and binary project files; the FORTRAN core is closed.
+The 2D implicit FV kernel itself remains CPU-only as of HEC-RAS 6.6;
+CUDA-based GPU acceleration entered the product line only in
+HEC-RAS 2025 and only through a *separate explicit* solver shipped
+alongside the existing 2D module, not as a parallelisation of the
+implicit kernel. HEC-RAS's strengths are real — FEMA approval for FIRM
+mapping in the US, broad LATAM adoption including in Chile, deep
+integration with HEC-HMS for hydrology — but its lineage forecloses
 the modernisation paths discussed in §1.
 
 **TELEMAC-MASCARET** [@Hervouet2007], maintained by an opensource
@@ -502,7 +505,9 @@ shallow-water equations and therefore restricted to subcritical and
 mildly transcritical regimes. The remaining ten solvers either lack
 GPU support entirely (BASEMENT, TELEMAC, ANUGA, SRH-2D, Iber, GeoClaw,
 Kratos), maintain partial GPU acceleration confined to specific modules
-(Delft3D, MIKE), or treat GPU as an opt-in afterthought (HEC-RAS 6.x).
+(Delft3D, MIKE), or — in the case of HEC-RAS — ship GPU only as a
+*separate* explicit solver added in 2025, with the regulatory 2D
+implicit kernel remaining CPU-only.
 
 The cost is concentration of computational capacity. Continental-scale
 flood studies — basin-by-basin coverage of a country, or comparative
