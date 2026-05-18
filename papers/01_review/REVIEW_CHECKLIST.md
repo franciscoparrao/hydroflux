@@ -303,29 +303,38 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 🔴 Críticos:     6/6  resueltos ✅
 🟡 Importantes:  8/8  resueltos ✅
 🟢 Menores:      4/4  resueltos ✅
-Pre-existentes:  0/10 resueltos
+Pre-existentes:  5/10 resueltos (las 5 figuras + renumbering)
 ─────────────────────────────────
-TOTAL:          18/28 resueltos (TODAS las observaciones del
-                                 tex-review review cerradas)
+TOTAL:          23/28 resueltos
 ```
 
-**Issues del tex-review: 18/18 cerradas.** Las 10 tareas pre-existentes
-restantes son trabajo de producción / verificación (no observaciones
-analíticas):
+**Figuras: 4/4 generadas y cross-referenciadas** (renumbering consolidó
+"Figure 1 master table" como simplemente "Table 1", y la composite
+Maule/Huasco pasó de Figure 5 a Figure 4):
+
+- **Figure 1** (intersection diagram): radar 5 ejes con 5 solvers
+  representativos + hydroflux pentagon. Generado por
+  `figures/gen_fig1_intersection.py`. Referenciado en §3.6.
+- **Figure 2** (Stoker dam break): perfil n=400 vs analítico +
+  convergencia log-log con orden 0.80/0.81. Generado por
+  `figures/gen_fig2_stoker.py`. Referenciado en §4.3.1.
+- **Figure 3** (MacDonald variable): inverse design profile +
+  convergencia orden 1.04. Generado por `figures/gen_fig3_macdonald.py`.
+  Referenciado en §4.3.3 con cross-ref a Figure 2.
+- **Figure 4** (Maule/Huasco flagship): par insignia composite copiado
+  de `examples/figures/maule_vs_huasco.png` a
+  `papers/01_review/figures/fig4_maule_huasco.png`. Referenciado en
+  §4.4.
+
+**5 TODOs de producción restantes** (cosméticos pre-submit):
 
 1. ORCID confirmar
 2. GitHub URL confirmar
 3. Licencia decidir (MIT/Apache 2.0/MPL 2.0)
 4. DEM provenance confirmar (HydroSHEDS vs Chilean repository)
 5. HEC-RAS version menor verificar (§2.1 "[verify exact version]")
-6. Figura 1 (master table formatted) — generar
-7. Figura 2 (intersection diagram) — generar
-8. Figura 3 (Stoker convergence plot) — generar desde benchmarks/
-9. Figura 4 (MacDonald variable result plot) — generar desde benchmarks/
-10. Figura 5 flagship — ya existe en examples/figures/, solo
-    cross-referenciar (ya hecho como "Figure 5" en §4.4)
 
 **Sub-tarea de #6**: skill `verify-refs` sobre las 3 refs nuevas con
 autorías reconstruidas (WilkinsonFAIR2016, Wilcox2016, Serey2019).
 
-Última actualización: 2026-05-18, post-resolución completa del review.
+Última actualización: 2026-05-18, post-generación de las 4 figuras.

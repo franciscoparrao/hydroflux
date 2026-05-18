@@ -193,8 +193,9 @@ roadmap document for the open-source flood community over the second
 half of the 2020s.
 
 The remainder of the paper is structured as follows. Section 2 surveys
-the twelve solvers and presents the comparative master table (Figure
-1). Section 3 articulates the four gaps and the cross-cutting fifth.
+the twelve solvers and presents the comparative master table
+(Table 1). Section 3 articulates the four gaps and the cross-cutting
+fifth (Figure 1).
 Section 4 lays out the
 hydroflux roadmap together with the validation evidence for its first
 1D building block, including a flagship demonstration on two
@@ -206,7 +207,7 @@ problems and issues a community invitation. Section 6 concludes.
 
 We survey twelve solvers spanning the regulatory, academic and
 commercial tracks of two-dimensional flood and shallow-water modelling.
-Table 1 (Figure 1) consolidates the comparison across eight axes;
+Table 1 consolidates the comparison across eight axes;
 the discussion below organises them into three lineages whose distinct
 design philosophies illuminate what the landscape collectively solves
 and what it collectively misses. Each ficha was assembled from the
@@ -583,15 +584,31 @@ modelling.
 
 These five gaps are not independent design choices that could be
 plugged one by one. They are the consequence of the language, hardware
-era, and disciplinary boundaries that the field inherited. No existing
-solver can pivot to cover the intersection — open and forkable, in a
-modern host language with ergonomic autograd, GPU-first, with native
-coupling to non-hydraulic hazards — without rewriting its numerical
-core. The intersection is narrow precisely because each gap, taken
-alone, would already represent a substantial engineering effort;
-taken jointly, they define a coherent technical agenda whose
-boundaries can be drawn cleanly. Section 4 traces that agenda
-beginning from a 1D building block already in working order.
+era, and disciplinary boundaries that the field inherited. Figure 1
+renders the situation across the five axes for five representative
+solvers — the regulatory anchor HEC-RAS, the open-source GPU-mature
+LISFLOOD-FP, the methodologically rigorous but closed-source BASEMENT,
+the legacy-FORTRAN multidomain TELEMAC, and the commercial GPU-leader
+TUFLOW HPC — together with the hydroflux target. Each existing solver
+sits near the centre of the diagram on most axes, with extension along
+one or two axes corresponding to its specific historical strengths;
+none reaches the full pentagon. No existing solver can pivot to cover
+the intersection — open and forkable, in a modern host language with
+ergonomic autograd, GPU-first, with native coupling to non-hydraulic
+hazards — without rewriting its numerical core. The intersection is
+narrow precisely because each gap, taken alone, would already
+represent a substantial engineering effort; taken jointly, they
+define a coherent technical agenda whose boundaries can be drawn
+cleanly. Section 4 traces that agenda beginning from a 1D building
+block already in working order.
+
+![**Figure 1.** The intersection is the gap. Five-axis radar plot
+across the five structural gaps of §3; existing solvers cover one or
+two axes each (the cluster near the centre), the hydroflux target
+pentagon spans all five. Scores are deliberately qualitative — see
+§3.1–3.5 and `state-of-the-art.md` for the substantive justification
+per solver.](figures/fig1_intersection.pdf){#fig:intersection
+width=85%}
 
 # 4 — A roadmap: hydroflux
 
@@ -674,13 +691,22 @@ star region, and a right-going shock. With `h_L = 1.0 m`, `h_R = 0.1 m`,
 `g = 9.81 m s⁻²`, the analytical solution has `h* = 0.396 m`,
 `u* = 2.32 m s⁻¹` and shock speed `S = 3.11 m s⁻¹`. At `t = 0.075 s` on a
 domain `[0, 1] m` we observe an `L¹` depth error of `4.2 × 10⁻³` at `n =
-400` cells, with empirical order **0.81** across `n ∈ {100, 200, 400}`.
-The reduced order relative to first-order theory is the expected
-signature of HLL applied to a discontinuous solution: dissipation
-smears the shock over three to five cells and dominates the global `L¹`
-budget. The order is a sensitive regression indicator: an HLLC or MUSCL
-upgrade should raise it noticeably while leaving the rarefaction error
-essentially unchanged.
+400` cells, with empirical order **0.81** across `n ∈ {100, 200, 400}`
+(Figure 2). The reduced order relative to first-order theory is the
+expected signature of HLL applied to a discontinuous solution:
+dissipation smears the shock over three to five cells and dominates
+the global `L¹` budget. The order is a sensitive regression indicator:
+an HLLC or MUSCL upgrade should raise it noticeably while leaving the
+rarefaction error essentially unchanged.
+
+![**Figure 2.** Stoker wet–wet dam break against the hydroflux 1D
+solver. (a) Depth profile at $t = 0.075$ s for $n = 400$; numerical
+solution (points) recovers the analytical rarefaction, star region and
+shock with shock smearing over three to five cells, characteristic of
+HLL. (b) Log–log convergence on $n \in \{50, 100, 200, 400, 800\}$;
+empirical order $0.80$ for $L^1(h)$ and $0.81$ for $L^1(hu)$, the
+expected shock-degraded order.](figures/fig2_stoker.pdf){#fig:stoker
+width=100%}
 
 ### 4.3.2 MacDonald uniform flow (Manning normal depth)
 
@@ -704,15 +730,25 @@ test as a regression guard.
 The non-trivial case of @MacDonald1997: we prescribe a smooth depth
 profile `h(x) = 1 + 0.2 sin(2π x / L)` and `q = 1.0 m² s⁻¹`, then derive
 the bed `z(x)` by analytical integration of
-`dz/dx = −(1 − Fr²) dh/dx − S_f` and run the solver from the analytical
-initial state. The reach is sub-critical throughout (`Fr_max = 0.45`).
-After two wave transits, the empirical `L¹(h)` errors across `n ∈ {50,
-100, 200, 400, 800}` give ratios `2.12, 2.07, 2.03, 2.02` per 2×
-refinement, implying an empirical order of **1.03**. This matches the
+`dz/dx = −(1 − Fr²) dh/dx − S_f` (Figure 3a) and run the solver from
+the analytical initial state. The reach is sub-critical throughout
+(`Fr_max = 0.45`). After two wave transits, the empirical `L¹(h)`
+errors across `n ∈ {50, 100, 200, 400, 800}` give ratios
+`2.12, 2.07, 2.03, 2.02` per 2× refinement, implying an empirical
+order of **1.03** (Figure 3b). This matches the formal first-order
+target of HLL + forward Euler on a smooth steady state without shocks
+and, together with the dam-break order 0.81, brackets the expected
+behaviour: full order on smooth flow, shock-degraded order on Riemann
+problems.
+
+![**Figure 3.** MacDonald variable-depth steady state. (a) Inverse
+design: prescribed depth profile $h(x) = 1.0 + 0.2 \sin(2\pi x / L)$
+(blue band) over the analytically derived bed $z(x)$ (brown line) by
+trapezoidal integration of $dz/dx = -(1 - Fr^2) dh/dx - S_f$. (b)
+Log–log convergence; empirical order $1.04$ for $L^1(h)$ matches the
 formal first-order target of HLL + forward Euler on a smooth steady
-state without shocks and, together with the dam-break order 0.81,
-brackets the expected behaviour: full order on smooth flow,
-shock-degraded order on Riemann problems.
+state. Contrast with the shock-degraded 0.81 of the Stoker dam break
+(Figure 2).](figures/fig3_macdonald.pdf){#fig:macdonald width=100%}
 
 ## 4.4 Application to two Chilean Andean reaches
 
@@ -738,7 +774,7 @@ to 1.50 m, velocity 0.97 to 1.38 m s⁻¹, and the Froude number remains
 between 0.26 and 0.49 — comfortably sub-critical despite the steeper
 terrain.
 
-The flagship comparison (Figure 5) reveals a counter-intuitive
+The flagship comparison (Figure 4) reveals a counter-intuitive
 finding: **Froude is lower in Huasco than in Maule despite Huasco's
 threefold steeper slope**. This is a clean algebraic consequence of the
 Manning normal-depth identity
@@ -753,6 +789,18 @@ calibration against observations is performed, and the demonstration is
 illustrative rather than predictive. Both pipelines are reproducible in
 `examples/maule_reach_demo/` and `examples/huasco_reach_demo/` of the
 repository.
+
+![**Figure 4.** *Flagship.* hydroflux-solver-1d on two contrasting
+Chilean Andean pilot basins. **Left**: Río Maule (BNA #11),
+Mediterranean-temperate, mean slope $\approx 1\%$, $q = 3$ m²/s,
+$n = 0.04$. **Right**: Río Huasco (BNA #06), semiarid Andean
+boulder-bed reach, mean slope $\approx 3.5\%$, $q = 1$ m²/s,
+$n = 0.06$. Top panels: longitudinal profile (bed in brown, water
+surface above). Bottom panels: Froude number along the reach with
+critical line at $Fr = 1$. The Huasco reach has a *lower* Froude
+number despite its threefold steeper slope — a closed-form consequence
+of the Manning normal-depth identity discussed in the
+text.](figures/fig4_maule_huasco.pdf){#fig:flagship width=100%}
 
 ## 4.5 Multi-year roadmap
 
