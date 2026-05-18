@@ -47,11 +47,12 @@ not a finished solver but the conceptual articulation of the four-gap
 intersection, supported by a feasibility artefact and an explicit
 invitation to community convergence.
 
-The accompanying open-source code is released under a permissive
-licence at the repository indicated in the manuscript, and a benchmark
-suite (Stoker, MacDonald, future UK EA 2D) is distributed alongside.
-The intent is to provide a target that the BASEMENT, LISFLOOD-FP,
-ANUGA, and JAX-Hydro communities can adopt, fork, audit and improve.
+The accompanying open-source code is released under the **MIT OR
+Apache-2.0** dual licence at
+<https://github.com/franciscoparrao/hydroflux>, with a benchmark suite
+(Stoker, MacDonald, future UK EA 2D) distributed alongside. The intent
+is to provide a target that the BASEMENT, LISFLOOD-FP, ANUGA, and
+JAX-Hydro communities can adopt, fork, audit and improve.
 
 **Conflict of interest declaration**: I am the author of the *hydroflux*
 solver discussed in Section 4. The review of Section 2 covers competing
@@ -88,5 +89,5 @@ Sincerely,
 Francisco Parra
 Postdoctoral Fellow, Universidad de Santiago de Chile
 DICYT 2026–2027
+Email: francisco.parra.o@usach.cl
 ORCID: *(TODO confirm pre-submit)*
-Email: *(TODO confirm pre-submit)*

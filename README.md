@@ -82,4 +82,16 @@ Puede citarse y vincularse a la postdoctoral en CLAUDE.md, READMEs y futuros pap
 
 ## Licencia
 
-MIT / Apache 2.0 (decidir al primer release público). Compatible con uso académico y comercial.
+Licenciado bajo **MIT OR Apache-2.0** dual — el usuario downstream elige.
+Compatible con uso académico, comercial, GPL-compatible downstream (vía
+Apache) y maximally-permissive downstream (vía MIT). Es la convención
+estándar del ecosistema Rust y matchea la licencia del paquete hermano
+[SurtGIS](https://github.com/franciscoparrao/surtgis).
+
+Ver `LICENSE-MIT` y `LICENSE-APACHE` en la raíz del repositorio para los
+textos completos.
+
+A menos que el contribuyente declare lo contrario explícitamente,
+cualquier contribución intencionalmente enviada para inclusión en este
+trabajo, según lo definido en la licencia Apache-2.0, será dual-licenciada
+como arriba sin términos o condiciones adicionales.

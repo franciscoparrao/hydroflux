@@ -1,8 +1,14 @@
 [package]
-name = "hydroflux-solver-1d"
-version = "0.1.0-dev"
-edition.workspace = true
+name        = "hydroflux-solver-1d"
+version     = "0.1.0-dev"
+description = "Saint-Venant 1D solver: finite-volume + HLL Riemann + Audusse well-balanced + Manning friction"
+edition.workspace      = true
 rust-version.workspace = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+keywords.workspace     = true
+categories.workspace   = true
 
 [dependencies]
 ndarray.workspace = true

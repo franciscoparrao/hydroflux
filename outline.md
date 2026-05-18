@@ -127,7 +127,7 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 
 - [ ] **Esquema numérico 1D**: HLL vs Roe vs HLLC. (Decisión: 2026 Q3 al implementar.)
 - [ ] **Estructura del crate**: monorepo workspace con crates separados (solver-1d, solver-2d, common, io) vs single crate con módulos. (Decisión: 2026 Q3 al primer commit.)
-- [ ] **Licencia**: MIT vs Apache 2.0 vs MPL 2.0. (Decisión: antes del primer release público.)
+- [x] ~~**Licencia**: MIT vs Apache 2.0 vs MPL 2.0.~~ **Decidido 2026-05-18: MIT OR Apache-2.0 dual** (convención Rust ecosystem; consistente con SurtGIS; downstream elige).
 - [ ] **Nombre definitivo**: hydroflux es tentativo. Verificar disponibilidad en crates.io, dominio, redes. (Decisión: antes del v0.1 release.)
 
 ---

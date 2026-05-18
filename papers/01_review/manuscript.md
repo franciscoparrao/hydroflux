@@ -897,9 +897,8 @@ We end with an explicit invitation. The wedge identified in §3 is wide
 enough to support multiple independent implementations, and the
 intersection is what matters, not the language. Issues, pull requests,
 forks, and competing implementations are all welcome at
-<https://github.com/franciscoparrao/hydroflux> *(TODO confirm repo URL
-before submission)*. The benchmark suite is the protocol; the
-implementation is the conversation.
+<https://github.com/franciscoparrao/hydroflux>. The benchmark suite is
+the protocol; the implementation is the conversation.
 
 # 6 — Conclusion
 
@@ -953,8 +952,9 @@ The implementation is the conversation that follows.
 # Data and code availability
 
 All source code lives in the public repository at
-<https://github.com/franciscoparrao/hydroflux> *(TODO)* under a
-permissive licence *(TODO: MIT vs Apache-2.0 vs MPL-2.0)*. Each release
+<https://github.com/franciscoparrao/hydroflux> under the
+**MIT OR Apache-2.0** dual licence (Rust ecosystem convention; downstream
+users select the licence that best fits their needs). Each release
 carries a Zenodo DOI. Benchmark inputs (Stoker, MacDonald cases) are
 included in the repository under CC-BY-4.0. Chilean basin DEMs used in
 §4.4 are derived from the Hydrographically-conditioned digital

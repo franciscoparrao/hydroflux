@@ -279,8 +279,13 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 ## Otros TODOs identificados (no de la review, pre-existentes en el draft)
 
 - [ ] **ORCID** confirmar (yaml frontmatter)
-- [ ] **GitHub URL** confirmar (§5 + Data availability)
-- [ ] **Licencia final** decidir MIT vs Apache 2.0 vs MPL 2.0 (Data avail)
+- [x] **GitHub URL** confirmado: <https://github.com/franciscoparrao/hydroflux>
+      (placeholder personal; pivotear a USACH org si se decide después)
+- [x] **Licencia final**: **MIT OR Apache-2.0 dual** (convención Rust
+      ecosystem; consistente con SurtGIS). `LICENSE-MIT` + `LICENSE-APACHE`
+      en repo root. Cargo.toml workspace.package actualizado con
+      `license = "MIT OR Apache-2.0"`. Manuscript Data section + cover
+      letter + README confirmados.
 - [ ] **DEM provenance** confirmar HydroSHEDS vs repositorio chileno
 - [ ] **HEC-RAS version** verificar release menor de OpenCL GPU (§2.1)
 - [ ] **Figura 1**: master table como figura formateada (no markdown
@@ -303,12 +308,12 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 🔴 Críticos:     6/6   resueltos ✅
 🟡 Importantes:  8/8   resueltos ✅
 🟢 Menores:      4/4   resueltos ✅
-Pre-existentes:  5/10  resueltos (figuras)
-Sub-tarea #6:   1/1   resuelto ✅ (verify-refs ejecutado, 4 errores
-                                     reales de autorías corregidos, 18
-                                     DOIs agregados al bib)
+Pre-existentes:  7/10  resueltos (5 figuras + GitHub URL + licencia)
+Sub-tarea #6:   1/1   resuelto ✅ (verify-refs ejecutado)
 ─────────────────────────────────
-TOTAL:          24/29 resueltos
+TOTAL:          26/29 resueltos
+
+Restantes: ORCID, DEM provenance, HEC-RAS version exacta.
 ```
 
 **Figuras: 4/4 generadas, refactorizadas con paper-figures style, y
@@ -330,13 +335,13 @@ como simplemente "Table 1"):
   rasterio, con callout flecha apuntando al hallazgo contraintuitivo
   Fr-Huasco-lower. `gen_fig4_maule_huasco.py`.
 
-**5 TODOs de producción restantes** (cosméticos pre-submit):
+**TODOs de producción** (estado actualizado 2026-05-18):
 
-1. ORCID confirmar
-2. GitHub URL confirmar
-3. Licencia decidir (MIT/Apache 2.0/MPL 2.0)
-4. DEM provenance confirmar (HydroSHEDS vs Chilean repository)
-5. HEC-RAS version menor verificar (§2.1 "[verify exact version]")
+1. ⏳ ORCID confirmar
+2. ✅ ~~GitHub URL~~: <https://github.com/franciscoparrao/hydroflux>
+3. ✅ ~~Licencia~~: **MIT OR Apache-2.0** dual
+4. ⏳ DEM provenance (HydroSHEDS vs Chilean repository)
+5. ⏳ HEC-RAS version menor (§2.1 "[verify exact version]")
 
 **Sub-tarea de #6: skill `verify-refs` ejecutado el 2026-05-18 sobre
 references.bib completo (36 entries).** Hallazgos:

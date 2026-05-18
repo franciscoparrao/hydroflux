@@ -10,8 +10,14 @@ members = [
 ]
 
 [workspace.package]
-edition = "2024"
-rust-version = "1.85"
+edition       = "2024"
+rust-version  = "1.85"
+authors       = ["Francisco Parra <francisco.parra.o@usach.cl>"]
+license       = "MIT OR Apache-2.0"
+repository    = "https://github.com/franciscoparrao/hydroflux"
+description   = "Differentiable, GPU-native, coupled hydrometeorological hazard solver in Rust"
+keywords      = ["hydraulics", "shallow-water", "flood", "differentiable", "gis"]
+categories    = ["science::geo", "simulation"]
 
 [workspace.dependencies]
 ndarray = "0.16"
