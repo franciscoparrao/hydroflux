@@ -7,6 +7,7 @@
 resolver = "3"
 members = [
     "solver-1d",
+    "solver-2d",
 ]
 
 [workspace.package]
