@@ -16,7 +16,10 @@
   publisher = {Springer},
   year      = {2009},
   note      = {Referencia canónica para esquemas FV en shallow water.
-               Toro test cases (5 problemas 1D) son benchmark estándar.}
+               Toro test cases (5 problemas 1D) son benchmark estándar.
+               Sin DOI: CrossRef devuelve 10.1007/978-3-662-03915-1 con
+               year=1999 (1ª edición). El DOI Springer correcto para la
+               3ª edición se verifica antes de submit.}
 }
 
 @article{Bermudez1994,
@@ -27,6 +30,7 @@
   number  = {8},
   pages   = {1049--1071},
   year    = {1994},
+  doi     = {10.1016/0045-7930(94)90004-3},
   note    = {Tratamiento del término fuente para well-balanced schemes
              (preservar lake-at-rest). Cita obligada en methods paper.}
 }
@@ -39,6 +43,7 @@
   number  = {11},
   pages   = {1041--1045},
   year    = {1997},
+  doi     = {10.1061/(asce)0733-9429(1997)123:11(1041)},
   note    = {Soluciones analíticas para flujo en canal con fricción.
              Benchmark estándar para validar steady-state 1D.}
 }
@@ -71,6 +76,7 @@
   volume  = {4},
   pages   = {25--34},
   year    = {1994},
+  doi     = {10.1007/BF01414629},
   note    = {Paper original del esquema HLLC. Mejora HLL preservando contacto.
              Decisión Q3 2026 entre HLL/Roe/HLLC para solver-1d.}
 }
@@ -84,6 +90,7 @@
   number  = {6},
   pages   = {2050--2065},
   year    = {2004},
+  doi     = {10.1137/S1064827503431090},
   note    = {Hydrostatic reconstruction — el truco para que well-balanced funcione
              con topografía discontinua. Imprescindible para el solver 2D.}
 }
@@ -97,6 +104,7 @@
   number  = {1},
   pages   = {133--160},
   year    = {2007},
+  doi     = {10.4310/cms.2007.v5.n1.a6},
   note    = {Esquema central-upwind, base de ANUGA y otros. Alternativa Riemann-free.}
 }
 
@@ -126,6 +134,7 @@
   number  = {1-2},
   pages   = {54--77},
   year    = {2000},
+  doi     = {10.1016/S0022-1694(00)00278-X},
   note    = {Paper original de LISFLOOD-FP. Inertial approximation.}
 }
 
@@ -136,7 +145,8 @@
   journal = {Water Resources Research},
   volume  = {48},
   number  = {W11506},
-  year    = {2012}
+  year    = {2012},
+  doi     = {10.1029/2012WR012514}
 }
 
 @techreport{NeelzPender2013,
@@ -181,6 +191,7 @@
   number  = {1-2},
   pages   = {33--45},
   year    = {2010},
+  doi     = {10.1016/j.jhydrol.2010.03.027},
   note    = {Formulación inercial de LISFLOOD-FP — descarta el término convectivo.
              Cita clave en gap final para señalar limitación de flujo transcrítico.}
 }
@@ -206,6 +217,7 @@
   number  = {1},
   pages   = {12--23},
   year    = {2010},
+  doi     = {10.1061/(asce)hy.1943-7900.0000134},
   note    = {Paper técnico de SRH-2D (USBR). Implicit time stepping en mesh híbrida.}
 }
 
@@ -216,6 +228,7 @@
   volume  = {20},
   pages   = {211--289},
   year    = {2011},
+  doi     = {10.1017/S0962492911000043},
   note    = {Paper canónico de GeoClaw. AMR + augmented Riemann solver well-balanced.}
 }
 
@@ -227,6 +240,7 @@
   number  = {8-9},
   pages   = {883--915},
   year    = {2004},
+  doi     = {10.1016/j.coastaleng.2004.07.014},
   note    = {Paper técnico de Delft3D-FLOW y morfología. Referencia core del solver Deltares.}
 }
 
@@ -254,6 +268,7 @@
   number  = {7},
   pages   = {1897--1910},
   year    = {2000},
+  doi     = {10.1029/2000WR900090},
   note    = {Acoplamiento físico lluvia → estabilidad → trigger. Base teórica
              para el coupling Years 4-6.}
 }
@@ -275,6 +290,7 @@
   number  = {5},
   pages   = {978--992},
   year    = {2009},
+  doi     = {10.1016/j.cageo.2007.12.003},
   note    = {DAN3D, modelo de propagación. Referencia para coupling.}
 }
 
@@ -287,6 +303,7 @@
   number  = {1-2},
   pages   = {1--14},
   year    = {2010},
+  doi     = {10.1016/j.coldregions.2010.04.005},
   note    = {Paper técnico de RAMMS (WSL/SLF). El módulo DEBRIS-FLOW comparte engine.
              Referencia para el lado "propagación granular" del coupling.}
 }
@@ -300,6 +317,7 @@
   number  = {2},
   pages   = {553--569},
   year    = {2017},
+  doi     = {10.5194/gmd-10-553-2017},
   note    = {Modelo open-source de propagación de mass flows en GRASS GIS.
              Alternativa abierta a RAMMS, citada en el gap final como ejemplo
              del pipeline file-based actual.}
@@ -313,6 +331,7 @@
   number  = {4},
   pages   = {1153--1171},
   year    = {1994},
+  doi     = {10.1029/93WR02979},
   note    = {SHALSTAB — modelo de susceptibilidad físicamente basado. Primer eslabón
              del pipeline lluvia → falla → propagación → inundación.}
 }
@@ -345,12 +364,13 @@
   volume  = {12},
   number  = {5988},
   year    = {2021},
+  doi     = {10.1038/s41467-021-26107-z},
   note    = {Paper seminal de differentiable parameter learning aplicado a modelos
              hidrológicos distribuidos. Cita transversal en el gap final.}
 }
 
 @article{Feng2022,
-  author  = {Feng, D. and Liu, J. and Lawson, K. and Shen, C.},
+  author  = {Feng, D. and Liu, J. and Lawson, K.},
   title   = {Differentiable, learnable, regionalized process-based models with
              multiphysical outputs can approach state-of-the-art hydrologic
              prediction accuracy},
@@ -358,6 +378,7 @@
   volume  = {58},
   number  = {10},
   year    = {2022},
+  doi     = {10.1029/2022WR032404},
   note    = {Differentiable PB hydrology. Demuestra que el approach diferenciable
              alcanza accuracy state-of-the-art en streamflow. Citar en review paper.}
 }
@@ -377,6 +398,7 @@
   number  = {8},
   pages   = {552--567},
   year    = {2023},
+  doi     = {10.1038/s43017-023-00450-9},
   note    = {Review de differentiable modeling en geosciences. Marco conceptual del
              wedge "diferenciable" de hydroflux. Cita obligada en sección 3 del review.}
 }
@@ -436,9 +458,9 @@
 % =============================================================================
 
 @article{Wilcox2016AtacamaFlash,
-  author  = {Wilcox, Andrew C. and Escauriaza, Crist\'ian and Agredano, Roberto
-             and Mignot, Emmanuel and Zuazo, Vicente and Otarola, Sebasti\'an
-             and Castro, Luis and Gironas, Jorge and Cienfuegos, Rodrigo and
+  author  = {Wilcox, Andrew C. and Escauriaza, Cristian and Agredano, Roberto
+             and Mignot, Emmanuel and Zuazo, Vicente and Ot\'arola, Sebasti\'an
+             and Castro, Lina and Giron\'as, Jorge and Cienfuegos, Rodrigo and
              Mao, Luca},
   title   = {An integrated analysis of the {M}arch 2015 {A}tacama floods},
   journal = {Geophysical Research Letters},
@@ -451,12 +473,14 @@
              Chile). Análisis hidrometeorológico, transporte de sedimento,
              impactos. Caso citado en §1.2 del review como ejemplo de cascade
              rainfall→landslide→debris flow→inundation.
-             Verificar lista exacta de autores con verify-refs.}
+             Autorías verificadas con verify-refs/CrossRef (2026-05-18):
+             Castro, Lina (no Luis); Otárola con acento; Cristian/Gironás
+             corregidos.}
 }
 
 @article{Serey2019MauleInventory,
-  author  = {Serey, Alejandra and Pi\~nero-Feliciangeli, Lorena and
-             Sep\'ulveda, Sergio A. and Poblete, Felipe and Petley,
+  author  = {Serey, Alejandra and Pi\~nero-Feliciangeli, Laura and
+             Sep\'ulveda, Sergio A. and Poblete, Fernando and Petley,
              David N. and Murphy, William},
   title   = {Landslides induced by the 2010 {C}hile megathrust earthquake:
              a comprehensive inventory and correlations with geological
@@ -470,5 +494,7 @@
   note    = {Inventario de landslides co-sísmicos del terremoto Maule 2010
              (Mw 8.8). Más de 1000 features documentados. Citado en §1.2 del
              review como ejemplo de cascade trigger.
-             Verificar lista de autores con verify-refs.}
+             Autorías verificadas con verify-refs/CrossRef (2026-05-18):
+             Piñero-Feliciangeli, Laura (no Lorena); Poblete, Fernando
+             (no Felipe).}
 }

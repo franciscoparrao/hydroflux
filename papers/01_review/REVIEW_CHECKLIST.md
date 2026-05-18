@@ -300,12 +300,15 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 ## Resumen de progreso
 
 ```
-🔴 Críticos:     6/6  resueltos ✅
-🟡 Importantes:  8/8  resueltos ✅
-🟢 Menores:      4/4  resueltos ✅
-Pre-existentes:  5/10 resueltos (las 5 figuras + renumbering)
+🔴 Críticos:     6/6   resueltos ✅
+🟡 Importantes:  8/8   resueltos ✅
+🟢 Menores:      4/4   resueltos ✅
+Pre-existentes:  5/10  resueltos (figuras)
+Sub-tarea #6:   1/1   resuelto ✅ (verify-refs ejecutado, 4 errores
+                                     reales de autorías corregidos, 18
+                                     DOIs agregados al bib)
 ─────────────────────────────────
-TOTAL:          23/28 resueltos
+TOTAL:          24/29 resueltos
 ```
 
 **Figuras: 4/4 generadas, refactorizadas con paper-figures style, y
@@ -335,7 +338,38 @@ como simplemente "Table 1"):
 4. DEM provenance confirmar (HydroSHEDS vs Chilean repository)
 5. HEC-RAS version menor verificar (§2.1 "[verify exact version]")
 
-**Sub-tarea de #6**: skill `verify-refs` sobre las 3 refs nuevas con
-autorías reconstruidas (WilkinsonFAIR2016, Wilcox2016, Serey2019).
+**Sub-tarea de #6: skill `verify-refs` ejecutado el 2026-05-18 sobre
+references.bib completo (36 entries).** Hallazgos:
+
+- **3 refs reconstruidas verifican DOIs OK**, pero el lookup directo
+  reveló **errores reales de autorías**:
+  - `Wilcox2016AtacamaFlash`: `Castro, Luis` → **`Castro, Lina`**;
+    `Otarola` → **`Otárola`** (acento); `Cristian` (no Cristián);
+    `Gironás` (con acento). Corregido.
+  - `Serey2019MauleInventory`: `Piñero-Feliciangeli, Lorena` →
+    **`Laura`**; `Poblete, Felipe` → **`Fernando`**. Corregido.
+  - `WilkinsonFAIR2016`: autorías ok (mantenemos "and others" para
+    los ~53 coautores del FAIR consortium).
+- **`Feng2022` tenía Shen erróneamente como 4° autor** — CrossRef
+  confirma solo 3 autores (Feng, Liu, Lawson). Removido.
+- **18 DOIs agregados** a refs CrossRef-matched: Bermudez1994,
+  MacDonald1997, Toro1994, Audusse2004, KurganovPetrova2007,
+  BatesDeRoo2000, Neal2012, Bates2010, Lai2010, LeVeque2011, Lesser2004,
+  Iverson2000, HungrMcDougall2009, Christen2010, Montgomery1994,
+  Tsai2021, Shen2023, Mergili2017 (manual), Feng2022 (manual).
+- **Toro2009 sin DOI** intencionalmente: CrossRef devolvió DOI de la 1ª
+  edición (1999), no la 3ª (2009) que se cita. Resolver pre-submit.
+- **Griewank2008 título "Suspicious"**: CrossRef stripped el subtítulo.
+  Mantenemos el título completo del SIAM book (más informativo).
+- **9 refs Not-found legítimas**: Roe1981 (pre-DOI), NeelzPender2013
+  (UK EA technical report), Roberts2015 (ANUGA manual), Brunner2020
+  (HEC-RAS manual), Blade2014 (Spanish-language journal no indexado),
+  Vetsch2020 (BASEMENT manual placeholder), Hungr2005 (book chapter),
+  Pack1998 (SINMAP technical report), SurtgisRef (Zenodo placeholder).
+
+Score final: **25 verified + 1 acceptable Suspicious = 26/36 (72.2%)**
+con APIs CrossRef/OpenAlex. Los 9 not-found son legítimamente
+no-indexables (técnicos/libros/placeholders). Score efectivo para refs
+que ESTÁN en CrossRef: ~96 % (25/26).
 
 Última actualización: 2026-05-18, post-generación de las 4 figuras.
