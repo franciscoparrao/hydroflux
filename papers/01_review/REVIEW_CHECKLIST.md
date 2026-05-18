@@ -134,47 +134,45 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #7 — `§3.1` tono moralizante "compromised openness"
 
-- [ ] *Resolver*
-- **Issue**: "Compromised openness" es adjetivo cargado moralmente. Lo
-  mismo "structurally consequential" repetido. Editor NHESS pediría
-  tono neutral.
-- **Fix propuesto**: "Constrained openness" / "Limited openness" para
-  el título de §3.1; "consequential for the field's trajectory" en
-  lugar de "structurally consequential".
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto*
+- **Issue**: "Compromised openness" cargado moralmente.
+- **Fix propuesto**: "Constrained openness".
+- **Resuelto**: Las 3 instancias de "compromised" cambiadas a
+  "constrained" (título §3.1, §1.3 setup, §6 restatement). El otro
+  fragmento "structurally consequential" ya había sido reescrito en
+  la pasada del #1.
 
 ### #8 — `§1.2` counter-example missing en coupled hazards
 
-- [ ] *Resolver*
-- **Issue**: Los tres casos chilenos (Atacama, Maule, Huasco) son todos
-  donde el coupling importó. No hay counter-example donde solver
-  desacoplado resolvió bien — sesga la evidencia hacia la hipótesis.
-- **Fix propuesto**: agregar frase reconociendo que en eventos
-  puramente fluviales el solver desacoplado es adecuado; el coupling
-  resuelve el SUBCONJUNTO de casos donde la cascada importa.
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto*
+- **Issue**: Sesgo de confirmación al elegir solo casos donde coupling
+  importó.
+- **Fix propuesto**: reconocer el subset de aplicabilidad.
+- **Resuelto**: Agregado párrafo de cierre al "Coupled hazards"
+  subsección: "This is not an argument that every flood event needs
+  coupling: purely fluvial winter inundation on a stable floodplain —
+  by far the most common case in regulatory practice — is well served
+  by the decoupled shallow-water solvers of §2. The coupling case is
+  for the *subset* of events where the cascade itself determines the
+  magnitude and timing of inundation, and for that subset the
+  file-based pipeline is the present limit."
 
 ### #9 — `§3` título "Four" vs cinco subsecciones
 
-- [ ] *Resolver*
-- **Issue**: Título de la sección dice "Four unresolved gaps" pero
-  tiene cinco subsecciones (3.1-3.5 + 3.6 closing). El texto del §3
-  reconoce "four convergent gaps, together with a fifth that cuts
-  across" pero el título no.
-- **Fix propuesto**: renombrar a "Four convergent gaps and a
-  cross-cutting absence" o "Five structural gaps in the open-source
-  landscape".
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto*
+- **Issue**: Título inconsistente con contenido.
+- **Fix propuesto**: "Four convergent gaps and a cross-cutting absence".
+- **Resuelto**: Aplicado. También actualizado el outline en §1.3:
+  "Section 3 articulates the four gaps and the cross-cutting fifth."
 
 ### #10 — Abstract "release the entire toolchain" overstatement
 
-- [ ] *Resolver*
-- **Issue**: "We release the entire toolchain under a permissive
-  licence" sugiere 2D + GPU + autograd ya hechos. La realidad es 1D.
-- **Fix propuesto**: "We release the foundation of an open-source
-  toolchain — currently a 1D building block — and a multi-year
-  roadmap..."
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto*
+- **Issue**: Abstract sobre-vendía 2D+GPU+autograd ya hechos.
+- **Resuelto**: Reemplazado por: "We release the 1D foundation of the
+  toolchain under a permissive licence — the 2D, GPU, autograd and
+  coupling layers are roadmap items, not present achievements — and
+  invite the community..."
 
 ### #11 — `§4.2` "Why Rust not Julia?" no defendido
 
@@ -195,15 +193,18 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #12 — `§3.2` "Why not fork Delft3D LGPL?" no respondido
 
-- [ ] *Resolver*
-- **Issue**: Reviewer Deltares-friendly puede preguntar por qué
-  greenfield en lugar de Rust shim sobre Delft3D LGPL kernel.
-- **Fix propuesto**: en §3.2 párrafo 2, agregar 1-2 frases: "We
-  considered building a Rust shim over an LGPL kernel (Delft3D D-Flow
-  FM, TELEMAC). Both alternatives carry the FORTRAN/C++ build-system
-  tax precisely where autodifferentiation hooks need to be inserted;
-  the gradient flow would still terminate at the FFI boundary."
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto*
+- **Issue**: Reviewer Deltares-friendly preguntaría sobre wrapper en
+  lugar de greenfield.
+- **Resuelto**: Agregado párrafo completo de defensa al final de §3.2:
+  "A natural objection is to ask why not build a thin modern-language
+  wrapper over an existing LGPL kernel... The wrapper inherits the
+  FORTRAN/legacy C++ build-system tax precisely on the boundary that
+  needs the most flexibility, and the gradient tape terminates at the
+  FFI seam rather than propagating through the physics... The same
+  critique applies to Python frontends over Cython kernels (ANUGA) or
+  framework plugins over closed cores." Cubre 3 objeciones relacionadas
+  con un solo argumento.
 
 ### #13 — `§5` asintótica de checkpointing imprecisa
 
@@ -218,14 +219,20 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #14 — `§5` sustainability single-author no abordado
 
-- [ ] *Resolver*
-- **Issue**: Roadmap multi-year (hasta 2032) tiene un solo autor.
-  Reviewer concerned con long-term sustainability preguntará.
-- **Fix propuesto**: en §5 "Reproducibility as community
-  infrastructure", una frase: "We acknowledge the single-author origin
-  of this roadmap and explicitly seek collaborators across the 2D,
-  GPU, autograd, and coupling subprojects."
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto*
+- **Issue**: Roadmap multi-year sin abordar long-term sustainability.
+- **Resuelto**: Agregado bullet "Sustainability and collaboration" al
+  §5, después de "Reproducibility as community infrastructure":
+  "The roadmap of §4.5 extends across seven years and four substantial
+  subprojects (2D, GPU, autograd, coupling) on a single-author
+  foundation. We acknowledge this openly: a long-horizon roadmap
+  maintained by one principal investigator is structurally fragile,
+  and the community-target framing of this paper is also an explicit
+  invitation to collaborators. The subprojects are loosely coupled by
+  design — each lives in its own crate of the Rust workspace and
+  depends on the others through stable interfaces rather than shared
+  state — so that distributed contribution is possible without
+  coordinated rewrites..."
 
 ---
 
@@ -241,14 +248,15 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ### #16 — `§1` "twice over" no falsable
 
-- [ ] *Resolver*
-- **Issue**: "Scientific computing landscape has been rebuilt twice
-  over" — frase retórica no falsable. Podría ser 1.5 o 3 rebuilds según
-  cómo cuentes.
-- **Fix propuesto**: "has gone through two structural transitions" +
-  nombrar las dos explícitamente en la misma frase (GPU,
-  differentiable).
-- **Resuelto**: *(pendiente)*
+- [x] *Resuelto*
+- **Issue**: "Rebuilt twice over" — retórico no falsable.
+- **Fix propuesto**: nombrar las transiciones explícitamente.
+- **Resuelto**: Cambiado a "has gone through two structural transitions
+  in the same period. The first brought general-purpose GPUs and
+  high-level parallel programming as accessible primitives; the second
+  is bringing differentiable programming as a first-class citizen..."
+  Ambas transiciones nombradas y conectadas a los gaps que articula
+  el paper.
 
 ### #17 — `§4.1` nota de proceso "versión canónica del wedge"
 
@@ -293,19 +301,31 @@ propuesto. Al resolver, marcar `[x]` y agregar bullet `**Resuelto**:
 
 ```
 🔴 Críticos:     6/6  resueltos ✅
-🟡 Importantes:  2/8  resueltos (#11, #13 como bonus durante 🔴)
-🟢 Menores:      3/4  resueltos (#15, #17, #18 como bonus durante 🔴)
+🟡 Importantes:  8/8  resueltos ✅
+🟢 Menores:      4/4  resueltos ✅
 Pre-existentes:  0/10 resueltos
 ─────────────────────────────────
-TOTAL:          11/28 resueltos
+TOTAL:          18/28 resueltos (TODAS las observaciones del
+                                 tex-review review cerradas)
 ```
 
-**Próxima pasada** (issues 🟡 restantes #7, #8, #9, #10, #12, #14):
-ajustes de tono ("compromised" → "constrained"), counter-example en
-§1.2, título §3, abstract overstatement, Why-not-fork-Delft3D,
-sustainability single-author.
+**Issues del tex-review: 18/18 cerradas.** Las 10 tareas pre-existentes
+restantes son trabajo de producción / verificación (no observaciones
+analíticas):
+
+1. ORCID confirmar
+2. GitHub URL confirmar
+3. Licencia decidir (MIT/Apache 2.0/MPL 2.0)
+4. DEM provenance confirmar (HydroSHEDS vs Chilean repository)
+5. HEC-RAS version menor verificar (§2.1 "[verify exact version]")
+6. Figura 1 (master table formatted) — generar
+7. Figura 2 (intersection diagram) — generar
+8. Figura 3 (Stoker convergence plot) — generar desde benchmarks/
+9. Figura 4 (MacDonald variable result plot) — generar desde benchmarks/
+10. Figura 5 flagship — ya existe en examples/figures/, solo
+    cross-referenciar (ya hecho como "Figure 5" en §4.4)
 
 **Sub-tarea de #6**: skill `verify-refs` sobre las 3 refs nuevas con
 autorías reconstruidas (WilkinsonFAIR2016, Wilcox2016, Serey2019).
 
-Última actualización: 2026-05-17, post-resolución de los 🔴 críticos.
+Última actualización: 2026-05-18, post-resolución completa del review.

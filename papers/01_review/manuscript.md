@@ -26,9 +26,11 @@ abstract: |
     Andean, slope ≈ 3.5 %). The accompanying roadmap extends through
     two-dimensional shallow water, GPU acceleration, native
     autodifferentiation, and continental-scale coupled simulation across
-    the 15 main Chilean basins. We release the entire toolchain under a
-    permissive licence and invite the community to converge on a common
-    open-source target for the next decade of coupled-hazard simulation.
+    the 15 main Chilean basins. We release the 1D foundation of the
+    toolchain under a permissive licence — the 2D, GPU, autograd and
+    coupling layers are roadmap items, not present achievements — and
+    invite the community to converge on a common open-source target for
+    the next decade of coupled-hazard simulation.
 keywords: [shallow water equations, finite volume, well-balanced,
            differentiable physics, coupled hazards, debris flow,
            Rust, GPU, open source, Chile]
@@ -42,12 +44,13 @@ in regulatory practice — the US Army Corps of Engineers' HEC-RAS
 FORTRAN computational kernel wrapped in a Windows GUI, project files in
 proprietary binaries, no native GPU, no automatic differentiation, no
 mechanism for coupling to non-hydraulic hazards. Around it, the wider
-scientific computing landscape has been rebuilt twice over. The first
-rebuild brought general-purpose GPUs and high-level parallel
-programming; the second is bringing differentiable programming as a
-first-class citizen, with reverse-mode automatic differentiation
-flowing transparently through tens of thousands of lines of physical
-code. Hydraulics has watched both rebuilds happen elsewhere.
+scientific computing landscape has gone through two structural
+transitions in the same period. The first brought general-purpose GPUs
+and high-level parallel programming as accessible primitives; the
+second is bringing differentiable programming as a first-class citizen,
+with reverse-mode automatic differentiation flowing transparently
+through tens of thousands of lines of physical code. Hydraulics has
+watched both transitions happen elsewhere.
 
 This paper argues that the conjunction of these two unbridged
 transitions, together with two further structural gaps — the absence of
@@ -127,6 +130,13 @@ infiltration, slope stability, granular propagation, shallow-water
 inundation — that today are simulated by entirely distinct code
 families with file-based handoffs between them. The handoffs lose
 conservation, lose synchronisation, and lose gradient information.
+This is not an argument that every flood event needs coupling: purely
+fluvial winter inundation on a stable floodplain — by far the most
+common case in regulatory practice — is well served by the decoupled
+shallow-water solvers of §2. The coupling case is for the *subset* of
+events where the cascade itself determines the magnitude and timing of
+inundation, and for that subset the file-based pipeline is the
+present limit.
 
 **Differentiable physics as the connecting tissue.** Differentiable
 modelling has consolidated rapidly in hydrology over the past five
@@ -161,7 +171,7 @@ two-dimensional shallow-water solvers (§2) drawn from regulatory,
 academic and commercial practice; we read each across nine consistent
 axes (numerical scheme, parallelism, openness, regulatory acceptance,
 extensibility, *inter alia*). *Second*, we use the survey to identify
-four convergent gaps in the open-source landscape — compromised
+four convergent gaps in the open-source landscape — constrained
 openness, legacy languages, GPU as exception, and the absence of
 single-engine coupling — together with a cross-cutting fifth: the
 absence of native differentiability across the whole set (§3). *Third*,
@@ -184,7 +194,8 @@ half of the 2020s.
 
 The remainder of the paper is structured as follows. Section 2 surveys
 the twelve solvers and presents the comparative master table (Figure
-1). Section 3 articulates the four gaps. Section 4 lays out the
+1). Section 3 articulates the four gaps and the cross-cutting fifth.
+Section 4 lays out the
 hydroflux roadmap together with the validation evidence for its first
 1D building block, including a flagship demonstration on two
 contrasting Chilean Andean reaches (Río Maule, Mediterranean-temperate;
@@ -402,7 +413,7 @@ Section 3 develops these four thresholds as the structural gaps that
 define the opening for the next generation of solvers, and the
 opportunity space for hydroflux.
 
-# 3 — Four unresolved gaps
+# 3 — Four convergent gaps and a cross-cutting absence
 
 The twelve-solver survey of §2 lets us articulate four convergent gaps
 in the contemporary shallow-water landscape, together with a fifth
@@ -413,7 +424,7 @@ adoption, language choice, hardware era and disciplinary boundary —
 over the last three decades. We articulate them here as the design
 constraints that the next generation of solvers must address.
 
-## 3.1 Compromised openness
+## 3.1 Constrained openness
 
 The solvers that dominate regulatory practice are predominantly
 closed or proprietary: HEC-RAS, MIKE, TUFLOW, SRH-2D, Iber and
@@ -428,7 +439,7 @@ issues for the multiphysics frameworks, and (in ANUGA's case) a
 release cadence that has not kept pace with the contemporary research
 literature.
 
-The cost of compromised openness is twofold. Scientifically, the
+The cost of constrained openness is twofold. Scientifically, the
 ability to *diff* two simulation setups — to test, in a pull-request
 discussion, what one parameter change does — is unavailable in any
 GUI-binary workflow; this collides directly with the principles for
@@ -465,6 +476,21 @@ lines of legacy is more expensive than rewriting from scratch in a
 language where it is given. The flood community has not yet faced this
 trade-off explicitly because no working group has paid the rewriting
 cost; §4 argues that the cost is now justified.
+
+A natural objection is to ask why not build a thin modern-language
+wrapper over an existing LGPL kernel — Delft3D D-Flow FM or
+TELEMAC-2D — rather than greenfield from scratch. We considered this
+option. Both kernels expose the FV update as compiled procedures
+across a foreign-function interface, which is where gradient flow
+would have to be inserted. The wrapper inherits the FORTRAN / legacy
+C++ build-system tax precisely on the boundary that needs the most
+flexibility, and the gradient tape terminates at the FFI seam rather
+than propagating through the physics. The wrapper approach buys
+short-term reuse of validated numerics at the cost of foreclosing the
+very capability — end-to-end autograd — that motivates the project.
+The same critique applies to Python frontends over Cython kernels
+(ANUGA) or framework plugins over closed cores: each preserves the
+numerical maturity below at the cost of the integration layer above.
 
 ## 3.3 GPU as the exception
 
@@ -805,6 +831,20 @@ order-of-convergence comparisons published here become longitudinal
 rather than snapshots. The benchmark inputs are CC-BY-4.0; the
 reference outputs are versioned in the repository.
 
+**Sustainability and collaboration.** The roadmap of §4.5 extends
+across seven years and four substantial subprojects (2D, GPU,
+autograd, coupling) on a single-author foundation. We acknowledge this
+openly: a long-horizon roadmap maintained by one principal investigator
+is structurally fragile, and the community-target framing of this paper
+is also an explicit invitation to collaborators. The subprojects are
+loosely coupled by design — each lives in its own crate of the Rust
+workspace and depends on the others through stable interfaces rather
+than shared state — so that distributed contribution is possible
+without coordinated rewrites. We expect to seek dedicated postdoctoral
+or doctoral collaborators across the 2D, GPU, autograd and coupling
+fronts during the 2027–2029 Fondecyt cycles, and to formalise external
+contribution through the standard open-source pull-request workflow.
+
 We end with an explicit invitation. The wedge identified in §3 is wide
 enough to support multiple independent implementations, and the
 intersection is what matters, not the language. Issues, pull requests,
@@ -817,7 +857,7 @@ implementation is the conversation.
 
 Twelve representative shallow-water solvers, spanning regulatory,
 academic, and commercial practice, share four convergent structural
-gaps: compromised openness, legacy host languages, GPU as exception
+gaps: constrained openness, legacy host languages, GPU as exception
 rather than norm, and the absence of single-engine coupling between
 the hydraulic, slope-stability and granular-propagation regimes that
 make up the actual phenomenology of hydrometeorological hazards.
