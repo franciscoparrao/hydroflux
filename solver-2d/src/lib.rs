@@ -31,6 +31,7 @@ pub mod boundary;
 pub mod flux;
 pub mod geometry;
 pub mod riemann;
+pub mod source;
 pub mod state;
 pub mod update;
 
@@ -41,5 +42,6 @@ pub use boundary::{Boundaries2D, Boundary, Side, ghost_cell};
 pub use flux::{FluxX, FluxY};
 pub use geometry::Mesh2D;
 pub use riemann::{hllc_flux_x, hllc_flux_y};
+pub use source::manning_friction_step;
 pub use state::{Conserved2D, Primitive2D};
 pub use update::{cfl_time_step, forward_euler_step, max_wave_speeds};
