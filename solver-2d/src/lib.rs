@@ -32,6 +32,7 @@ pub mod flux;
 pub mod geometry;
 pub mod riemann;
 pub mod state;
+pub mod update;
 
 /// Standard gravity used throughout the solver, in m/s².
 pub const GRAVITY: f64 = 9.81;
@@ -41,3 +42,4 @@ pub use flux::{FluxX, FluxY};
 pub use geometry::Mesh2D;
 pub use riemann::{hllc_flux_x, hllc_flux_y};
 pub use state::{Conserved2D, Primitive2D};
+pub use update::{cfl_time_step, forward_euler_step, max_wave_speeds};
