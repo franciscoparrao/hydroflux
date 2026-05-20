@@ -4,7 +4,31 @@
 //! HLLC interface flux and the hydrostatic reconstruction of Audusse
 //! et al. (2004) extended per face direction. Manning friction is
 //! applied separately as an operator-split fractional step (see
-//! `crate::source`, pending).
+//! `crate::source`).
+//!
+//! # MUSCL slope-limited reconstruction
+//!
+//! At each interior face the cell states are linearly extrapolated to
+//! the face midpoint using minmod-limited slopes (van Leer 1979). The
+//! reconstruction is performed on the **primitive** vector `(η, u, v)`
+//! where `η = h + z` is the water-surface elevation and `u, v` are
+//! velocity components — *not* on the conserved `(h, hu, hv)` directly,
+//! and *not* on `(η, hu, hv)` either. Reconstructing velocities rather
+//! than momenta is what gives consistent face states on a non-flat
+//! bed: when the analytical solution has `u` uniform but `h` varying
+//! (e.g. Manning normal flow), `(η, u, v)`-MUSCL gives equal velocity
+//! on both sides of every face, and the HLLC sees a consistent state.
+//! Reconstructing `(η, hu, hv)` would shift the velocity across the
+//! face because `h` differs between the two sides of an Audusse
+//! reconstruction, producing a 1% steady-state drift in MacDonald
+//! uniform flow. See Liang & Marche (2009), Kurganov & Petrova (2007),
+//! and Bouchut (2004) for the same choice in the SWE literature.
+//!
+//! The bed is treated as piecewise constant per cell (no bed slope
+//! reconstruction). Boundary cells use zero slope and the boundary
+//! face flux falls back to first-order — a controlled accuracy
+//! degradation that keeps the BC machinery unchanged. The interior
+//! is second-order in space; boundaries remain first-order.
 //!
 //! # Audusse in 2D
 //!
@@ -198,6 +222,250 @@ fn well_balanced_y_face(
     }
 }
 
+/// Minmod slope limiter (van Leer 1974, Roe 1986). Returns the
+/// smaller-magnitude argument when both have the same sign; zero
+/// otherwise. The simplest TVD limiter — most dissipative of the
+/// common choices but unconditionally stable and trivial to verify.
+fn minmod(a: f64, b: f64) -> f64 {
+    if a * b <= 0.0 {
+        0.0
+    } else if a.abs() < b.abs() {
+        a
+    } else {
+        b
+    }
+}
+
+/// Slopes per cell for the **primitive** reconstruction vector
+/// `(η, u, v)` in a single coordinate direction.
+///
+/// Reconstructing velocities `u, v` (rather than momenta `hu, hv`) is
+/// essential for well-balancedness on flows with non-uniform depth
+/// over a sloped bed: when the analytical solution has constant `u`
+/// but `h` varies (e.g. MacDonald uniform Manning flow with `η` linear
+/// in the bed slope direction), velocity-reconstruction gives the
+/// same `u` on both sides of every face, so the HLLC sees consistent
+/// face states. Momentum-reconstruction would produce a steady-state
+/// drift of order `dx·S₀/h_n`.
+#[derive(Debug, Clone, Copy, Default)]
+struct CellSlopes {
+    eta: f64,
+    u: f64,
+    v: f64,
+}
+
+/// Cell-centered primitive values `(η, u, v)`. Dry cells return
+/// `u = v = 0` (velocity is undefined when `h ≤ H_DRY`).
+fn primitives_at(
+    states: &Array2<Conserved2D>,
+    bed: &Array2<f64>,
+    i: usize,
+    j: usize,
+) -> (f64, f64, f64) {
+    let s = states[(i, j)];
+    if s.h > H_DRY {
+        (s.h + bed[(i, j)], s.hu / s.h, s.hv / s.h)
+    } else {
+        (s.h + bed[(i, j)], 0.0, 0.0)
+    }
+}
+
+/// Returns `true` if any cell within distance 2 of `(i, j)` along the
+/// `x` axis is dry (depth ≤ `H_DRY`). Used to drop slopes to zero in
+/// a 2-cell buffer around wet/dry fronts so that MUSCL reconstruction
+/// from a wet cell cannot extrapolate over a nearby dry cell and
+/// produce spurious overshoots at the front.
+fn any_neighbor_dry_x(states: &Array2<Conserved2D>, i: usize, j: usize, n_cols: usize) -> bool {
+    let j_lo = j.saturating_sub(2);
+    let j_hi = (j + 2).min(n_cols - 1);
+    for jj in j_lo..=j_hi {
+        if states[(i, jj)].h <= H_DRY {
+            return true;
+        }
+    }
+    false
+}
+
+/// Same as [`any_neighbor_dry_x`] but along the `y` axis.
+fn any_neighbor_dry_y(states: &Array2<Conserved2D>, i: usize, j: usize, n_rows: usize) -> bool {
+    let i_lo = i.saturating_sub(2);
+    let i_hi = (i + 2).min(n_rows - 1);
+    for ii in i_lo..=i_hi {
+        if states[(ii, j)].h <= H_DRY {
+            return true;
+        }
+    }
+    false
+}
+
+/// Compute minmod-limited primitive slopes per cell in the `x`
+/// direction.
+///
+/// Interior cells (`1 ≤ j ≤ n_cols − 2`) use central minmod between
+/// forward and backward differences. Boundary cells use the
+/// available one-sided difference (forward for `j = 0`, backward for
+/// `j = n_cols − 1`) — this lets a smooth steady-state flow on a
+/// sloped bed carry its bed-slope through the first/last cells
+/// consistently with the interior. If any cell within a 2-cell
+/// buffer of the slope's stencil is dry the slope drops to zero
+/// (first-order at wet/dry fronts) — this prevents a MUSCL
+/// reconstruction from a wet cell from extrapolating over a nearby
+/// dry cell and producing a spurious overshoot.
+fn compute_slopes_x(states: &Array2<Conserved2D>, mesh: &Mesh2D) -> Array2<CellSlopes> {
+    let n_cols = mesh.n_cols();
+    Array2::from_shape_fn(states.dim(), |(i, j)| {
+        if n_cols < 2 {
+            return CellSlopes::default();
+        }
+        if any_neighbor_dry_x(states, i, j, n_cols) {
+            return CellSlopes::default();
+        }
+        if j == 0 {
+            // Forward one-sided difference: slope = (right − centre) / dx.
+            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, 0);
+            let (eta_r, u_r, v_r) = primitives_at(states, &mesh.bed, i, 1);
+            return CellSlopes {
+                eta: (eta_r - eta_c) / mesh.dx,
+                u: (u_r - u_c) / mesh.dx,
+                v: (v_r - v_c) / mesh.dx,
+            };
+        }
+        if j + 1 == n_cols {
+            // Backward one-sided difference.
+            let (eta_l, u_l, v_l) = primitives_at(states, &mesh.bed, i, j - 1);
+            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
+            return CellSlopes {
+                eta: (eta_c - eta_l) / mesh.dx,
+                u: (u_c - u_l) / mesh.dx,
+                v: (v_c - v_l) / mesh.dx,
+            };
+        }
+        // Interior: central minmod.
+        let (eta_l, u_l, v_l) = primitives_at(states, &mesh.bed, i, j - 1);
+        let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
+        let (eta_r, u_r, v_r) = primitives_at(states, &mesh.bed, i, j + 1);
+        CellSlopes {
+            eta: minmod((eta_c - eta_l) / mesh.dx, (eta_r - eta_c) / mesh.dx),
+            u: minmod((u_c - u_l) / mesh.dx, (u_r - u_c) / mesh.dx),
+            v: minmod((v_c - v_l) / mesh.dx, (v_r - v_c) / mesh.dx),
+        }
+    })
+}
+
+/// Compute minmod-limited primitive slopes per cell in the `y`
+/// direction. Boundary cells use the available one-sided difference.
+fn compute_slopes_y(states: &Array2<Conserved2D>, mesh: &Mesh2D) -> Array2<CellSlopes> {
+    let n_rows = mesh.n_rows();
+    Array2::from_shape_fn(states.dim(), |(i, j)| {
+        if n_rows < 2 {
+            return CellSlopes::default();
+        }
+        if any_neighbor_dry_y(states, i, j, n_rows) {
+            return CellSlopes::default();
+        }
+        if i == 0 {
+            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, 0, j);
+            let (eta_b, u_b, v_b) = primitives_at(states, &mesh.bed, 1, j);
+            return CellSlopes {
+                eta: (eta_b - eta_c) / mesh.dy,
+                u: (u_b - u_c) / mesh.dy,
+                v: (v_b - v_c) / mesh.dy,
+            };
+        }
+        if i + 1 == n_rows {
+            let (eta_t, u_t, v_t) = primitives_at(states, &mesh.bed, i - 1, j);
+            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
+            return CellSlopes {
+                eta: (eta_c - eta_t) / mesh.dy,
+                u: (u_c - u_t) / mesh.dy,
+                v: (v_c - v_t) / mesh.dy,
+            };
+        }
+        let (eta_t, u_t, v_t) = primitives_at(states, &mesh.bed, i - 1, j);
+        let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
+        let (eta_b, u_b, v_b) = primitives_at(states, &mesh.bed, i + 1, j);
+        CellSlopes {
+            eta: minmod((eta_c - eta_t) / mesh.dy, (eta_b - eta_c) / mesh.dy),
+            u: minmod((u_c - u_t) / mesh.dy, (u_b - u_c) / mesh.dy),
+            v: minmod((v_c - v_t) / mesh.dy, (v_b - v_c) / mesh.dy),
+        }
+    })
+}
+
+/// Reconstruct the left/right cell states at an interior `x`-face
+/// between cells `(i, j_left)` and `(i, j_right)` using MUSCL slopes.
+/// Returns the two cell-side conservative states ready to be fed into
+/// [`well_balanced_x_face`].
+///
+/// The reconstruction is on primitives `(η, u, v)`. The conservative
+/// momenta on each side are rebuilt as `hu = h · u`, `hv = h · v`
+/// where `h = max(η_face − z_cell, 0)`. This guarantees that the
+/// velocity at the face is the same from both sides, even when the
+/// reconstructed `h` differs across the (piecewise-constant) bed jump.
+///
+/// The bed elevations at the two sides are the unmodified cell values
+/// — not reconstructed. Audusse's hydrostatic reconstruction in
+/// [`well_balanced_x_face`] then sees these as the `z` arguments.
+fn reconstruct_x_face_states(
+    states: &Array2<Conserved2D>,
+    slopes_x: &Array2<CellSlopes>,
+    bed: &Array2<f64>,
+    i: usize,
+    j_left: usize,
+    j_right: usize,
+    dx: f64,
+) -> (Conserved2D, Conserved2D) {
+    let half_dx = 0.5 * dx;
+
+    let (eta_l, u_l, v_l) = primitives_at(states, bed, i, j_left);
+    let eta_minus = eta_l + half_dx * slopes_x[(i, j_left)].eta;
+    let u_minus = u_l + half_dx * slopes_x[(i, j_left)].u;
+    let v_minus = v_l + half_dx * slopes_x[(i, j_left)].v;
+    let h_minus = (eta_minus - bed[(i, j_left)]).max(0.0);
+
+    let (eta_r, u_r, v_r) = primitives_at(states, bed, i, j_right);
+    let eta_plus = eta_r - half_dx * slopes_x[(i, j_right)].eta;
+    let u_plus = u_r - half_dx * slopes_x[(i, j_right)].u;
+    let v_plus = v_r - half_dx * slopes_x[(i, j_right)].v;
+    let h_plus = (eta_plus - bed[(i, j_right)]).max(0.0);
+
+    (
+        Conserved2D::new(h_minus, h_minus * u_minus, h_minus * v_minus),
+        Conserved2D::new(h_plus, h_plus * u_plus, h_plus * v_plus),
+    )
+}
+
+/// Reconstruct the top/bottom cell states at an interior `y`-face
+/// between cells `(i_top, j)` and `(i_bottom, j)` using MUSCL slopes.
+fn reconstruct_y_face_states(
+    states: &Array2<Conserved2D>,
+    slopes_y: &Array2<CellSlopes>,
+    bed: &Array2<f64>,
+    i_top: usize,
+    i_bottom: usize,
+    j: usize,
+    dy: f64,
+) -> (Conserved2D, Conserved2D) {
+    let half_dy = 0.5 * dy;
+
+    let (eta_t, u_t, v_t) = primitives_at(states, bed, i_top, j);
+    let eta_minus = eta_t + half_dy * slopes_y[(i_top, j)].eta;
+    let u_minus = u_t + half_dy * slopes_y[(i_top, j)].u;
+    let v_minus = v_t + half_dy * slopes_y[(i_top, j)].v;
+    let h_minus = (eta_minus - bed[(i_top, j)]).max(0.0);
+
+    let (eta_b, u_b, v_b) = primitives_at(states, bed, i_bottom, j);
+    let eta_plus = eta_b - half_dy * slopes_y[(i_bottom, j)].eta;
+    let u_plus = u_b - half_dy * slopes_y[(i_bottom, j)].u;
+    let v_plus = v_b - half_dy * slopes_y[(i_bottom, j)].v;
+    let h_plus = (eta_plus - bed[(i_bottom, j)]).max(0.0);
+
+    (
+        Conserved2D::new(h_minus, h_minus * u_minus, h_minus * v_minus),
+        Conserved2D::new(h_plus, h_plus * u_plus, h_plus * v_plus),
+    )
+}
+
 /// One forward-Euler update of the 2D FV solution. Modifies `states` in
 /// place.
 ///
@@ -228,9 +496,17 @@ pub fn forward_euler_step(
         return;
     }
 
+    // Compute MUSCL slopes per cell (one pass before face fluxes).
+    // Interior cells get minmod-limited central slopes; boundary cells
+    // get zero slope, so the boundary face flux falls back to
+    // first-order.
+    let slopes_x = compute_slopes_x(states, mesh);
+    let slopes_y = compute_slopes_y(states, mesh);
+
     // Precompute all x-faces and y-faces. x-faces have shape
     // (n_rows, n_cols + 1); y-faces have shape (n_rows + 1, n_cols).
-    // Boundary faces use ghost cells from `bcs`.
+    // Boundary faces use ghost cells from `bcs` and stay first-order;
+    // interior faces use MUSCL reconstruction of (η, hu, hv).
     let faces_x = Array2::<FaceFluxX>::from_shape_fn((n_rows, n_cols + 1), |(i, j)| {
         if j == 0 {
             let (g, z_g) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
@@ -239,12 +515,9 @@ pub fn forward_euler_step(
             let (g, z_g) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
             well_balanced_x_face(states[(i, n_cols - 1)], mesh.bed[(i, n_cols - 1)], g, z_g)
         } else {
-            well_balanced_x_face(
-                states[(i, j - 1)],
-                mesh.bed[(i, j - 1)],
-                states[(i, j)],
-                mesh.bed[(i, j)],
-            )
+            let (recon_l, recon_r) =
+                reconstruct_x_face_states(states, &slopes_x, &mesh.bed, i, j - 1, j, mesh.dx);
+            well_balanced_x_face(recon_l, mesh.bed[(i, j - 1)], recon_r, mesh.bed[(i, j)])
         }
     });
 
@@ -256,12 +529,9 @@ pub fn forward_euler_step(
             let (g, z_g) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
             well_balanced_y_face(states[(n_rows - 1, j)], mesh.bed[(n_rows - 1, j)], g, z_g)
         } else {
-            well_balanced_y_face(
-                states[(i - 1, j)],
-                mesh.bed[(i - 1, j)],
-                states[(i, j)],
-                mesh.bed[(i, j)],
-            )
+            let (recon_t, recon_b) =
+                reconstruct_y_face_states(states, &slopes_y, &mesh.bed, i - 1, i, j, mesh.dy);
+            well_balanced_y_face(recon_t, mesh.bed[(i - 1, j)], recon_b, mesh.bed[(i, j)])
         }
     });
 

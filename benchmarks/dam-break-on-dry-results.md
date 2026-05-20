@@ -73,19 +73,17 @@ Variable de similaridad `ξ = (x − x_dam) / t`:
 
 ### Métricas informativas (mesh 400×3)
 
-Test `report_metrics` (con `#[ignore]`):
+Test `report_metrics` (con `#[ignore]`). Resultados con MUSCL
+slope-limited reconstruction activo (commit MUSCL):
 
-| Métrica | Valor |
-|---|---|
-| Mesh | 400 × 3 (`dx = 0.250` m) |
-| Pasos integrados a `t = 4 s` | ~125 |
-| Celdas en la rarefacción | 150 |
-| **L1 rel error en `h`** | **2.71%** |
-| **L² rel error en `h`** | **2.74%** |
-| **L∞ error en `h`** | **4.91% de h_L** (49.1 mm) |
-| Frente seco numérico | 69.125 m |
-| Frente seco analítico | 75.057 m |
-| Lag del frente | 5.93 m (8% relativo, 24 cells) |
+| Métrica | First-order (pre-MUSCL) | MUSCL (η, u, v) primitivas + minmod | Mejora |
+|---|---|---|---|
+| L1 rel error en `h` | 2.71% | **1.14%** | 2.4× |
+| L² rel error en `h` | 2.74% | **0.99%** | 2.8× |
+| L∞ error en `h` | 4.91% de h_L | **1.40%** | 3.5× |
+| Frente seco numérico | 69.125 m | 70.375 m | — |
+| Frente seco analítico | 75.057 m | 75.057 m | — |
+| Lag del frente | 5.93 m (8%) | 4.68 m (6%) | 1.3× |
 
 ## Análisis
 
