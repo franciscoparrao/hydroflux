@@ -11,23 +11,25 @@ Acoplamos peligros hidrometeorológicos (lluvia → remoción en masa → flujo 
 
 HEC-RAS es estándar regulatorio mundial pero arcaico operacionalmente: archivos binarios no versionables, Windows-only, sin paralelismo nativo, calibración manual, integración pobre con stacks modernos (Linux, cloud, ML, GIS). Los alternativos open source (LISFLOOD-FP, BASEMENT, TELEMAC, ANUGA) resolvieron parte del problema pero no acoplan peligros, no son diferenciables, ni están diseñados para escala continental.
 
-## El wedge
+## El wedge (revisado 2026-05-19, post-pivot)
 
-**hydroflux es el solver acoplado de peligros hidrometeorológicos que aún no existe**: integra lluvia → falla de ladera → propagación granular → inundación en un mismo engine numérico, diferenciable de extremo a extremo para calibración por gradiente y problemas inversos, ejecutado nativamente sobre GPU desde el primer commit (Rust + wgpu/CUDA), escalable a las 15 cuencas BNA continentales chilenas sobre cluster, y trazable bit a bit gracias a project files de texto plano versionables con Git y CI/CD. La defensibilidad del wedge no está en ninguna de esas cinco dimensiones por separado — cada una ya existe parcialmente en algún solver — sino en su **intersección**: ningún proyecto vigente puede pivotar a cubrirla sin reescribir su núcleo numérico en un lenguaje moderno con ergonomía de autograd, y ningún proyecto en lenguaje moderno tiene la madurez numérica de HEC-RAS, BASEMENT o TELEMAC. Esa estrechez es precisamente el espacio que hydroflux ocupa por construcción.
+**hydroflux ocupa la intersección residual que queda después del cambio de landscape 2024-2025.** El wedge ingenuo "open + modern lang + GPU + diff + coupled" fue parcialmente cubierto por Hydrograd.jl (Julia + Zygote/Enzyme, differentiable SWE), AegirJAX (Python+JAX, differentiable SWE) y SynxFlow (C++/CUDA, coupled flood+landslide+debris). La intersección defendible que queda — donde hydroflux se construye, y que ningún solver vigente ni entrante cubre simultáneamente — combina cuatro propiedades: **(i) acoplamiento físico de peligros y diferenciabilidad en el MISMO engine**, propiedad que Hydrograd/AegirJAX no cubren (no acoplan landslide) y que SynxFlow no cubre (kernels CUDA hand-coded sin autograd); **(ii) GPU multiplataforma vía `wgpu`** (Vulkan, Metal, DX12, WebGPU), liberándose de la dependencia CUDA-NVIDIA que ata a los tres entrantes; **(iii) deployment como binary estático nativo** sin runtime Python/Julia, viabilizando el uso operacional en agencias chilenas (DGA, SERNAGEOMIN, MOP); **(iv) anclaje en cuencas BNA chilenas** en sus regímenes episódico semiárido andino y continuo mediterráneo, geografía que ningún solver del state of the art trata como dominio nativo. La intersección es defendible **por construcción**: cada eje exige una decisión arquitectónica que los entrantes no pueden revertir sin reescribir su núcleo — Hydrograd no abandona Julia, AegirJAX no abandona JAX, SynxFlow no agrega autograd a CUDA. Lo que hydroflux gana al sumar esos ejes es un único solver que cierra el ciclo lluvia → falla → propagación → inundación de manera diferenciable, portable, reproducible y aplicada a hidrología chilena.
 
-*Versión canónica en `outline.md` § "Wedge en un párrafo". Desglose por eje:*
+*Versión canónica en `outline.md` § "Wedge en un párrafo". Comparación con los 3 entrantes 2024-2025 en `state-of-the-art.md` § "Entradas 2024-2025". Desglose por eje:*
 
-| Eje | Diferenciador |
-|---|---|
-| Acoplamiento | Lluvia → landslide → flujo de detritos → inundación en un único engine (no pipeline de archivos entre tools separadas) |
-| Diferenciabilidad | Autograd nativo (dual numbers / op overloading) habilita calibración por gradiente, problemas inversos, surrogate ML |
-| GPU-first | Rust + wgpu/CUDA, no GPU como afterthought |
-| Escala | Continental: 15 cuencas BNA chilenas (Arica → Punta Arenas) en cluster |
-| Reproducibilidad | Project files YAML/TOML versionables (git), CI/CD para modelos hidrológicos |
+| Eje | Cubierto por entrantes 2024-2025 | Diferenciador de hydroflux |
+|---|---|---|
+| Diferenciabilidad | ✅ Hydrograd, AegirJAX | NO es wedge en sí; necesario pero no suficiente |
+| Acoplamiento físico de peligros | ✅ SynxFlow | NO es wedge en sí; necesario pero no suficiente |
+| **Coupling + diff simultáneo** | ❌ ninguno | ✅ **Wedge real**: ningún solver lo cubre |
+| **GPU multiplataforma (wgpu)** | ❌ todos son CUDA / JAX-XLA | ✅ Vulkan, Metal, DX12, WebGPU; libre de NVIDIA |
+| **Binary deployment nativo** | ❌ todos requieren runtime managed | ✅ Rust static binary; operacionalizable en agencias |
+| **Aplicación cuencas BNA chilenas** | ❌ ninguno targetea | ✅ régimen semiárido andino + mediterráneo |
+| Reproducibilidad (texto, CI/CD, DOI) | parcial | ✅ project files YAML/TOML, releases Zenodo |
 
 ## Estado
 
-Año 1 (2026). Prototipo 1D en construcción. Ver `outline.md` para el arco multi-año y milestones.
+Año 1 (2026), tras pivot estratégico 2026-05-18. Solver-1d completo y validado (4 benchmarks analíticos + 2 demos chilenas). Solver-2d primera iteración cerrada al 2026-05-19: HLLC + Audusse-2D + Manning 2D + Thacker 1981 pasa (L² 1.62%, mass conservation a precisión de máquina). Paper de review Q4 2026 archivado; primer paper metodológico se mueve a 2028 Q1 con artifact-backing. Ver `outline.md` para el arco multi-año y milestones revisados.
 
 ## Estructura del repo
 
@@ -67,11 +69,13 @@ Puede citarse y vincularse a la postdoctoral en CLAUDE.md, READMEs y futuros pap
 
 | Año | Output principal | Venue tentativo |
 |---|---|---|
-| 2026 | Review/positioning paper | Earth-Science Reviews, NHESS |
-| 2027 | Methods paper del 2D solver | Geoscientific Model Development |
-| 2028 | Diferenciable + calibración por gradiente | Water Resources Research, Nature Comms |
-| 2029-2031 | 2-3 papers de aplicación + Fondecyt Iniciación | NHESS, JGR, HESS |
-| 2032+ | Acoplamiento landslide-flood (Fondecyt Regular) | Nature, Science Advances |
+| 2026 | Solver-1d + solver-2d primera iteración (artifact backing, sin paper) | Releases Zenodo |
+| 2027 | Solver-2d con autograd forward-mode + UK EA pasado + GPU wgpu | Releases Zenodo |
+| 2028 Q1 | **Primer paper metodológico** (artifact-backed) | Water Resources Research, Geoscientific Model Development |
+| 2028 Q2 | Postulación **Fondecyt Iniciación** | — |
+| 2028 Q4 | Reverse-mode autograd + coupling primitives | — |
+| 2029-2031 | 2-3 papers de aplicación + Fondecyt Iniciación adjudicado | NHESS, JGR, HESS |
+| 2032+ | Acoplamiento landslide-flood maduro (Fondecyt Regular) | Nature, Science Advances |
 | Continuo | Releases v0.x, v1.0 en GitHub | Zenodo DOI por versión |
 
 ## Quickstart (futuro, cuando exista código)

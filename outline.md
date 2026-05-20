@@ -1,8 +1,8 @@
 # Outline: hydroflux — research line del postdoc DICYT
 
-Última actualización: 2026-05-15
-Estado: Año 1, fase de bootstrapping.
-Próximo milestone: review/positioning paper draft (target: Q4 2026).
+Última actualización: 2026-05-19
+Estado: Año 1, primera iteración del solver-2d cerrada (Thacker 1981 validated). Paper de review Q4 2026 archivado. Primer paper metodológico se mueve a 2028 Q1.
+Próximo milestone: wetting/drying robusto + Manning 2D analítico (2027 Q1 según outline).
 
 ---
 
@@ -19,11 +19,11 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 
 ---
 
-## Wedge en un párrafo
+## Wedge en un párrafo (revisado 2026-05-19)
 
-> *Versión canónica del wedge — citable directamente en README, intro de papers, propuestas Fondecyt. Cambios sustantivos a este párrafo deben propagarse en paralelo a `README.md` y `state-of-the-art.md` (gap final).*
+> *Versión canónica del wedge — citable directamente en README, intro de papers, propuestas Fondecyt. Cambios sustantivos a este párrafo deben propagarse en paralelo a `README.md` y `state-of-the-art.md` (gap final). La versión anterior (2026-05-16, pre-pivot) está archivada en `papers/01_review/STATUS.md` junto al manuscript dormant.*
 
-**hydroflux es el solver acoplado de peligros hidrometeorológicos que aún no existe**: integra lluvia → falla de ladera → propagación granular → inundación en un mismo engine numérico, diferenciable de extremo a extremo para calibración por gradiente y problemas inversos, ejecutado nativamente sobre GPU desde el primer commit (Rust + wgpu/CUDA), escalable a las 15 cuencas BNA continentales chilenas sobre cluster, y trazable bit a bit gracias a project files de texto plano versionables con Git y CI/CD. La defensibilidad del wedge no está en ninguna de esas cinco dimensiones por separado — cada una ya existe parcialmente en algún solver — sino en su **intersección**: ningún proyecto vigente puede pivotar a cubrirla sin reescribir su núcleo numérico en un lenguaje moderno con ergonomía de autograd, y ningún proyecto en lenguaje moderno tiene la madurez numérica de HEC-RAS, BASEMENT o TELEMAC. Esa estrechez es precisamente el espacio que hydroflux ocupa por construcción.
+**hydroflux ocupa la intersección residual que queda después del cambio de landscape 2024-2025.** El wedge ingenuo "open + modern lang + GPU + diff + coupled" fue parcialmente cubierto por Hydrograd.jl (Julia + Zygote/Enzyme, differentiable SWE), AegirJAX (Python+JAX, differentiable SWE) y SynxFlow (C++/CUDA, coupled flood+landslide+debris). La intersección defendible que queda — donde hydroflux se construye, y que ningún solver vigente ni entrante cubre simultáneamente — combina cuatro propiedades: **(i) acoplamiento físico de peligros y diferenciabilidad en el MISMO engine**, propiedad que Hydrograd/AegirJAX no cubren (no acoplan landslide) y que SynxFlow no cubre (kernels CUDA hand-coded sin autograd); **(ii) GPU multiplataforma vía `wgpu`** (Vulkan, Metal, DX12, WebGPU), liberándose de la dependencia CUDA-NVIDIA que ata a los tres entrantes y a la mayoría de los incumbentes; **(iii) deployment como binary estático nativo** sin runtime Python/Julia ni librerías compartidas, viabilizando el uso operacional en agencias chilenas (DGA, SERNAGEOMIN, MOP), edge devices, y eventualmente WASM; **(iv) anclaje en cuencas BNA chilenas** en sus regímenes episódico semiárido andino y continuo mediterráneo, geografía y régimen que ningún solver del state of the art trata como dominio nativo. La intersección es defendible **por construcción**: cada eje individual exige una decisión arquitectónica que los entrantes no pueden revertir sin reescribir su núcleo — Hydrograd no abandona Julia, AegirJAX no abandona JAX, SynxFlow no agrega autograd a sus kernels CUDA. Lo que hydroflux gana al sumar esos ejes es un único solver que cierra el ciclo lluvia → falla → propagación → inundación de manera diferenciable, portable, reproducible y aplicada a hidrología chilena, sin depender de hardware NVIDIA ni de runtimes managed.
 
 ---
 
@@ -86,40 +86,29 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 
 ---
 
-## Plan Año 1 detallado (lo accionable)
+## Plan Año 1 detallado (lo accionable, revisado post-pivot)
 
-### Fase 1 (2026 Q2, EN CURSO)
+### Fase 1 (2026 Q2) ✅ CERRADA
 
-- [ ] **Review vivo del state of the art** en `state-of-the-art.md`. Cubrir: HEC-RAS, LISFLOOD-FP, BASEMENT, TELEMAC, ANUGA, Iber, SRH-2D, MIKE, TUFLOW. Para cada uno: stack, esquema numérico, validación, licencia, gap detectado.
-- [ ] **Bibliografía inicial** en `references.bib`. Mínimo 30 papers seed:
-  - Numérico: Toro 2009 (shallow water), Bermudez & Vázquez 1994 (well-balanced), MacDonald 1997 (analytical benchmarks).
-  - Flood specific: Bates & De Roo 2000, Néelz & Pender 2013 (UK EA benchmarks).
-  - Coupled hazards: Iverson 2000 (debris flows), Hungr 2005 (landslide propagation).
-  - Differentiable: Andreadis et al. 2022/2023 (differentiable hydrology), JAX-Hydro papers.
-- [ ] **Identificación de wedge específico**: confirmar narrativa Fondecyt en 1 párrafo cerrado.
-- [ ] **Outreach soft**: borrador de email a 2-3 grupos internacionales (no enviar todavía, dejar listo para Q4 cuando haya algo concreto que mostrar).
+- [x] **Review vivo del state of the art** en `state-of-the-art.md`. 12 fichas iniciales + 3 fichas 2024-2025 (Hydrograd, AegirJAX, SynxFlow) agregadas el 2026-05-19 tras pivot.
+- [x] **Bibliografía inicial** en `references.bib`. 36 entries con DOIs verificados.
+- [x] **Identificación de wedge específico**: párrafo canónico cerrado y revisado tras pivot 2026-05-19.
+- [ ] ~~Outreach soft~~ — diferido hasta tener artifact v0.2+ (2027).
 
-### Fase 2 (2026 Q3)
+### Fase 2 (2026 Q3) ✅ CERRADA
 
-- [ ] **Crate Rust `solver-1d/`** con Saint-Venant 1D:
-  - Discretización: finite volume, HLL o Roe Riemann solver.
-  - Topo: lectura de DEM 1D vía SurtGIS.
-  - Boundary conditions: hidrograma upstream, depth downstream, supercritical outflow.
-  - Tests: dam break analítico (Stoker 1957), MacDonald steady-state.
-- [ ] **Integración con SurtGIS** para I/O DEM + outputs depth/discharge a GeoTIFF.
-- [ ] **Benchmarks**: ejecutar Toro 1D tests, documentar resultados en `benchmarks/toro-1d-results.md`.
+- [x] **Crate Rust `solver-1d/`** con Saint-Venant 1D: HLL Riemann + Audusse well-balanced + Manning friction + inflow/outflow BCs. 52 tests verdes.
+- [x] **Integración con SurtGIS** para I/O DEM + outputs depth/discharge a GeoTIFF.
+- [x] **Benchmarks 1D**: Stoker (order 0.81) + MacDonald uniform (drift 9e-5) + MacDonald variable (order 1.03) + dam break. Documentados en `benchmarks/`.
+- [x] **2 demos chilenas**: Maule + Huasco con datos reales.
 
-### Fase 3 (2026 Q4)
+### Fase 3 (2026 Q4) — REVISADA (no más review paper)
 
-- [ ] **Draft review paper** en `papers/01_review/`. Estructura tentativa:
-  1. Introducción: HEC-RAS y el problema regulatorio
-  2. Open-source landscape (con tabla comparativa de tu state-of-the-art.md)
-  3. Cuatro gaps no resueltos: acoplamiento, diferenciabilidad, GPU-first, reproducibilidad
-  4. Proposed roadmap (lo que hydroflux va a hacer)
-  5. Open challenges + invitación a la comunidad
-- [ ] **Submit** a Advances in Water Resources (Elsevier subscription, sin APC) como primary; Computers & Geosciences como fallback. Reconsiderar NHESS / ESR sólo si se confirma waiver de APC o acuerdo institucional USACH-Elsevier que cubra OA fees.
-- [ ] **Release público v0.1** en GitHub: repo con 1D + tests + docs básicos. DOI Zenodo.
-- [ ] **Outreach**: enviar los emails preparados en Q2 con link a release.
+- [x] **Solver-2d primera iteración** (2026-05-19): scaffold + HLLC + Audusse-2D + boundary 4 lados × 4 tipos + Manning 2D + Thacker 1981 pasa. 60 unit tests + 6 integration tests. L² rel error 1.62%, mass conservation 8.83e-16.
+- [ ] **Documentación pública del solver-2d**: README detallado, ejemplos de uso, integration con SurtGIS para 2D raster I/O. (Pendiente este Q4.)
+- [ ] **Release público v0.1** en GitHub: repo con solver-1d + solver-2d primera iteración + benchmarks + docs. DOI Zenodo. (Pendiente: requiere docs.)
+- [ ] ~~Draft review paper~~ — **archivado en `papers/01_review/STATUS.md`** tras pivot 2026-05-18. Primer paper se mueve a 2028 Q1 como methods paper artifact-backed (target WRR o GMD).
+- [ ] ~~Outreach a grupos internacionales~~ — diferido hasta release v0.2+ con autograd funcional (2027 Q4).
 
 ---
 
@@ -134,13 +123,18 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 
 ## Métricas de éxito por fase
 
-| Fase | Métrica de cierre |
-|---|---|
-| 2026 Q2 | state-of-the-art.md tiene 10+ solvers cubiertos + references.bib con 30+ entries |
-| 2026 Q3 | 1D pasa Toro test 1-5 + MacDonald + 1 dam break analítico, todos con error <5% |
-| 2026 Q4 | Review paper submitted + 3 emails outreach enviados + repo público con 50+ ⭐ (optimista) |
-| 2027 Q4 | Solver 2D pasa UK EA benchmark suite (6/6 casos OK) |
-| 2028 Q4 | Fondecyt Iniciación adjudicado + paper diferenciable submitted |
+| Fase | Métrica de cierre | Estado |
+|---|---|---|
+| 2026 Q2 | state-of-the-art.md tiene 10+ solvers cubiertos + references.bib con 30+ entries | ✅ Cerrado (12+3 fichas, 36 entries) |
+| 2026 Q3 | 1D pasa MacDonald + dam break analítico con error <5% | ✅ Cerrado (Stoker order 0.81, MacDonald variable order 1.03) |
+| 2026 Q4 | Solver-2d primera iteración pasa Thacker 1981 + release público v0.1 | 🟡 En curso (Thacker ✓, release pendiente) |
+| 2027 Q1 | Wetting/drying robusto + Manning 2D analítico | ⏳ Pendiente |
+| 2027 Q2 | UK EA 2D benchmark suite (6/6 casos OK) | ⏳ Pendiente |
+| 2027 Q3 | GPU port via wgpu (cross-platform Vulkan/Metal/DX12) | ⏳ Pendiente |
+| 2027 Q4 | Autograd forward-mode + paper methods draft | ⏳ Pendiente |
+| 2028 Q1 | **Primer paper metodológico submitted** (WRR o GMD) | ⏳ Pendiente |
+| 2028 Q2 | Postulación Fondecyt Iniciación | ⏳ Pendiente |
+| 2028 Q4 | Fondecyt Iniciación adjudicado + coupling primitives demo | ⏳ Pendiente |
 
 ---
 
@@ -152,3 +146,4 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 | 2026-05-16 | Cierre fase 2026 Q2: state-of-the-art.md con 12 fichas + síntesis gap final + cross-link; references.bib con 30 entries; wedge canónico en 1 párrafo añadido (replicado en README). Próxima fase activa: 2026 Q3 (prototipo Saint-Venant 1D). |
 | 2026-05-17 | Cierre fase 2026 Q3: solver-1d completo y validado (HLL + Audusse + Manning + inflow/outflow BCs); 52 tests; 2 demos chilenas (Maule + Huasco). |
 | 2026-05-18 | **Pivot estratégico**: literature check reveló 3 papers 2025 que cubren la mayor parte del wedge — Hydrograd.jl (Liu WRR 2025, Julia differentiable SWE), AegirJAX (JAX/Python diff SWE), SynxFlow (Xia JOSS 2024/2025, GPU coupled flood+landslide+debris). El claim del manuscript "no production-grade flood solver in mature autograd language" pasa a falso. Decisión: pausar paper Q4 2026 (archive en `papers/01_review/`), pivotear a desarrollo. Primer paper se mueve a 2028 Q1 como methods paper con artifact 2D + autograd, target WRR o GMD. Rationale: artifact-backed claim contra Hydrograd/AegirJAX/SynxFlow es defendible, roadmap-promise no. DICYT obligation cubierta por Paper 2 (U-Net SAR en R2 RSE). Fondecyt 2028 más fuerte con artifact que con review. |
+| 2026-05-19 | **Cierre primera iteración solver-2d**: 6 commits (`03e57df → 2a92c6d`), ~2160 LOC, 60 unit tests + 6 integration tests, todos verdes. Building blocks completos (state + flux + geometry + riemann HLLC + boundary 4×4 + update Audusse 2D + source Manning 2D). Benchmark analítico **Thacker 1981** pasa: L² rel error 1.62%, L∞ 2.49% h₀, conservación de masa 8.83e-16 (machine precision). Resultados consistentes con literatura (Liang & Marche 2009: 1%, Brufau et al. 2002: 3%). **Wedge revisado a la luz del pivot 2026-05-18**: la versión 2026-05-16 (intersección amplia open+modern+GPU+diff+coupled) se archiva; el wedge canónico nuevo articula la intersección residual defendible — (i) coupled+diff simultáneo, (ii) GPU multiplataforma vía wgpu, (iii) binary deployment nativo, (iv) aplicación a cuencas BNA chilenas. Propagado a `state-of-the-art.md` (3 fichas nuevas + síntesis gap final reescrita) y `README.md`. |
