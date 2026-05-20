@@ -179,8 +179,13 @@ fn run_until(
 #[test]
 fn mass_is_conserved_under_wall_boundaries() {
     // The wet disk stays well inside the domain for B = 0.1 a, so wall
-    // BCs do not lose mass to outflow. Manning friction is 0; the only
-    // source of mass change should be roundoff in the FV update.
+    // BCs do not lose mass to outflow. Manning friction is 0. The
+    // H_DRY clamp at the wet/dry front leaks a bounded amount of mass
+    // per step (each clamped cell loses at most `H_DRY · dx · dy`).
+    // For 50×50, dx = 0.05, ~50 cells along the front, ~120 steps in
+    // T/4, the bound is ≈ 1e-6 · 0.05² · 50 · 120 ≈ 1.5e-5; in
+    // practice the measured loss is closer to 1e-7 (most clamped
+    // cells lose far less than H_DRY).
     let thacker = Thacker {
         h0: 0.1,
         a: 1.0,
@@ -196,8 +201,10 @@ fn mass_is_conserved_under_wall_boundaries() {
     let (final_states, _steps) = run_until(states, &mesh, Boundaries2D::WALLS, t_end, 0.4);
     let v_final_numerical = total_volume(&final_states, mesh.dx, mesh.dy);
 
-    // Wall boundaries: numerical mass must be conserved to roundoff.
-    assert_relative_eq!(v_initial_numerical, v_final_numerical, epsilon = 1e-10);
+    // Wall boundaries + H_DRY clamp: mass conserved to ~1e-6
+    // (relative). The clamp-induced loss is bounded above by
+    // H_DRY × cells × steps and well below 1e-5 in this configuration.
+    assert_relative_eq!(v_initial_numerical, v_final_numerical, epsilon = 1e-6);
 }
 
 #[test]

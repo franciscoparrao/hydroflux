@@ -38,6 +38,22 @@ pub mod update;
 /// Standard gravity used throughout the solver, in m/s².
 pub const GRAVITY: f64 = 9.81;
 
+/// Wet/dry threshold [m]. After a forward-Euler step, cells whose
+/// updated depth falls below this value are clamped to dry: depth set
+/// to zero, both momentum components zeroed out. Above this threshold
+/// the cell is treated as wet by every consumer (CFL accounting,
+/// velocity computation, flux evaluation).
+///
+/// The choice 10⁻⁶ m is a balance: small enough that a 1 mm puddle is
+/// still "wet" (a millimetre of water carries meaningful momentum on
+/// metre-scale meshes), but large enough that `u = hu / h` does not
+/// blow up under finite-precision arithmetic for cells that are
+/// effectively at the wet/dry front. The Riemann solver uses a
+/// tighter internal threshold (10⁻¹²) to pick the two-rarefaction
+/// wave speed; that is a separate concern from the cell-level
+/// definition of "dry".
+pub const H_DRY: f64 = 1.0e-6;
+
 pub use boundary::{Boundaries2D, Boundary, Side, ghost_cell};
 pub use flux::{FluxX, FluxY};
 pub use geometry::Mesh2D;

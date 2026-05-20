@@ -39,28 +39,31 @@
 //! with `s_x_max = max(|u| + c)`, `s_y_max = max(|v| + c)`. We return
 //! `f64::INFINITY` for an entirely dry domain.
 
-use crate::GRAVITY;
 use crate::boundary::{Boundaries2D, Side, ghost_cell};
 use crate::flux::{FluxX, FluxY};
 use crate::geometry::Mesh2D;
 use crate::riemann::{hllc_flux_x, hllc_flux_y};
 use crate::state::Conserved2D;
+use crate::{GRAVITY, H_DRY};
 use ndarray::Array2;
 
 /// Maximum signal speeds `(s_x, s_y)` across the state field, where
 /// `s_x = max(|u| + c)` and `s_y = max(|v| + c)`. Returns `(0, 0)` for
 /// an empty or all-dry state.
+///
+/// Dry cells (`h ≤ H_DRY`) contribute zero to both maxima — the CFL
+/// must not be tightened by spurious `hu / h` blow-ups in essentially
+/// dry cells.
 pub fn max_wave_speeds(states: &Array2<Conserved2D>) -> (f64, f64) {
     let mut s_x = 0.0_f64;
     let mut s_y = 0.0_f64;
     for s in states {
-        let h = s.h.max(0.0);
-        let c = (GRAVITY * h).sqrt();
-        let (u, v) = if s.h > 0.0 {
-            (s.hu / s.h, s.hv / s.h)
-        } else {
-            (0.0, 0.0)
-        };
+        if s.h <= H_DRY {
+            continue;
+        }
+        let c = (GRAVITY * s.h).sqrt();
+        let u = s.hu / s.h;
+        let v = s.hv / s.h;
         s_x = s_x.max(u.abs() + c);
         s_y = s_y.max(v.abs() + c);
     }
@@ -267,6 +270,17 @@ pub fn forward_euler_step(
     //   left  x-face is faces_x[(i, j)]   — cell is on its RIGHT side → .plus
     //   bottom y-face is faces_y[(i+1, j)] — cell is on its TOP side → .minus
     //   top    y-face is faces_y[(i, j)]   — cell is on its BOTTOM side → .plus
+    //
+    // Positivity preservation: cells whose updated depth would fall
+    // at or below H_DRY are clamped to DRY (depth = 0, both momentum
+    // components zeroed). This is the simplest wetting/drying
+    // treatment — see Liang & Marche (2009) for the flux-rescaling
+    // alternative that is strictly mass-conservative. The clamp can
+    // lose a small amount of mass at the wet/dry front (bounded
+    // pointwise by H_DRY per cell, globally by H_DRY · dx · dy per
+    // step times the number of cells that crossed the threshold);
+    // this is acceptable for first-iteration robustness and will be
+    // tightened with flux-rescaling when needed.
     let dt_dx = dt / mesh.dx;
     let dt_dy = dt / mesh.dy;
     for i in 0..n_rows {
@@ -278,14 +292,18 @@ pub fn forward_euler_step(
 
             let dh =
                 dt_dx * (fx_right.mass - fx_left.mass) + dt_dy * (fy_bottom.mass - fy_top.mass);
-            let dhu = dt_dx * (fx_right.x_momentum - fx_left.x_momentum)
-                + dt_dy * (fy_bottom.x_momentum - fy_top.x_momentum);
-            let dhv = dt_dx * (fx_right.y_momentum - fx_left.y_momentum)
-                + dt_dy * (fy_bottom.y_momentum - fy_top.y_momentum);
-
-            states[(i, j)].h -= dh;
-            states[(i, j)].hu -= dhu;
-            states[(i, j)].hv -= dhv;
+            let new_h = states[(i, j)].h - dh;
+            if new_h <= H_DRY {
+                states[(i, j)] = Conserved2D::DRY;
+            } else {
+                let dhu = dt_dx * (fx_right.x_momentum - fx_left.x_momentum)
+                    + dt_dy * (fy_bottom.x_momentum - fy_top.x_momentum);
+                let dhv = dt_dx * (fx_right.y_momentum - fx_left.y_momentum)
+                    + dt_dy * (fy_bottom.y_momentum - fy_top.y_momentum);
+                states[(i, j)].h = new_h;
+                states[(i, j)].hu -= dhu;
+                states[(i, j)].hv -= dhv;
+            }
         }
     }
 }

@@ -29,14 +29,39 @@
 //!
 //! # Dry-bed handling
 //!
-//! The current implementation uses the same approximate dry treatment
-//! as the 1D solver (cells with `h ≤ 0` carry `c = 0`). For
-//! dam-break-on-dry benchmarks (Toro §10.5.4) a two-rarefaction
-//! wave-speed estimate is needed; deferred to a follow-up iteration.
+//! Wet–wet interfaces use the Davis (1988) bound
+//! `s_L = min(u_n_L − c_L, u_n_R − c_R)`,
+//! `s_R = max(u_n_L + c_L, u_n_R + c_R)`. This is well known to
+//! under-estimate the dry-bed wave speed by up to a factor of two: at
+//! a wet/dry front the leading edge of the rarefaction into the dry
+//! region propagates at `u_n_W ± 2·c_W` (Toro 2009 §10.5.4,
+//! "Two-Rarefaction Riemann Solver"), not at `u_n_W ± c_W`.
+//!
+//! We therefore branch on the wet/dry pattern at the face:
+//!
+//! - Both sides dry → zero flux (trivial).
+//! - Left dry, right wet → `s_L = u_n_R − 2·c_R`, `s_R = u_n_R + c_R`.
+//!   The rarefaction propagates leftward into the dry region.
+//! - Left wet, right dry → `s_L = u_n_L − c_L`, `s_R = u_n_L + 2·c_L`.
+//!   Symmetric: rarefaction propagates rightward into the dry region.
+//! - Both wet → Davis bound (the original wet–wet branch).
+//!
+//! The wet/dry threshold is fixed to [`DRY_TOL`] inside this module
+//! (independent of the higher-level `H_DRY` constant used by the FV
+//! update), because the wave-speed branch only needs to detect cells
+//! with depth at or below the numerical noise floor — at this
+//! threshold the celerity `√(g·h)` falls below 10⁻⁴ m/s and the
+//! distinction between "dry" and "wet" wave speeds is meaningful.
 
 use crate::GRAVITY;
 use crate::flux::{FluxX, FluxY};
 use crate::state::Conserved2D;
+
+/// Wet/dry threshold used internally by the Riemann solver to detect
+/// dry cells when picking wave-speed estimates. Tighter than the
+/// user-visible `H_DRY` constant: this is the numerical-noise floor
+/// for the wave-speed branch, not a physical wet/dry definition.
+const DRY_TOL: f64 = 1.0e-12;
 
 /// HLLC Riemann flux through an `x`-face between left state `ul`
 /// and right state `ur`. Mass and `x`-momentum (normal) flow are
@@ -84,25 +109,41 @@ fn hllc_normal_flux(
     qn_r: f64,
     qt_r: f64,
 ) -> (f64, f64, f64) {
-    // Wave speeds (Davis 1988 bound).
-    let cl = (GRAVITY * h_l.max(0.0)).sqrt();
-    let cr = (GRAVITY * h_r.max(0.0)).sqrt();
-    let un_l = if h_l > 0.0 { qn_l / h_l } else { 0.0 };
-    let un_r = if h_r > 0.0 { qn_r / h_r } else { 0.0 };
-    let ut_l = if h_l > 0.0 { qt_l / h_l } else { 0.0 };
-    let ut_r = if h_r > 0.0 { qt_r / h_r } else { 0.0 };
+    let h_l_wet = h_l > DRY_TOL;
+    let h_r_wet = h_r > DRY_TOL;
 
-    let sl = (un_l - cl).min(un_r - cr);
-    let sr = (un_l + cl).max(un_r + cr);
+    // Both sides dry: no flux, no Riemann problem to solve.
+    if !h_l_wet && !h_r_wet {
+        return (0.0, 0.0, 0.0);
+    }
+
+    let cl = if h_l_wet { (GRAVITY * h_l).sqrt() } else { 0.0 };
+    let cr = if h_r_wet { (GRAVITY * h_r).sqrt() } else { 0.0 };
+    let un_l = if h_l_wet { qn_l / h_l } else { 0.0 };
+    let un_r = if h_r_wet { qn_r / h_r } else { 0.0 };
+    let ut_l = if h_l_wet { qt_l / h_l } else { 0.0 };
+    let ut_r = if h_r_wet { qt_r / h_r } else { 0.0 };
+
+    // Wave-speed estimate. The Davis (1988) bound is correct for two
+    // wet states; at a wet/dry interface the leading edge of the
+    // rarefaction into the dry region propagates at `u_n_W ± 2·c_W`
+    // (Toro §10.5.4), not at `u_n_W ± c_W`. We branch on the wet/dry
+    // pattern to use the right estimate.
+    let (sl, sr) = match (h_l_wet, h_r_wet) {
+        (true, true) => ((un_l - cl).min(un_r - cr), (un_l + cl).max(un_r + cr)),
+        (false, true) => (un_r - 2.0 * cr, un_r + cr),
+        (true, false) => (un_l - cl, un_l + 2.0 * cl),
+        (false, false) => unreachable!("handled by the both-dry early return above"),
+    };
 
     // Physical fluxes in the normal direction. Tangential flux is
     // qn · u_t (advected by the normal velocity).
-    let (fm_l, fn_l, ft_l) = if h_l > 0.0 {
+    let (fm_l, fn_l, ft_l) = if h_l_wet {
         (qn_l, qn_l * un_l + 0.5 * GRAVITY * h_l * h_l, qn_l * ut_l)
     } else {
         (0.0, 0.0, 0.0)
     };
-    let (fm_r, fn_r, ft_r) = if h_r > 0.0 {
+    let (fm_r, fn_r, ft_r) = if h_r_wet {
         (qn_r, qn_r * un_r + 0.5 * GRAVITY * h_r * h_r, qn_r * ut_r)
     } else {
         (0.0, 0.0, 0.0)
@@ -242,6 +283,88 @@ mod tests {
         let f = hllc_flux_y(ul, ur);
         assert!(f.mass > 0.0);
         assert_relative_eq!(f.x_momentum, f.mass * u, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn right_dry_face_produces_outflow_into_dry_region() {
+        // Water at rest on the left, fully dry on the right. The
+        // analytical solution is a left-going rarefaction whose
+        // leading edge (the dry front) propagates at +2·c_L. HLLC with
+        // the correct wave speed must produce strictly positive mass
+        // flux through the face — water moves from L into the dry R.
+        let h_l = 1.0;
+        let ul = Conserved2D::new(h_l, 0.0, 0.0);
+        let ur = Conserved2D::DRY;
+        let f = hllc_flux_x(ul, ur);
+        let c_l = (GRAVITY * h_l).sqrt();
+        // Mass flux on the dry-bed Stoker problem must be positive and
+        // bounded above by h_L · 2·c_L (the dry-front speed times the
+        // depth on the wet side, which is the upper bound from
+        // conservation through the leading edge).
+        assert!(
+            f.mass > 0.0,
+            "mass flux into dry region must be positive, got {}",
+            f.mass
+        );
+        assert!(
+            f.mass < h_l * 2.0 * c_l,
+            "mass flux must be bounded by h_L · 2·c_L = {}, got {}",
+            h_l * 2.0 * c_l,
+            f.mass
+        );
+    }
+
+    #[test]
+    fn left_dry_face_produces_inflow_from_right_region() {
+        // Symmetric mirror image: dry on the left, water at rest on the
+        // right. The dry front propagates leftward; mass flux at the
+        // face must be strictly negative (water moves from R into the
+        // dry L).
+        let h_r = 1.0;
+        let ul = Conserved2D::DRY;
+        let ur = Conserved2D::new(h_r, 0.0, 0.0);
+        let f = hllc_flux_x(ul, ur);
+        let c_r = (GRAVITY * h_r).sqrt();
+        assert!(
+            f.mass < 0.0,
+            "mass flux from wet R into dry L must be negative, got {}",
+            f.mass
+        );
+        assert!(
+            f.mass.abs() < h_r * 2.0 * c_r,
+            "|mass flux| bounded by h_R · 2·c_R = {}, got {}",
+            h_r * 2.0 * c_r,
+            f.mass.abs()
+        );
+    }
+
+    #[test]
+    fn dry_bed_mass_flux_matches_two_rarefaction_closed_form() {
+        // Closed-form check. For Stoker dry-bed (u_L = 0, dry on the
+        // right, wave speeds s_L = −c_L, s_R = +2·c_L), the HLLC
+        // sampling of F_L* at ξ = 0 gives:
+        //   h*_L  = h_L · (s_L − u_L) / (s_L − s*) = h_L / 3
+        //   F.mass = s_L · (h*_L − h_L) = (−c_L) · (−2·h_L/3) = (2/3)·c_L·h_L
+        // This must hold to machine precision because everything in
+        // the path is exact algebra once the wave speeds are picked.
+        let h_l = 1.0;
+        let ul = Conserved2D::new(h_l, 0.0, 0.0);
+        let f = hllc_flux_x(ul, Conserved2D::DRY);
+        let c_l = (GRAVITY * h_l).sqrt();
+        let expected = (2.0 / 3.0) * c_l * h_l;
+        assert_relative_eq!(f.mass, expected, epsilon = 1e-12);
+
+        // Cross-check: this exceeds what the Davis bound would yield
+        // for the same problem (Davis: s_R = +c_L, giving F.mass =
+        // c_L · h_L / 2). The ratio (2/3) / (1/2) = 4/3 quantifies the
+        // wave-speed correction at a wet/dry interface.
+        let davis_flux = 0.5 * c_l * h_l;
+        assert!(
+            f.mass > davis_flux,
+            "two-rarefaction flux {} must exceed Davis-bound flux {}",
+            f.mass,
+            davis_flux
+        );
     }
 
     #[test]
