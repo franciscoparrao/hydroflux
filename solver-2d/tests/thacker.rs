@@ -38,7 +38,7 @@
 //! in time.
 
 use approx::assert_relative_eq;
-use hydroflux_solver_2d::{Boundaries2D, Conserved2D, Mesh2D, cfl_time_step, forward_euler_step};
+use hydroflux_solver_2d::{Boundaries2D, Conserved2D, Mesh2D, cfl_time_step, ssprk2_step};
 use ndarray::Array2;
 
 const G: f64 = 9.81;
@@ -166,7 +166,7 @@ fn run_until(
     while t < t_end {
         let dt_cfl = cfl_time_step(&states, mesh, cfl);
         let dt = dt_cfl.min(t_end - t);
-        forward_euler_step(&mut states, mesh, bcs, dt);
+        ssprk2_step(&mut states, mesh, bcs, dt);
         t += dt;
         steps += 1;
         if steps > 100_000 {
@@ -345,7 +345,7 @@ fn lake_at_rest_is_preserved_on_paraboloidal_basin() {
     for _ in 0..2000 {
         let dt_cfl = cfl_time_step(&states, &mesh, 0.4);
         let dt = dt_cfl.min(t_end);
-        forward_euler_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
+        ssprk2_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
         if dt < 1e-15 {
             break;
         }

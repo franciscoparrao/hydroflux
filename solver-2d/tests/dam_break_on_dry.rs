@@ -36,7 +36,7 @@
 //! analytical profile.
 
 use hydroflux_solver_2d::{
-    Boundaries2D, Boundary, Conserved2D, Mesh2D, cfl_time_step, forward_euler_step,
+    Boundaries2D, Boundary, Conserved2D, Mesh2D, cfl_time_step, forward_euler_step, ssprk2_step,
 };
 use ndarray::Array2;
 
@@ -98,7 +98,43 @@ fn initial_state(case: DamBreak, n_rows: usize, n_cols: usize, dx: f64) -> Array
     })
 }
 
+/// Time integrator selection for the runner.
+#[derive(Debug, Clone, Copy)]
+enum Integrator {
+    /// Forward Euler — first-order in time, paired with MUSCL spatial
+    /// reconstruction gives an asymmetric scheme (order 2 in space,
+    /// order 1 in time).
+    Euler,
+    /// SSP-RK2 — second-order in time, fully matches the spatial
+    /// order of MUSCL.
+    SspRk2,
+}
+
+fn step_with(
+    integrator: Integrator,
+    states: &mut Array2<Conserved2D>,
+    mesh: &Mesh2D,
+    bcs: Boundaries2D,
+    dt: f64,
+) {
+    match integrator {
+        Integrator::Euler => forward_euler_step(states, mesh, bcs, dt),
+        Integrator::SspRk2 => ssprk2_step(states, mesh, bcs, dt),
+    }
+}
+
 fn run_until(
+    states: Array2<Conserved2D>,
+    mesh: &Mesh2D,
+    bcs: Boundaries2D,
+    t_end: f64,
+    cfl: f64,
+) -> Array2<Conserved2D> {
+    run_until_with(Integrator::SspRk2, states, mesh, bcs, t_end, cfl)
+}
+
+fn run_until_with(
+    integrator: Integrator,
     mut states: Array2<Conserved2D>,
     mesh: &Mesh2D,
     bcs: Boundaries2D,
@@ -110,7 +146,7 @@ fn run_until(
     while t < t_end {
         let dt_cfl = cfl_time_step(&states, mesh, cfl);
         let dt = dt_cfl.min(t_end - t);
-        forward_euler_step(&mut states, mesh, bcs, dt);
+        step_with(integrator, &mut states, mesh, bcs, dt);
         t += dt;
         steps += 1;
         if steps > 100_000 {
@@ -308,39 +344,25 @@ fn l1_error_inside_rarefaction_is_bounded() {
     );
 }
 
-#[test]
-#[ignore = "informational: prints metrics for benchmarks/dam-break-on-dry-results.md"]
-fn report_metrics() {
-    // Not a pass/fail test — prints L1/L∞ + wet-front-position error
-    // for the markdown writeup. Run with:
-    //   cargo test --release -p hydroflux-solver-2d --test dam_break_on_dry -- --ignored --nocapture
-    let case = DamBreak {
-        h_l: 1.0,
-        x_dam: 50.0,
-        length: 100.0,
-        t_end: 4.0,
-    };
-    let n_cols = 400; // finer mesh for the writeup
-    let n_rows = 3;
-    let (mesh, dx) = build_mesh(case, n_cols, n_rows);
-    let initial = initial_state(case, n_rows, n_cols, dx);
-    let final_states = run_until(initial, &mesh, make_bcs(), case.t_end, 0.4);
-
-    let mid_row = n_rows / 2;
+fn measure_errors(
+    case: DamBreak,
+    final_states: &Array2<Conserved2D>,
+    mid_row: usize,
+    dx: f64,
+    n_cols: usize,
+) -> (f64, f64, f64, f64) {
     let c_l = case.celerity();
     let x_tail = case.x_dam - c_l * case.t_end;
     let x_head = case.x_dam + 2.0 * c_l * case.t_end;
-
     let mut l1_err = 0.0;
     let mut l1_norm = 0.0;
     let mut l2_num = 0.0;
     let mut l2_den = 0.0;
     let mut linf = 0.0_f64;
-    let mut cells = 0;
     let mut x_front_numerical = 0.0;
     for j in 0..n_cols {
         let x = (j as f64 + 0.5) * dx;
-        if final_states[(mid_row, j)].h > 0.01 * case.h_l {
+        if final_states[(mid_row, j)].h > 1.0e-5 {
             x_front_numerical = x;
         }
         if x < x_tail || x > x_head {
@@ -354,32 +376,63 @@ fn report_metrics() {
         l2_num += e * e;
         l2_den += h_an * h_an;
         linf = linf.max(e);
-        cells += 1;
     }
-    let rel_l1 = l1_err / l1_norm;
-    let rel_l2 = (l2_num / l2_den).sqrt();
+    (
+        l1_err / l1_norm,
+        (l2_num / l2_den).sqrt(),
+        linf,
+        x_front_numerical,
+    )
+}
+
+#[test]
+#[ignore = "informational: Euler vs SSP-RK2 head-to-head for the writeup"]
+fn report_metrics() {
+    // Not a pass/fail test — runs the same problem with both
+    // time integrators and prints a side-by-side table for the
+    // markdown writeup. Run with:
+    //   cargo test --release -p hydroflux-solver-2d --test dam_break_on_dry -- --ignored --nocapture
+    let case = DamBreak {
+        h_l: 1.0,
+        x_dam: 50.0,
+        length: 100.0,
+        t_end: 4.0,
+    };
+    let n_cols = 400;
+    let n_rows = 3;
+    let (mesh, dx) = build_mesh(case, n_cols, n_rows);
+    let mid_row = n_rows / 2;
+    let c_l = case.celerity();
     let x_front_an = case.wet_front_position(case.t_end);
 
-    eprintln!("\n=== Dam-break-on-dry benchmark report ===");
+    eprintln!("\n=== Dam-break-on-dry: time-integrator comparison ===");
     eprintln!("Mesh: {n_cols} cells × {n_rows} rows, dx = {dx:.3} m");
     eprintln!(
         "h_L = {} m, c_L = {:.3} m/s, t_end = {} s",
         case.h_l, c_l, case.t_end
     );
-    eprintln!("Rarefaction cells (interior): {cells}");
-    eprintln!("L1 relative error on h: {:.3}%", rel_l1 * 100.0);
-    eprintln!("L² relative error on h: {:.3}%", rel_l2 * 100.0);
+    eprintln!("Spatial scheme: MUSCL (η, u, v) primitives + minmod limiter");
+    eprintln!();
     eprintln!(
-        "L∞ error on h: {:.4} m ({:.2}% of h_L)",
-        linf,
-        100.0 * linf / case.h_l
+        "{:<20} {:>10} {:>10} {:>14} {:>14}",
+        "Integrator", "L1 [%]", "L² [%]", "L∞ [% h_L]", "front lag [m]"
     );
-    eprintln!(
-        "Wet-front position: numerical {:.3} m, analytical {:.3} m, |Δ| = {:.3} m ({:.2} cells)",
-        x_front_numerical,
-        x_front_an,
-        (x_front_numerical - x_front_an).abs(),
-        (x_front_numerical - x_front_an).abs() / dx
-    );
-    eprintln!("=========================================\n");
+    for (name, integrator) in [
+        ("Forward Euler", Integrator::Euler),
+        ("SSP-RK2", Integrator::SspRk2),
+    ] {
+        let initial = initial_state(case, n_rows, n_cols, dx);
+        let final_states = run_until_with(integrator, initial, &mesh, make_bcs(), case.t_end, 0.4);
+        let (rel_l1, rel_l2, linf, x_front) =
+            measure_errors(case, &final_states, mid_row, dx, n_cols);
+        eprintln!(
+            "{:<20} {:>9.3}% {:>9.3}% {:>13.3}% {:>14.3}",
+            name,
+            rel_l1 * 100.0,
+            rel_l2 * 100.0,
+            100.0 * linf / case.h_l,
+            (x_front - x_front_an).abs(),
+        );
+    }
+    eprintln!("=====================================================\n");
 }

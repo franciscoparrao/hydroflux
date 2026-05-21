@@ -578,6 +578,65 @@ pub fn forward_euler_step(
     }
 }
 
+/// Strong-stability-preserving Runge-Kutta second-order step
+/// (Shu & Osher 1988):
+///
+/// ```text
+///   U^(1)    = U^n + dt · L(U^n)              (forward-Euler predictor)
+///   U^(2)    = U^(1) + dt · L(U^(1))          (forward-Euler corrector)
+///   U^{n+1}  = ½ · U^n + ½ · U^(2)            (convex combination)
+/// ```
+///
+/// Equivalent to the Heun method, but written so it is manifestly a
+/// convex combination of two forward-Euler updates. This is what makes
+/// it **strong-stability-preserving**: every property that the
+/// forward-Euler step preserves under a CFL bound — non-negative
+/// depth, finite momentum, mass conservation under wall BCs — is
+/// inherited by the SSP-RK2 update without any extra CFL constraint
+/// (`cfl_SSPRK2 ≤ cfl_FE`). The positivity clamp inside
+/// [`forward_euler_step`] composes cleanly: the predictor produces a
+/// valid wet/dry state, the corrector produces another, the average
+/// is the convex combination of two non-negative states (thus
+/// non-negative). See Gottlieb, Ketcheson & Shu (2009) for the
+/// general theory of SSP methods.
+///
+/// In combination with MUSCL slope-limited spatial reconstruction
+/// (Audusse + minmod), the scheme is second-order in space AND time
+/// — the natural pairing that gives the full benefit of MUSCL.
+/// Without SSP-RK2 the time-error of forward Euler dominates and the
+/// asymptotic order drops to ~1.5 in practice.
+///
+/// `dt` is bounded by the same `cfl_time_step` as forward Euler.
+/// Panics on shape mismatch (same as [`forward_euler_step`]).
+pub fn ssprk2_step(states: &mut Array2<Conserved2D>, mesh: &Mesh2D, bcs: Boundaries2D, dt: f64) {
+    // Snapshot U^n. Allocation per step is the cost we pay for the
+    // simple "two Euler steps + average" formulation. A scratch buffer
+    // owned by the caller would eliminate it; left to a later
+    // optimization since allocations are a small fraction of the
+    // total cost compared to the face-flux pass.
+    let u_n = states.clone();
+
+    // Predictor: states becomes U^(1) = U^n + dt L(U^n).
+    forward_euler_step(states, mesh, bcs, dt);
+
+    // Corrector: states becomes U^(2) = U^(1) + dt L(U^(1)).
+    forward_euler_step(states, mesh, bcs, dt);
+
+    // Convex combination: U^{n+1} = ½(U^n + U^(2)).
+    for ((i, j), s) in states.indexed_iter_mut() {
+        let prev = u_n[(i, j)];
+        s.h = 0.5 * (prev.h + s.h);
+        s.hu = 0.5 * (prev.hu + s.hu);
+        s.hv = 0.5 * (prev.hv + s.hv);
+        // Re-clamp the averaged state to dry if it ended up below
+        // the threshold (can happen if one of the two halves was wet
+        // but very shallow; the average is below H_DRY).
+        if s.h <= H_DRY {
+            *s = Conserved2D::DRY;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -887,5 +946,120 @@ mod tests {
         let mesh = flat_mesh(4, 5, 1.0, 1.0);
         let mut states = Array2::from_elem((3, 3), Conserved2D::new(1.0, 0.0, 0.0));
         forward_euler_step(&mut states, &mesh, Boundaries2D::TRANSMISSIVE, 0.01);
+    }
+
+    // -----------------------------------------------------------------
+    // SSP-RK2 tests (the predictor-corrector + convex-combination time
+    // integrator). The forward-Euler tests above cover the FV operator
+    // L(U); these focus on the time-integration shell.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn ssprk2_lake_at_rest_on_flat_bed_is_preserved_exactly() {
+        // The convex combination of two forward-Euler updates of an
+        // exactly-preserved state must itself preserve the state.
+        let n_rows = 10;
+        let n_cols = 12;
+        let mesh = flat_mesh(n_rows, n_cols, 1.0, 1.0);
+        let mut states = Array2::from_elem((n_rows, n_cols), Conserved2D::new(2.0, 0.0, 0.0));
+        let dt = 0.01;
+        for _ in 0..100 {
+            ssprk2_step(&mut states, &mesh, Boundaries2D::TRANSMISSIVE, dt);
+        }
+        for s in &states {
+            assert_relative_eq!(s.h, 2.0, epsilon = 1e-12);
+            assert_relative_eq!(s.hu, 0.0, epsilon = 1e-12);
+            assert_relative_eq!(s.hv, 0.0, epsilon = 1e-12);
+        }
+    }
+
+    #[test]
+    fn ssprk2_lake_at_rest_on_diagonal_bed_is_preserved() {
+        // The well-balanced 2D test under SSP-RK2 — the C-property
+        // must hold under the full predictor-corrector scheme, not
+        // just the single Euler step.
+        let n_rows = 15;
+        let n_cols = 20;
+        let mesh = diagonal_sloped_mesh(n_rows, n_cols, 1.0, 1.0, 0.03, 0.04);
+        let eta = 5.0;
+        let initial = lake_at_rest_on(&mesh, eta);
+        let mut states = initial.clone();
+        for _ in 0..200 {
+            let dt = cfl_time_step(&states, &mesh, 0.4);
+            ssprk2_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
+        }
+        for ((i, j), s) in states.indexed_iter() {
+            assert_relative_eq!(s.h, initial[(i, j)].h, epsilon = 1e-10);
+            assert_relative_eq!(s.hu, 0.0, epsilon = 1e-10);
+            assert_relative_eq!(s.hv, 0.0, epsilon = 1e-10);
+        }
+    }
+
+    #[test]
+    fn ssprk2_mass_is_conserved_with_walls() {
+        // SSP-RK2 inherits the telescoping property of forward Euler:
+        // each sub-step is conservative under walls, the convex
+        // combination of conservative states is conservative.
+        let n_rows = 25;
+        let n_cols = 25;
+        let dx = 1.0;
+        let dy = 1.0;
+        let mesh = flat_mesh(n_rows, n_cols, dx, dy);
+        let mut states = gaussian_bump_2d(n_rows, n_cols, 1.0, 0.5);
+        let m0 = total_mass(&states, dx, dy);
+        for _ in 0..200 {
+            let dt = cfl_time_step(&states, &mesh, 0.4);
+            ssprk2_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
+        }
+        let m1 = total_mass(&states, dx, dy);
+        assert_relative_eq!(m0, m1, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn ssprk2_remains_isotropic_on_uniform_mesh() {
+        // The averaging step is variable-by-variable and direction-
+        // agnostic; isotropy must survive.
+        let n = 21;
+        let mesh = flat_mesh(n, n, 1.0, 1.0);
+        let mut states = gaussian_bump_2d(n, n, 1.0, 0.5);
+        for _ in 0..50 {
+            let dt = cfl_time_step(&states, &mesh, 0.4);
+            ssprk2_step(&mut states, &mesh, Boundaries2D::TRANSMISSIVE, dt);
+        }
+        for i in 0..n {
+            for j in 0..n {
+                assert_relative_eq!(states[(i, j)].h, states[(n - 1 - i, j)].h, epsilon = 1e-10);
+                assert_relative_eq!(states[(i, j)].h, states[(j, i)].h, epsilon = 1e-10);
+            }
+        }
+    }
+
+    #[test]
+    fn ssprk2_preserves_positivity_at_dry_bed_interface() {
+        // A wet-on-left, dry-on-right configuration must not produce
+        // negative depths under SSP-RK2 (each Euler sub-step clamps
+        // to DRY when needed; the convex combination of two clamped
+        // states is also non-negative).
+        let n_rows = 3;
+        let n_cols = 100;
+        let mesh = flat_mesh(n_rows, n_cols, 1.0, 1.0);
+        let mut states = Array2::from_elem((n_rows, n_cols), Conserved2D::DRY);
+        for i in 0..n_rows {
+            for j in 0..n_cols / 2 {
+                states[(i, j)] = Conserved2D::new(1.0, 0.0, 0.0);
+            }
+        }
+        for _ in 0..300 {
+            let dt = cfl_time_step(&states, &mesh, 0.4);
+            if !dt.is_finite() {
+                break;
+            }
+            ssprk2_step(&mut states, &mesh, Boundaries2D::TRANSMISSIVE, dt);
+        }
+        for s in &states {
+            assert!(s.h.is_finite() && s.h >= 0.0, "h ill-formed: {}", s.h);
+            assert!(s.hu.is_finite(), "hu non-finite: {}", s.hu);
+            assert!(s.hv.is_finite(), "hv non-finite: {}", s.hv);
+        }
     }
 }

@@ -29,8 +29,7 @@
 
 use approx::assert_relative_eq;
 use hydroflux_solver_2d::{
-    Boundaries2D, Boundary, Conserved2D, Mesh2D, cfl_time_step, forward_euler_step,
-    manning_friction_step,
+    Boundaries2D, Boundary, Conserved2D, Mesh2D, cfl_time_step, manning_friction_step, ssprk2_step,
 };
 use ndarray::Array2;
 
@@ -70,7 +69,7 @@ fn run_until(
     let mut steps = 0;
     while t < t_end {
         let dt = cfl_time_step(&states, mesh, cfl).min(t_end - t);
-        forward_euler_step(&mut states, mesh, bcs, dt);
+        ssprk2_step(&mut states, mesh, bcs, dt);
         manning_friction_step(&mut states, manning, dt, 1.0e-9);
         t += dt;
         steps += 1;
