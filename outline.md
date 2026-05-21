@@ -1,8 +1,8 @@
 # Outline: hydroflux — research line del postdoc DICYT
 
-Última actualización: 2026-05-19
-Estado: Año 1, primera iteración del solver-2d cerrada (Thacker 1981 validated). Paper de review Q4 2026 archivado. Primer paper metodológico se mueve a 2028 Q1.
-Próximo milestone: wetting/drying robusto + Manning 2D analítico (2027 Q1 según outline).
+Última actualización: 2026-05-21
+Estado: Año 1, solver-2d orden 2 (MUSCL + SSP-RK2 + Liang & Marche 2009 bed-recon + flux-rescaling) implementado y validado. MacDonald 45× mejor que primera iteración. 82 tests verde. Paper de review Q4 2026 archivado. Primer paper metodológico se mueve a 2028 Q1, ángulo a decidir en 2027 Q4 entre dos tracks paralelos (Track A: differentiable Chilean calibration; Track C: cross-platform GPU continental).
+Próximo milestone: data scouting para tracks A y C + release público v0.1 (cierre 2026 Q4).
 
 ---
 
@@ -41,18 +41,18 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 
 **Output del año revisado**: solver-1d v0.1 público + solver-2d scaffold + foundation para artifact-driven paper 2028.
 
-### Año 2 — 2027 (cierre postdoc)
+### Año 2 — 2027 (cierre postdoc) — DOS TRACKS EN PARALELO
 
-**Objetivo revisado**: solver 2D estable + GPU + autograd. Primer paper submitted al final del año.
+**Objetivo revisado (2026-05-21)**: solver-2d estable + GPU funcional + autograd funcional. **AMBAS capacidades se desarrollan en paralelo**; el ángulo del paper 2028 Q1 se decide al final del año según qué resultados son más fuertes. Ver § "Estrategia del caso aplicado 2028 Q1" abajo.
 
 | Trimestre | Milestones |
 |---|---|
-| **2027 Q1** | Solver-2d: wetting/drying robusto, Manning friction 2D, BCs 2D (4 lados + hidrograma + critical). Validación analítica más extensa: Thacker 1981, dam-break radial Asher 1976, lake-at-rest sobre bumpy bathymetry. |
-| **2027 Q2** | UK EA 2D benchmark suite — los 6 casos. Iteración hasta pasar. Documentación. |
-| **2027 Q3** | GPU acceleration vía wgpu. Refactor del kernel principal a compute shaders. Performance baseline vs CPU. |
-| **2027 Q4** | **Autograd Rust**: forward-mode dual numbers como primer hito (más simple, demuestra concepto). Demo: calibración Manning field sobre tramo Maule via stochastic gradient descent. Primer paper metodológico draft. |
+| **2027 Q1** | Solver-2d completar Fase 3 pendiente (2026 Q4 spillover): docs, release v0.1, UK EA prep. Validación analítica más extensa: dam-break radial Asher 1976, lake-at-rest sobre bumpy bathymetry. **Data scouting para AMBOS tracks** (ver § Estrategia). |
+| **2027 Q2** | UK EA 2D benchmark suite — los 6 casos. Iteración hasta pasar. Documentación. Sin gating sobre tracks A/C. |
+| **2027 Q3** | **TRACK C (GPU)**: Port a wgpu. Refactor del kernel principal a compute shaders. Performance baseline vs CPU. Test cross-platform (Linux+NVIDIA, macOS+Apple Silicon, Linux+AMD). Continental run smoke test (1-2 BNA simultaneous). |
+| **2027 Q4** | **TRACK A (Autograd)**: Forward-mode dual numbers sobre el solver-2d. Demo: calibración Manning field sobre cuenca chilena vía gradient descent. **Decisión de ángulo del paper 2028 Q1 (ver § Estrategia)**. Borrador inicial del paper en el ángulo elegido. |
 
-**Output del año**: solver-2d con autograd FUNCIONAL + UK EA pasado + 1 paper draft sustantivo.
+**Output del año**: solver-2d con autograd FUNCIONAL + GPU FUNCIONAL + UK EA pasado + ángulo del paper decidido + borrador iniciado.
 
 ### Año 3 — 2028 (transición postdoc → Fondecyt)
 
@@ -60,9 +60,9 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 
 | Trimestre | Milestones |
 |---|---|
-| **2028 Q1** | **PRIMER PAPER METODOLÓGICO** submitted. Target Water Resources Research o Geoscientific Model Development (subscription, sin APC). Claim: *"Rust-based differentiable 2D shallow-water solver with native autograd; validation on UK EA 2D benchmark suite + Chilean Andean basins; toward coupled hazard simulation"*. Artifact-backed, no roadmap-promise. |
+| **2028 Q1** | **PRIMER PAPER METODOLÓGICO** submitted. Ángulo seleccionado en 2027 Q4 entre dos opciones articuladas: **(A) Differentiable Chilean calibration** — target WRR — gradient-based Manning calibration sobre cuenca BNA real con hidrogramas DGA; **(C) Cross-platform GPU continental** — target GMD o Adv Water Resour — 15 BNA simultaneas sobre escenarios CMIP6 con wgpu. Ambos venues subscription (sin APC). |
 | **2028 Q2** | Postulación **Fondecyt Iniciación** (~marzo 2028). Propuesta: acoplamiento flood-landslide diferenciable. Cita el paper Q1 como evidencia de capability — preliminary results sustantivos no aspiracionales. |
-| **2028 Q3** | Coupling primitives: integración Iverson trigger acoplado al solver 2D. Voellmy / mu(I) propagación granular en mixture form con SWE. Primer demo coupled (rainfall → trigger → propagation → inundation) sobre cuenca chilena. |
+| **2028 Q3** | Coupling primitives (paper 2, no Q1): integración Iverson trigger acoplado al solver 2D. Voellmy / mu(I) propagación granular en mixture form con SWE. Primer demo coupled (rainfall → trigger → propagation → inundation) sobre cuenca chilena. Independiente del ángulo elegido en Q1. |
 | **2028 Q4** | Reverse-mode autograd (más complejo que forward-mode — checkpointing schemes). Notificación Fondecyt (~nov 2028). Second paper draft sobre el coupling primitives. |
 
 **Output del año**: 1 paper metodológico submitted + Fondecyt postulado con artifact + coupling demo + 2nd paper draft.
@@ -105,10 +105,59 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 ### Fase 3 (2026 Q4) — REVISADA (no más review paper)
 
 - [x] **Solver-2d primera iteración** (2026-05-19): scaffold + HLLC + Audusse-2D + boundary 4 lados × 4 tipos + Manning 2D + Thacker 1981 pasa. 60 unit tests + 6 integration tests. L² rel error 1.62%, mass conservation 8.83e-16.
-- [ ] **Documentación pública del solver-2d**: README detallado, ejemplos de uso, integration con SurtGIS para 2D raster I/O. (Pendiente este Q4.)
-- [ ] **Release público v0.1** en GitHub: repo con solver-1d + solver-2d primera iteración + benchmarks + docs. DOI Zenodo. (Pendiente: requiere docs.)
-- [ ] ~~Draft review paper~~ — **archivado en `papers/01_review/STATUS.md`** tras pivot 2026-05-18. Primer paper se mueve a 2028 Q1 como methods paper artifact-backed (target WRR o GMD).
+- [x] **Solver-2d orden 2** (2026-05-20 / 2026-05-21): MUSCL slope-limited reconstruction (η, u, v primitivas + minmod) + SSP-RK2 + Liang & Marche 2009 bed-reconstruction + flux rescaling (mass-conservative wet/dry). MacDonald drift 1.27% → 0.028% (45× mejor). 82 tests verde.
+- [ ] **Data scouting para tracks A y C** (ver § Estrategia abajo): hidrogramas DGA para cuenca calibration (track A) + escenarios CMIP6 downscaled Chile (track C). Sin código, ~1-2 días.
+- [ ] **Documentación pública del solver-2d**: README detallado, ejemplos de uso, integration con SurtGIS para 2D raster I/O.
+- [ ] **Release público v0.1** en GitHub: repo con solver-1d + solver-2d + benchmarks + docs. DOI Zenodo.
+- [ ] ~~Draft review paper~~ — **archivado en `papers/01_review/STATUS.md`** tras pivot 2026-05-18.
 - [ ] ~~Outreach a grupos internacionales~~ — diferido hasta release v0.2+ con autograd funcional (2027 Q4).
+
+---
+
+## Estrategia del caso aplicado 2028 Q1 (decisión 2026-05-21)
+
+**Decisión meta**: el ángulo del paper 2028 Q1 NO se fija ahora — se desarrollan dos tracks en paralelo durante 2027 y se elige el ángulo al final de Q4 según resultados.
+
+### Track A — Differentiable Chilean calibration
+
+> **Claim del paper**: "Gradient-based calibration of a spatially-distributed Manning field on a Chilean Andean (or Mediterranean) basin using observed DGA hydrographs, executed natively on Rust + wgpu (no Python/Julia runtime)."
+
+- **Wedge**: diferenciabilidad operacional + binary deployment + Chilean application.
+- **vs entrantes 2025**: Hydrograd.jl y AegirJAX hacen gradient calibration pero exigen runtime managed (Julia JIT / Python+JAX). Hydroflux ship as Rust static binary — clave para uso operacional en DGA/SERNAGEOMIN/MOP.
+- **Construido al 2027 Q4**: solver-2d con MUSCL + SSPRK2 + Audusse + Manning + bed-recon + flux-rescaling (HOY hecho) + UK EA pasado (2027 Q2) + forward-mode autograd (2027 Q4 milestone).
+- **Datos requeridos**: hidrograma DGA observado de la cuenca, periodo ≥ 6 meses, eventos discretos identificables. Manning prior field (uniform o land-cover-based).
+- **Target venue**: Water Resources Research (WRR). Subscription, sin APC. Acepta calibration methodology papers.
+- **Riesgo**: medio — autograd no trivial pero camino pavimentado por 3 entrantes 2025.
+
+### Track C — Cross-platform GPU continental
+
+> **Claim del paper**: "Continental-scale (15 BNA cuencas Chilean) flood simulation under CMIP6 climate scenarios, executed on cross-platform GPU (Vulkan/Metal/DX12/WebGPU) via wgpu — first opensource SWE solver hardware-agnostic."
+
+- **Wedge**: GPU multiplataforma + escala + Chile + open.
+- **vs entrantes 2025/incumbentes**: SynxFlow tiene GPU pero CUDA-only + GPL. TUFLOW HPC tiene GPU pero comercial + cerrado. LISFLOOD-FP GPU usa inertial approximation. Nadie tiene wgpu cross-platform + opensource + continental Chile.
+- **Construido al 2027 Q4**: solver-2d con todo lo anterior + UK EA + GPU port via wgpu (2027 Q3) + climate data pipeline.
+- **Datos requeridos**: 15 BNA DEMs (ya tienes) + CMIP6 downscaled scenarios (CR2) + boundary conditions per basin + lluvia forcing.
+- **Target venue**: Geoscientific Model Development (GMD) o Advances in Water Resources. Subscription, sin APC.
+- **Riesgo**: medio-alto — GPU port es trabajo grande pero bien-entendido. Data wrangling de CMIP6 ordenado pero tedioso.
+
+### Decisión de ángulo (2027 Q4)
+
+Criterios para elegir entre A y C al final de 2027 Q4:
+
+1. **Cuál tiene resultados más fuertes empíricamente** — qué pasa cuando los corremos.
+2. **Cuál cubre mejor el wedge canónico revisado** (intersección 4 ejes 2026-05-19).
+3. **Cuál es más reutilizable** para el paper 2 (coupling, 2029) y la postulación Fondecyt (Q2 2028).
+
+### Lo que explícitamente NO está en juego para 2028 Q1
+
+- **Track B (coupling landslide-flood)**: requiere 2+ años de development. Es paper 2 (target 2029-2030).
+- **Reverse-mode autograd**: forward-mode es suficiente para Track A. Reverse-mode queda para paper 2.
+- **3D / sediment transport**: outline 2032+.
+- **Combinaciones (A+C "diff GPU continental")**: scope explosion. Diferido a futuro.
+
+### Disciplina anti-scope-creep
+
+Cada track tiene scope mínimo definido. La tentación con "dos tracks en paralelo" es sumarle "una cosa más" a cada uno. Resistir. La cosa más va a paper 2.
 
 ---
 
@@ -127,12 +176,12 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 |---|---|---|
 | 2026 Q2 | state-of-the-art.md tiene 10+ solvers cubiertos + references.bib con 30+ entries | ✅ Cerrado (12+3 fichas, 36 entries) |
 | 2026 Q3 | 1D pasa MacDonald + dam break analítico con error <5% | ✅ Cerrado (Stoker order 0.81, MacDonald variable order 1.03) |
-| 2026 Q4 | Solver-2d primera iteración pasa Thacker 1981 + release público v0.1 | 🟡 En curso (Thacker ✓, release pendiente) |
-| 2027 Q1 | Wetting/drying robusto + Manning 2D analítico | ⏳ Pendiente |
+| 2026 Q4 | Solver-2d con MUSCL + SSP-RK2 + bed-recon + flux-rescaling. Thacker + dam-break-on-dry + MacDonald uniform pasan. Release v0.1. | 🟡 En curso (solver completo ✓, release pendiente, data scouting pendiente) |
+| 2027 Q1 | Validación analítica más extensa + data scouting tracks A/C | ⏳ Pendiente |
 | 2027 Q2 | UK EA 2D benchmark suite (6/6 casos OK) | ⏳ Pendiente |
-| 2027 Q3 | GPU port via wgpu (cross-platform Vulkan/Metal/DX12) | ⏳ Pendiente |
-| 2027 Q4 | Autograd forward-mode + paper methods draft | ⏳ Pendiente |
-| 2028 Q1 | **Primer paper metodológico submitted** (WRR o GMD) | ⏳ Pendiente |
+| 2027 Q3 | **Track C**: GPU port via wgpu (cross-platform Vulkan/Metal/DX12). Continental smoke test. | ⏳ Pendiente |
+| 2027 Q4 | **Track A**: Autograd forward-mode + demo calibración Chilean. **Decisión ángulo paper (A vs C)** + borrador inicial. | ⏳ Pendiente |
+| 2028 Q1 | **Primer paper metodológico submitted** (WRR si Track A elegido, GMD/AWR si Track C) | ⏳ Pendiente |
 | 2028 Q2 | Postulación Fondecyt Iniciación | ⏳ Pendiente |
 | 2028 Q4 | Fondecyt Iniciación adjudicado + coupling primitives demo | ⏳ Pendiente |
 
@@ -147,3 +196,6 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 | 2026-05-17 | Cierre fase 2026 Q3: solver-1d completo y validado (HLL + Audusse + Manning + inflow/outflow BCs); 52 tests; 2 demos chilenas (Maule + Huasco). |
 | 2026-05-18 | **Pivot estratégico**: literature check reveló 3 papers 2025 que cubren la mayor parte del wedge — Hydrograd.jl (Liu WRR 2025, Julia differentiable SWE), AegirJAX (JAX/Python diff SWE), SynxFlow (Xia JOSS 2024/2025, GPU coupled flood+landslide+debris). El claim del manuscript "no production-grade flood solver in mature autograd language" pasa a falso. Decisión: pausar paper Q4 2026 (archive en `papers/01_review/`), pivotear a desarrollo. Primer paper se mueve a 2028 Q1 como methods paper con artifact 2D + autograd, target WRR o GMD. Rationale: artifact-backed claim contra Hydrograd/AegirJAX/SynxFlow es defendible, roadmap-promise no. DICYT obligation cubierta por Paper 2 (U-Net SAR en R2 RSE). Fondecyt 2028 más fuerte con artifact que con review. |
 | 2026-05-19 | **Cierre primera iteración solver-2d**: 6 commits (`03e57df → 2a92c6d`), ~2160 LOC, 60 unit tests + 6 integration tests, todos verdes. Building blocks completos (state + flux + geometry + riemann HLLC + boundary 4×4 + update Audusse 2D + source Manning 2D). Benchmark analítico **Thacker 1981** pasa: L² rel error 1.62%, L∞ 2.49% h₀, conservación de masa 8.83e-16 (machine precision). Resultados consistentes con literatura (Liang & Marche 2009: 1%, Brufau et al. 2002: 3%). **Wedge revisado a la luz del pivot 2026-05-18**: la versión 2026-05-16 (intersección amplia open+modern+GPU+diff+coupled) se archiva; el wedge canónico nuevo articula la intersección residual defendible — (i) coupled+diff simultáneo, (ii) GPU multiplataforma vía wgpu, (iii) binary deployment nativo, (iv) aplicación a cuencas BNA chilenas. Propagado a `state-of-the-art.md` (3 fichas nuevas + síntesis gap final reescrita) y `README.md`. |
+| 2026-05-20 | **Solver-2d orden 2 espacial (MUSCL) + temporal (SSP-RK2)** (commits `6d3e4ab`, `a8f5175`): MUSCL slope-limited reconstruction sobre primitivas (η, u, v) + minmod limiter + SSP-RK2 (Shu & Osher 1988) como combinación convexa de dos forward-Euler. Mejora dam-break-on-dry L²: 2.74% → 0.99% (~3×). MacDonald drift 0.5% → 1.27% (regresión por sesgo η-MUSCL puro sin bed-reconstruction, documentada). 77 tests verde. |
+| 2026-05-21 | **Bed-reconstruction + flux rescaling (Liang & Marche 2009)** (commit `de7de0a`): las DOS piezas L&M 2009 juntas tras intento fallido + revert. (1) `z_face = midpoint(z_L, z_R)` compartido en cada cara → Audusse correction colapsa a 0, bed-slope source explícito centrado en celda en forma algebraica `S = (g/2)(h_R² − h_L²)/dx`. (2) Flux rescaling: per-cell α mass-conservative, reemplaza el H_DRY clamp. Las dos piezas son inseparables (bed-recon sola → CFL collapse en Thacker; flux-rescaling sola no toca el sesgo MacDonald). **MacDonald drift 1.27% → 0.028% (45× mejor)**, esencialmente machine-precision-limited. Trade-off: lake-at-rest Thacker paraboloid drifta ~1e-5 (cancelación source/flux-divergence solo bit-exacta para piecewise-linear beds, residual O(dx²) para smooth curved beds). Deuda: Castro & Parés 2007 fully-consistent-discrete well-balanced cerraría el gap. 82 tests verde. |
+| 2026-05-21 | **Estrategia caso aplicado 2028 Q1 definida**: "dos tracks en paralelo, decide ángulo en 2027 Q4". Track A = differentiable Chilean calibration (target WRR). Track C = cross-platform GPU continental (target GMD/AWR). Ambos developments comparten infraestructura (UK EA suite, solver-2d). Decisión deferida a 2027 Q4 según cuál tiene resultados más fuertes. Track B (coupling) explícitamente fuera de scope hasta paper 2 (2029-2030). Outline § "Estrategia del caso aplicado 2028 Q1" agregada. |
