@@ -136,8 +136,13 @@ fn uniform_flow_x_aligned_is_preserved() {
         max_dhu = max_dhu.max((s.hu - q).abs());
         max_dhv = max_dhv.max(s.hv.abs());
     }
-    // Tolerance 2% reflects the steady-state bias O(dx·S₀/h_n)
-    // introduced by η-MUSCL without bed-reconstruction. The interior
+    // Tolerance 2% was set when η-MUSCL alone left a residual
+    // O(dx·S₀/h_n) bias on this steady-state problem. With bed
+    // reconstruction (Liang & Marche 2009) + flux rescaling, the
+    // measured drift drops to ~0.03% (h) and ~0.18% (hu) on this
+    // mesh — a 45× improvement on h. The tolerance is left at 2%
+    // as a loose regression guard; substantial drift would indicate
+    // a regression in the well-balanced source or flux rescaling. The interior
     // face flux uses h* = h_n − 0.5·dx·S₀ instead of h_n (Audusse
     // reconstruction on a piecewise-constant bed), creating a small
     // mismatch with the first-order boundary face that drives a

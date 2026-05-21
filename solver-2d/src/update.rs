@@ -24,11 +24,20 @@
 //! uniform flow. See Liang & Marche (2009), Kurganov & Petrova (2007),
 //! and Bouchut (2004) for the same choice in the SWE literature.
 //!
-//! The bed is treated as piecewise constant per cell (no bed slope
-//! reconstruction). Boundary cells use zero slope and the boundary
-//! face flux falls back to first-order — a controlled accuracy
-//! degradation that keeps the BC machinery unchanged. The interior
-//! is second-order in space; boundaries remain first-order.
+//! The bed is reconstructed linearly at each face as the midpoint of
+//! the two adjacent cell-centered bed elevations (Liang & Marche
+//! 2009). Both sides of the face see the SAME `z_face`, which makes
+//! the Audusse hydrostatic correction vanish (the Audusse term
+//! `(g/2)(h² − h*²)` is exactly zero when `z_L = z_R = z_face`). The
+//! bed-slope source then moves out of the face flux and into an
+//! explicit cell-centered term `S = −g · h · ∇z` evaluated with
+//! central differences on the bed (one-sided at the boundaries). The
+//! flux divergence and the explicit source cancel exactly for the
+//! lake-at-rest configuration (C-property), and the net contribution
+//! reduces to the analytical bed-slope force for non-trivial flows
+//! over a smooth bed — eliminating the `O(dx · S₀ / h_n)` steady-state
+//! bias that earlier η-MUSCL iterations had without bed
+//! reconstruction.
 //!
 //! # Audusse in 2D
 //!
@@ -393,23 +402,28 @@ fn compute_slopes_y(states: &Array2<Conserved2D>, mesh: &Mesh2D) -> Array2<CellS
 }
 
 /// Reconstruct the left/right cell states at an interior `x`-face
-/// between cells `(i, j_left)` and `(i, j_right)` using MUSCL slopes.
-/// Returns the two cell-side conservative states ready to be fed into
-/// [`well_balanced_x_face`].
+/// between cells `(i, j_left)` and `(i, j_right)` using MUSCL slopes,
+/// **with shared bed-reconstruction at the face**.
 ///
-/// The reconstruction is on primitives `(η, u, v)`. The conservative
-/// momenta on each side are rebuilt as `hu = h · u`, `hv = h · v`
-/// where `h = max(η_face − z_cell, 0)`. This guarantees that the
-/// velocity at the face is the same from both sides, even when the
-/// reconstructed `h` differs across the (piecewise-constant) bed jump.
+/// The reconstruction is on primitives `(η, u, v)`. The bed at the
+/// face is the linear-interpolation midpoint `z_face = ½(z_L + z_R)`,
+/// SHARED between both sides. The depth at the face is therefore
+/// `h = max(η_face − z_face, 0)` from both sides — no asymmetry due
+/// to a piecewise-constant bed jump. This is the Liang & Marche
+/// (2009) construction that eliminates the steady-state bias of
+/// η-MUSCL on a sloped bed (the bias that motivated this iteration).
 ///
-/// The bed elevations at the two sides are the unmodified cell values
-/// — not reconstructed. Audusse's hydrostatic reconstruction in
-/// [`well_balanced_x_face`] then sees these as the `z` arguments.
+/// Returns `(recon_l, recon_r, z_face)`. The caller passes `z_face`
+/// to BOTH `z_left` and `z_right` of [`well_balanced_x_face`], which
+/// makes the Audusse correction vanish (the bed-slope source is
+/// captured by the explicit cell-centered source term in
+/// [`forward_euler_step`] instead).
+#[allow(clippy::too_many_arguments)]
 fn reconstruct_x_face_states(
     states: &Array2<Conserved2D>,
     slopes_x: &Array2<CellSlopes>,
     bed: &Array2<f64>,
+    z_face: f64,
     i: usize,
     j_left: usize,
     j_right: usize,
@@ -421,13 +435,14 @@ fn reconstruct_x_face_states(
     let eta_minus = eta_l + half_dx * slopes_x[(i, j_left)].eta;
     let u_minus = u_l + half_dx * slopes_x[(i, j_left)].u;
     let v_minus = v_l + half_dx * slopes_x[(i, j_left)].v;
-    let h_minus = (eta_minus - bed[(i, j_left)]).max(0.0);
 
     let (eta_r, u_r, v_r) = primitives_at(states, bed, i, j_right);
     let eta_plus = eta_r - half_dx * slopes_x[(i, j_right)].eta;
     let u_plus = u_r - half_dx * slopes_x[(i, j_right)].u;
     let v_plus = v_r - half_dx * slopes_x[(i, j_right)].v;
-    let h_plus = (eta_plus - bed[(i, j_right)]).max(0.0);
+
+    let h_minus = (eta_minus - z_face).max(0.0);
+    let h_plus = (eta_plus - z_face).max(0.0);
 
     (
         Conserved2D::new(h_minus, h_minus * u_minus, h_minus * v_minus),
@@ -436,11 +451,15 @@ fn reconstruct_x_face_states(
 }
 
 /// Reconstruct the top/bottom cell states at an interior `y`-face
-/// between cells `(i_top, j)` and `(i_bottom, j)` using MUSCL slopes.
+/// between cells `(i_top, j)` and `(i_bottom, j)` using MUSCL slopes,
+/// with shared bed-reconstruction at the face. See
+/// [`reconstruct_x_face_states`] for the rationale.
+#[allow(clippy::too_many_arguments)]
 fn reconstruct_y_face_states(
     states: &Array2<Conserved2D>,
     slopes_y: &Array2<CellSlopes>,
     bed: &Array2<f64>,
+    z_face: f64,
     i_top: usize,
     i_bottom: usize,
     j: usize,
@@ -452,18 +471,67 @@ fn reconstruct_y_face_states(
     let eta_minus = eta_t + half_dy * slopes_y[(i_top, j)].eta;
     let u_minus = u_t + half_dy * slopes_y[(i_top, j)].u;
     let v_minus = v_t + half_dy * slopes_y[(i_top, j)].v;
-    let h_minus = (eta_minus - bed[(i_top, j)]).max(0.0);
 
     let (eta_b, u_b, v_b) = primitives_at(states, bed, i_bottom, j);
     let eta_plus = eta_b - half_dy * slopes_y[(i_bottom, j)].eta;
     let u_plus = u_b - half_dy * slopes_y[(i_bottom, j)].u;
     let v_plus = v_b - half_dy * slopes_y[(i_bottom, j)].v;
-    let h_plus = (eta_plus - bed[(i_bottom, j)]).max(0.0);
+
+    let h_minus = (eta_minus - z_face).max(0.0);
+    let h_plus = (eta_plus - z_face).max(0.0);
 
     (
         Conserved2D::new(h_minus, h_minus * u_minus, h_minus * v_minus),
         Conserved2D::new(h_plus, h_plus * u_plus, h_plus * v_plus),
     )
+}
+
+/// Build the array of face bed elevations `z_face_x[i, j]` for every
+/// `x`-face (interior and boundary).
+///
+/// Interior `j ∈ 1..n_cols`: `z_face = ½(z[i, j-1] + z[i, j])`.
+/// West boundary `j = 0`: `z_face = ½(z_ghost_west + z[i, 0])`.
+/// East boundary `j = n_cols`: `z_face = ½(z[i, n_cols-1] + z_ghost_east)`.
+///
+/// The cell-centered bed gradient used by the explicit source is then
+/// `(z_face[i, j+1] − z_face[i, j]) / dx`, which is **consistent with
+/// the flux divergence**: the same `z_face` values feed both the
+/// pressure-flux term `g·h_face²/2` and the source. This consistency
+/// is what makes lake-at-rest exact on a general bed — the cell-by-
+/// cell cancellation between flux divergence and source only holds
+/// when both use the same face beds.
+fn build_z_face_x(states: &Array2<Conserved2D>, mesh: &Mesh2D, bcs: Boundaries2D) -> Array2<f64> {
+    let n_rows = mesh.n_rows();
+    let n_cols = mesh.n_cols();
+    Array2::from_shape_fn((n_rows, n_cols + 1), |(i, j)| {
+        if j == 0 {
+            let (_, z_g) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
+            0.5 * (z_g + mesh.bed[(i, 0)])
+        } else if j == n_cols {
+            let (_, z_g) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
+            0.5 * (mesh.bed[(i, n_cols - 1)] + z_g)
+        } else {
+            0.5 * (mesh.bed[(i, j - 1)] + mesh.bed[(i, j)])
+        }
+    })
+}
+
+/// Build the array of face bed elevations `z_face_y[i, j]` for every
+/// `y`-face. See [`build_z_face_x`] for the rationale.
+fn build_z_face_y(states: &Array2<Conserved2D>, mesh: &Mesh2D, bcs: Boundaries2D) -> Array2<f64> {
+    let n_rows = mesh.n_rows();
+    let n_cols = mesh.n_cols();
+    Array2::from_shape_fn((n_rows + 1, n_cols), |(i, j)| {
+        if i == 0 {
+            let (_, z_g) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
+            0.5 * (z_g + mesh.bed[(0, j)])
+        } else if i == n_rows {
+            let (_, z_g) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
+            0.5 * (mesh.bed[(n_rows - 1, j)] + z_g)
+        } else {
+            0.5 * (mesh.bed[(i - 1, j)] + mesh.bed[(i, j)])
+        }
+    })
 }
 
 /// One forward-Euler update of the 2D FV solution. Modifies `states` in
@@ -497,41 +565,63 @@ pub fn forward_euler_step(
     }
 
     // Compute MUSCL slopes per cell (one pass before face fluxes).
-    // Interior cells get minmod-limited central slopes; boundary cells
-    // get zero slope, so the boundary face flux falls back to
-    // first-order.
     let slopes_x = compute_slopes_x(states, mesh);
     let slopes_y = compute_slopes_y(states, mesh);
 
+    // Precompute the face bed elevations once: `z_face_x[i, j]` for
+    // every `x`-face and `z_face_y[i, j]` for every `y`-face. These
+    // arrays feed BOTH the face-flux pass (via Audusse-HLLC with
+    // `z_left = z_right = z_face`) and the explicit cell-centered
+    // source term that follows. The well-balancedness of the scheme
+    // hinges on this single source of truth for the face beds.
+    let z_face_x = build_z_face_x(states, mesh, bcs);
+    let z_face_y = build_z_face_y(states, mesh, bcs);
+
     // Precompute all x-faces and y-faces. x-faces have shape
     // (n_rows, n_cols + 1); y-faces have shape (n_rows + 1, n_cols).
-    // Boundary faces use ghost cells from `bcs` and stay first-order;
-    // interior faces use MUSCL reconstruction of (η, hu, hv).
     let faces_x = Array2::<FaceFluxX>::from_shape_fn((n_rows, n_cols + 1), |(i, j)| {
+        let z_face = z_face_x[(i, j)];
         if j == 0 {
-            let (g, z_g) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
-            well_balanced_x_face(g, z_g, states[(i, 0)], mesh.bed[(i, 0)])
+            let (g, _) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
+            well_balanced_x_face(g, z_face, states[(i, 0)], z_face)
         } else if j == n_cols {
-            let (g, z_g) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
-            well_balanced_x_face(states[(i, n_cols - 1)], mesh.bed[(i, n_cols - 1)], g, z_g)
+            let (g, _) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
+            well_balanced_x_face(states[(i, n_cols - 1)], z_face, g, z_face)
         } else {
-            let (recon_l, recon_r) =
-                reconstruct_x_face_states(states, &slopes_x, &mesh.bed, i, j - 1, j, mesh.dx);
-            well_balanced_x_face(recon_l, mesh.bed[(i, j - 1)], recon_r, mesh.bed[(i, j)])
+            let (recon_l, recon_r) = reconstruct_x_face_states(
+                states,
+                &slopes_x,
+                &mesh.bed,
+                z_face,
+                i,
+                j - 1,
+                j,
+                mesh.dx,
+            );
+            well_balanced_x_face(recon_l, z_face, recon_r, z_face)
         }
     });
 
     let faces_y = Array2::<FaceFluxY>::from_shape_fn((n_rows + 1, n_cols), |(i, j)| {
+        let z_face = z_face_y[(i, j)];
         if i == 0 {
-            let (g, z_g) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
-            well_balanced_y_face(g, z_g, states[(0, j)], mesh.bed[(0, j)])
+            let (g, _) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
+            well_balanced_y_face(g, z_face, states[(0, j)], z_face)
         } else if i == n_rows {
-            let (g, z_g) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
-            well_balanced_y_face(states[(n_rows - 1, j)], mesh.bed[(n_rows - 1, j)], g, z_g)
+            let (g, _) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
+            well_balanced_y_face(states[(n_rows - 1, j)], z_face, g, z_face)
         } else {
-            let (recon_t, recon_b) =
-                reconstruct_y_face_states(states, &slopes_y, &mesh.bed, i - 1, i, j, mesh.dy);
-            well_balanced_y_face(recon_t, mesh.bed[(i - 1, j)], recon_b, mesh.bed[(i, j)])
+            let (recon_t, recon_b) = reconstruct_y_face_states(
+                states,
+                &slopes_y,
+                &mesh.bed,
+                z_face,
+                i - 1,
+                i,
+                j,
+                mesh.dy,
+            );
+            well_balanced_y_face(recon_t, z_face, recon_b, z_face)
         }
     });
 
@@ -541,38 +631,179 @@ pub fn forward_euler_step(
     //   bottom y-face is faces_y[(i+1, j)] — cell is on its TOP side → .minus
     //   top    y-face is faces_y[(i, j)]   — cell is on its BOTTOM side → .plus
     //
-    // Positivity preservation: cells whose updated depth would fall
-    // at or below H_DRY are clamped to DRY (depth = 0, both momentum
-    // components zeroed). This is the simplest wetting/drying
-    // treatment — see Liang & Marche (2009) for the flux-rescaling
-    // alternative that is strictly mass-conservative. The clamp can
-    // lose a small amount of mass at the wet/dry front (bounded
-    // pointwise by H_DRY per cell, globally by H_DRY · dx · dy per
-    // step times the number of cells that crossed the threshold);
-    // this is acceptable for first-iteration robustness and will be
-    // tightened with flux-rescaling when needed.
     let dt_dx = dt / mesh.dx;
     let dt_dy = dt / mesh.dy;
+
+    // Liang & Marche (2009) FLUX RESCALING for strictly mass-
+    // conservative wetting/drying. Pass 1: for each cell, compute
+    // the total OUTGOING mass over this timestep assuming the raw
+    // face fluxes were applied. If the outflow would drain more
+    // mass than the cell holds, compute a rescaling factor
+    // `α ∈ [0, 1]` that caps the outflow at the available mass.
+    // The same `α` is then applied (in pass 2) to ALL three
+    // components of the face flux (mass, x-mom, y-mom) at each
+    // outgoing face — momentum advects with the rescaled mass.
+    //
+    // For each face, the scaling factor used is that of the
+    // UPSTREAM cell — the cell that is LOSING mass through this
+    // face. This guarantees: (a) no cell drains below H_DRY → 0,
+    // (b) the same scaled flux is seen by both cells sharing the
+    // face → mass is conserved exactly across the face, (c) on
+    // wet-wet flows where no cell hits the drain limit, α ≡ 1
+    // and the scheme reduces to the unrescaled FV update.
+    let alpha = Array2::<f64>::from_shape_fn((n_rows, n_cols), |(i, j)| {
+        let fx_right = faces_x[(i, j + 1)].minus.mass;
+        let fx_left = faces_x[(i, j)].plus.mass;
+        let fy_bottom = faces_y[(i + 1, j)].minus.mass;
+        let fy_top = faces_y[(i, j)].plus.mass;
+
+        // Cell (i,j) outflow: positive mass flux on the right side
+        // means mass flows L→R (cell loses); negative on the left
+        // means mass flows R→L (cell loses); analogously in y.
+        let mut out_mass = 0.0_f64;
+        if fx_right > 0.0 {
+            out_mass += dt_dx * fx_right;
+        }
+        if fx_left < 0.0 {
+            out_mass += dt_dx * (-fx_left);
+        }
+        if fy_bottom > 0.0 {
+            out_mass += dt_dy * fy_bottom;
+        }
+        if fy_top < 0.0 {
+            out_mass += dt_dy * (-fy_top);
+        }
+
+        let available = (states[(i, j)].h - H_DRY).max(0.0);
+        if out_mass > available && out_mass > 0.0 {
+            available / out_mass
+        } else {
+            1.0
+        }
+    });
+
+    // Pass 2: for each face, determine the upstream cell (the side
+    // losing mass) and scale by that side's α. Same α applies to
+    // .minus and .plus (they differ only in Audusse's
+    // hydrostatic-pressure correction, which is also rescaled).
+    let scale_x_face = |i: usize, j: usize| -> FaceFluxX {
+        let face = faces_x[(i, j)];
+        let alpha_up = if j == 0 {
+            // West boundary face. Outflow from cell (i, 0) when face.mass < 0
+            // (mass moves R→L, i.e. cell 0 loses mass into the ghost).
+            if face.minus.mass < 0.0 {
+                alpha[(i, 0)]
+            } else {
+                1.0
+            }
+        } else if j == n_cols {
+            // East boundary face. Outflow from cell (i, n_cols-1) when
+            // face.mass > 0.
+            if face.minus.mass > 0.0 {
+                alpha[(i, n_cols - 1)]
+            } else {
+                1.0
+            }
+        } else if face.minus.mass > 0.0 {
+            // Interior, L→R: upstream is left cell (j-1).
+            alpha[(i, j - 1)]
+        } else {
+            // Interior, R→L (or zero): upstream is right cell (j).
+            alpha[(i, j)]
+        };
+        FaceFluxX {
+            minus: FluxX {
+                mass: alpha_up * face.minus.mass,
+                x_momentum: alpha_up * face.minus.x_momentum,
+                y_momentum: alpha_up * face.minus.y_momentum,
+            },
+            plus: FluxX {
+                mass: alpha_up * face.plus.mass,
+                x_momentum: alpha_up * face.plus.x_momentum,
+                y_momentum: alpha_up * face.plus.y_momentum,
+            },
+        }
+    };
+    let scale_y_face = |i: usize, j: usize| -> FaceFluxY {
+        let face = faces_y[(i, j)];
+        let alpha_up = if i == 0 {
+            if face.minus.mass < 0.0 {
+                alpha[(0, j)]
+            } else {
+                1.0
+            }
+        } else if i == n_rows {
+            if face.minus.mass > 0.0 {
+                alpha[(n_rows - 1, j)]
+            } else {
+                1.0
+            }
+        } else if face.minus.mass > 0.0 {
+            alpha[(i - 1, j)]
+        } else {
+            alpha[(i, j)]
+        };
+        FaceFluxY {
+            minus: FluxY {
+                mass: alpha_up * face.minus.mass,
+                x_momentum: alpha_up * face.minus.x_momentum,
+                y_momentum: alpha_up * face.minus.y_momentum,
+            },
+            plus: FluxY {
+                mass: alpha_up * face.plus.mass,
+                x_momentum: alpha_up * face.plus.x_momentum,
+                y_momentum: alpha_up * face.plus.y_momentum,
+            },
+        }
+    };
+
+    // FV update with scaled face fluxes + explicit bed-slope source.
     for i in 0..n_rows {
         for j in 0..n_cols {
-            let fx_right = faces_x[(i, j + 1)].minus;
-            let fx_left = faces_x[(i, j)].plus;
-            let fy_bottom = faces_y[(i + 1, j)].minus;
-            let fy_top = faces_y[(i, j)].plus;
+            let fx_right = scale_x_face(i, j + 1).minus;
+            let fx_left = scale_x_face(i, j).plus;
+            let fy_bottom = scale_y_face(i + 1, j).minus;
+            let fy_top = scale_y_face(i, j).plus;
 
             let dh =
                 dt_dx * (fx_right.mass - fx_left.mass) + dt_dy * (fy_bottom.mass - fy_top.mass);
             let new_h = states[(i, j)].h - dh;
+
+            // After flux rescaling new_h ≥ H_DRY by construction
+            // for cells that started wet. A residual floor catches
+            // floating-point roundoff that could nudge a barely-
+            // wet cell below the threshold.
+            let dhu = dt_dx * (fx_right.x_momentum - fx_left.x_momentum)
+                + dt_dy * (fy_bottom.x_momentum - fy_top.x_momentum);
+            let dhv = dt_dx * (fx_right.y_momentum - fx_left.y_momentum)
+                + dt_dy * (fy_bottom.y_momentum - fy_top.y_momentum);
+
+            // Explicit bed-slope source — see module doc. Algebraic
+            // form `S = (g/2) · (h_R_at_face² − h_L_at_face²)/Δx`
+            // that cancels the pressure-flux divergence exactly for
+            // lake-at-rest on any bed. `h_face` from cell's own `η`.
+            let h_old = states[(i, j)].h;
+            let eta_cell = h_old + mesh.bed[(i, j)];
+
+            let h_face_left = (eta_cell - z_face_x[(i, j)]).max(0.0);
+            let h_face_right = (eta_cell - z_face_x[(i, j + 1)]).max(0.0);
+            let s_hu = 0.5 * GRAVITY * (h_face_right.powi(2) - h_face_left.powi(2)) / mesh.dx;
+
+            let h_face_top = (eta_cell - z_face_y[(i, j)]).max(0.0);
+            let h_face_bottom = (eta_cell - z_face_y[(i + 1, j)]).max(0.0);
+            let s_hv = 0.5 * GRAVITY * (h_face_bottom.powi(2) - h_face_top.powi(2)) / mesh.dy;
+
             if new_h <= H_DRY {
+                // Floor: roundoff or starting dry. Set to DRY (state
+                // already drained to ≤ H_DRY; rescaling brought us
+                // here by design when the cell ran out of mass).
                 states[(i, j)] = Conserved2D::DRY;
             } else {
-                let dhu = dt_dx * (fx_right.x_momentum - fx_left.x_momentum)
-                    + dt_dy * (fy_bottom.x_momentum - fy_top.x_momentum);
-                let dhv = dt_dx * (fx_right.y_momentum - fx_left.y_momentum)
-                    + dt_dy * (fy_bottom.y_momentum - fy_top.y_momentum);
                 states[(i, j)].h = new_h;
                 states[(i, j)].hu -= dhu;
+                states[(i, j)].hu += dt * s_hu;
                 states[(i, j)].hv -= dhv;
+                states[(i, j)].hv += dt * s_hv;
             }
         }
     }
