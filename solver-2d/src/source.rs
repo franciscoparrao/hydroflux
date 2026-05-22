@@ -56,6 +56,38 @@ pub fn apply_point_sources(
     }
 }
 
+/// Apply uniform rainfall to every cell for one timestep.
+///
+/// `rate` is the precipitation intensity in **metres of water per
+/// second** (i.e. depth per unit time, NOT per unit area). To
+/// convert from common units:
+/// - mm/hour:    `rate = mm_per_hour · 1e-3 / 3600`
+/// - mm/minute:  `rate = mm_per_minute · 1e-3 / 60`
+/// - m³/(s·m²):  same value (depth per area-time is the same number)
+///
+/// Negative `rate` represents evaporation / infiltration: a depth
+/// per unit time being removed. Cells whose depth would go below
+/// zero are clamped to dry (depth + both momentum components set
+/// to zero).
+///
+/// The rainfall does NOT add momentum (the convention from UK EA
+/// Test 2 and most flood solvers): rain falls vertically, hits
+/// stationary, and is then accelerated by the bed-slope source.
+pub fn apply_rain(states: &mut Array2<Conserved2D>, rate: f64, dt: f64) {
+    if rate == 0.0 {
+        return;
+    }
+    let dh = rate * dt;
+    for cell in states.iter_mut() {
+        let new_h = cell.h + dh;
+        if new_h <= 0.0 {
+            *cell = Conserved2D::DRY;
+        } else {
+            cell.h = new_h;
+        }
+    }
+}
+
 /// Semi-implicit Manning friction step in 2D. In-place point-implicit
 /// update applied independently in each cell:
 ///
@@ -343,6 +375,66 @@ mod tests {
         assert_relative_eq!(states[(1, 1)].h, 2.0, epsilon = 1e-12);
         assert_eq!(states[(0, 1)].h, 0.0);
         assert_eq!(states[(1, 0)].h, 0.0);
+    }
+
+    // -----------------------------------------------------------------
+    // Rain-on-grid tests
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn rain_adds_uniform_depth() {
+        // rate · dt added to every cell. For dry cells, this is the
+        // exact new depth.
+        let mut states = Array2::from_elem((3, 4), Conserved2D::DRY);
+        apply_rain(&mut states, 0.001, 60.0); // 1 mm/s · 60 s = 60 mm
+        for s in &states {
+            assert_relative_eq!(s.h, 0.06, epsilon = 1e-12);
+            assert_eq!(s.hu, 0.0);
+            assert_eq!(s.hv, 0.0);
+        }
+    }
+
+    #[test]
+    fn rain_preserves_existing_momentum() {
+        // Rain on a wet cell adds depth but does not change `hu, hv`.
+        // The new water enters at rest, so the cell's mean velocity
+        // (`hu / h`) drops slightly, but the conserved momentum stays.
+        let mut states = Array2::from_elem((1, 1), Conserved2D::new(1.0, 3.0, -1.5));
+        apply_rain(&mut states, 0.005, 4.0); // adds 0.02 m
+        assert_relative_eq!(states[(0, 0)].h, 1.02, epsilon = 1e-12);
+        assert_eq!(states[(0, 0)].hu, 3.0);
+        assert_eq!(states[(0, 0)].hv, -1.5);
+    }
+
+    #[test]
+    fn negative_rain_evaporates_to_dry() {
+        // Negative rate (evaporation) removes depth. A cell that drains
+        // past zero is clamped DRY (depth + momentum both zero).
+        let mut states = array![[Conserved2D::new(0.01, 0.5, 0.0)]];
+        apply_rain(&mut states, -1.0, 1.0); // wants to remove 1 m
+        assert_eq!(states[(0, 0)].h, 0.0);
+        assert_eq!(states[(0, 0)].hu, 0.0);
+        assert_eq!(states[(0, 0)].hv, 0.0);
+    }
+
+    #[test]
+    fn zero_rain_is_identity() {
+        let mut states = array![[Conserved2D::new(1.0, 0.5, -0.3)]];
+        let before = states.clone();
+        apply_rain(&mut states, 0.0, 100.0);
+        assert_eq!(states, before);
+    }
+
+    #[test]
+    fn rain_is_cumulative() {
+        let mut states = Array2::from_elem((1, 1), Conserved2D::DRY);
+        // 10 mm/h falling for 6 minutes = 1 mm total.
+        let rate = 0.01_f64 / 3600.0;
+        for _ in 0..360 {
+            // 360 × 1 s = 6 min
+            apply_rain(&mut states, rate, 1.0);
+        }
+        assert_relative_eq!(states[(0, 0)].h, 0.001, epsilon = 1e-12);
     }
 
     #[test]
