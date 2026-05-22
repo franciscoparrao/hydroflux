@@ -19,8 +19,8 @@
 //!   the `N` and `S` edges (`bank_height = 2.5 m`, `bank_strip =
 //!   30 m`) to confine the flow.
 //! - Manning `n = 0.04` (vegetated floodplain).
-//! - Initial state: **thin film** `h = 1 mm` (NOT fully dry — see
-//!   the limitation note below).
+//! - Initial state: thin film `h = 1 mm` (workaround for the
+//!   Discharge-BC-on-dry limitation, see the note below).
 //! - BC: Discharge `q = 2 m²/s` at `W`, Transmissive at `E`, Wall on
 //!   `N` and `S`. With these parameters the Manning normal depth in
 //!   the central channel is `h_n = (n·q/√S₀)^(3/5) ≈ 1.75 m`, well
@@ -33,25 +33,23 @@
 //! ASCII grid is downloaded) is a drop-in replacement: only the
 //! `build_mesh` function changes.
 //!
-//! # Known limitation surfaced by this test
+//! # Limitations surfaced by this test
 //!
-//! The `Boundary::Discharge` ghost-cell formulation prescribes the
-//! normal-direction momentum but keeps the ghost depth zero-gradient
-//! (`h_ghost = h_inner`). When the inner cell starts fully dry
-//! (`h_inner = 0`), the HLLC sees a dry-dry interface and returns
-//! zero flux — so the prescribed `q` never enters the domain.
-//! Workaround here: initialise the domain with a 1 mm thin film
-//! (still effectively dry but lets the Riemann solver propagate
-//! mass). The proper fix is to derive `h_ghost` from `q` and the
-//! local geometry (e.g. via Manning normal depth) in the BC
-//! reconstruction; deferred to a follow-up commit.
+//! 1. `Boundary::Discharge` with a fully-dry inner cell injects zero
+//!    flux — the HLLC sees a dry-dry interface (ghost.h = inner.h =
+//!    0 by zero-gradient) and returns 0. Workaround: thin-film init
+//!    (1 mm). A critical-depth ghost override was attempted but
+//!    interacts badly with raised-bed terrain (places water above
+//!    the bank elevation, producing unphysical head differences and
+//!    runaway depths). A robust fix requires deriving `h_ghost` from
+//!    the local bed slope (Manning normal depth) AND respecting the
+//!    inner cell's `η`. Deferred.
 //!
-//! A second limitation: `Boundary::Discharge` applies `q` UNIFORMLY
-//! to every cell on the boundary face — there is no per-cell BC
-//! yet. The raised banks therefore still receive some inflow, just
-//! less than the channel. The `channel_carries_more_water_than_banks`
-//! test asserts the relative magnitude rather than perfect bank
-//! confinement.
+//! 2. `Boundary::Discharge` applies `q` UNIFORMLY to every cell on
+//!    the boundary face. The raised banks therefore receive some
+//!    inflow, just less than the channel. The
+//!    `channel_carries_more_water_than_banks` test asserts the
+//!    relative magnitude rather than perfect bank confinement.
 //!
 //! # What it exercises
 //!
@@ -161,10 +159,9 @@ fn run_with_gauges(
 ) -> (Array2<Conserved2D>, Vec<(f64, Vec<f64>)>) {
     let n_rows = mesh.n_rows();
     let n_cols = mesh.n_cols();
-    // Thin-film initialisation (1 mm). See module docstring for the
-    // reason — needed because the current Discharge BC requires the
-    // inner cell to be non-dry for the Riemann solver to propagate
-    // the prescribed momentum.
+    // Thin-film initialisation (1 mm). Needed because the current
+    // Discharge BC injects zero flux when inner is fully dry — see
+    // module docstring.
     let mut states = Array2::from_elem((n_rows, n_cols), Conserved2D::new(0.001, 0.0, 0.0));
     let mut t = 0.0;
     let mut steps = 0;

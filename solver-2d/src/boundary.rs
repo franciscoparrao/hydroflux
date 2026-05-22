@@ -180,6 +180,19 @@ fn ghost_state(inner: Conserved2D, kind: Boundary, side: Side) -> Conserved2D {
         Boundary::Discharge { q } => {
             // Set the normal-direction momentum to q; keep depth and
             // tangential momentum zero-gradient.
+            //
+            // Known limitation: when `inner.h = 0` (fully dry), the
+            // HLLC sees a dry-dry interface and returns zero flux —
+            // the prescribed `q` never enters the domain. The caller
+            // must either initialise with a thin film or pre-fill
+            // the cells adjacent to the inflow. A critical-depth
+            // override (`h_ghost = (q²/g)^(1/3)`) was attempted but
+            // interacts badly with raised-bed terrain (places water
+            // ABOVE the inner cell's bed elevation, generating
+            // unphysical head differences). A robust fix would
+            // require deriving `h_ghost` from local bed slope (e.g.
+            // Manning normal depth) AND clamping to not exceed the
+            // inner cell's η. Deferred.
             if side.is_x_face() {
                 Conserved2D {
                     h: inner.h,
