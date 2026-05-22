@@ -215,3 +215,4 @@ empieza el data-pipeline en serio.
 | Fecha | Cambio |
 |---|---|
 | 2026-05-21 | Documento inicial creado. Identificación de fuentes y gaps para Tracks A y C. Sin descargas — solo scouting de paths. Recomendación: Huasco-Santa Juana como cuenca piloto candidata Track A. |
+| 2026-05-22 | **Extracción Santa Juana ejecutada**. Script en `examples/santa_juana_qflx/extract.py` + datos en parquet (`output/santa_juana_qflx.parquet`). 19 860 observaciones válidas confirmadas (= catálogo). Régimen caracterizado: mediana 3.5 m³/s, máximo histórico 107 m³/s (1984-07-11). 10 eventos candidate identificados. **Aluvión Atacama 2017** (2017-03-02, 38.9 m³/s) emerge como candidato fuerte para calibración. Bug encontrado y documentado en el camino: CR2 usa `-9999` como sentinel de missing (no NaN). |
