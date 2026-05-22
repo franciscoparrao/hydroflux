@@ -6,6 +6,7 @@
 [workspace]
 resolver = "3"
 members = [
+    "autograd",
     "solver-1d",
     "solver-2d",
 ]
