@@ -2,12 +2,59 @@
 //!
 //! The bed-slope source is folded into the well-balanced flux inside
 //! [`crate::update`] (Audusse hydrostatic reconstruction in 2D). This
-//! module covers the remaining cell-local sources — for now, just
-//! Manning friction.
+//! module covers the remaining cell-local sources:
+//!
+//! - [`manning_friction_step`]: semi-implicit Manning friction.
+//! - [`apply_point_sources`]: point inflows (e.g. UK EA Test 1).
 
 use crate::GRAVITY;
 use crate::state::Conserved2D;
 use ndarray::Array2;
+
+/// A point inflow source: adds water mass to a single cell at a
+/// prescribed volumetric rate. Used for UK EA-style tests with
+/// localised inflow (e.g. "flooding a disconnected water body").
+///
+/// The source does **not** add momentum: the injected water enters
+/// at rest and is accelerated downhill by the bed-slope source +
+/// pressure gradient. This matches the physical picture of a
+/// vertical drop (pipe outlet, rainfall focused at a point) and is
+/// what the UK EA tests assume.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PointSource {
+    /// Row index `i` (along `y`) of the cell receiving the inflow.
+    pub row: usize,
+    /// Column index `j` (along `x`).
+    pub col: usize,
+    /// Mass inflow rate `Q` [m³/s]. Positive injects mass; negative
+    /// withdraws it (useful for sinks like infiltration patches).
+    pub q_mass: f64,
+}
+
+/// Apply all point sources to the state for a single timestep.
+///
+/// For each source, `h_cell += Q · dt / (Δx · Δy)`. Momentum is
+/// unchanged. Cells that go below zero from a negative source
+/// (sink) are clamped to zero — sinks cannot draw more water than
+/// the cell holds.
+pub fn apply_point_sources(
+    states: &mut Array2<Conserved2D>,
+    sources: &[PointSource],
+    dt: f64,
+    dx: f64,
+    dy: f64,
+) {
+    let cell_area = dx * dy;
+    for src in sources {
+        let dh = src.q_mass * dt / cell_area;
+        let cell = &mut states[(src.row, src.col)];
+        cell.h = (cell.h + dh).max(0.0);
+        if cell.h == 0.0 {
+            cell.hu = 0.0;
+            cell.hv = 0.0;
+        }
+    }
+}
 
 /// Semi-implicit Manning friction step in 2D. In-place point-implicit
 /// update applied independently in each cell:
@@ -198,5 +245,111 @@ mod tests {
         for (b, a) in depths_before.iter().zip(depths_after.iter()) {
             assert_eq!(b, a);
         }
+    }
+
+    // -----------------------------------------------------------------
+    // Point source tests
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn point_source_adds_mass_at_expected_rate() {
+        // Q · dt / area is the depth increment per step.
+        let mut states = Array2::from_elem((3, 3), Conserved2D::DRY);
+        let sources = [PointSource {
+            row: 1,
+            col: 1,
+            q_mass: 2.0,
+        }];
+        let dt = 0.5_f64;
+        let dx = 1.0_f64;
+        let dy = 1.0_f64;
+        apply_point_sources(&mut states, &sources, dt, dx, dy);
+        assert_relative_eq!(states[(1, 1)].h, 1.0, epsilon = 1e-12); // 2·0.5/1 = 1
+        assert_eq!(states[(1, 1)].hu, 0.0);
+        assert_eq!(states[(1, 1)].hv, 0.0);
+        // Other cells untouched.
+        for ((i, j), s) in states.indexed_iter() {
+            if (i, j) != (1, 1) {
+                assert_eq!(s.h, 0.0);
+            }
+        }
+    }
+
+    #[test]
+    fn point_source_is_cumulative_across_steps() {
+        let mut states = Array2::from_elem((1, 1), Conserved2D::DRY);
+        let sources = [PointSource {
+            row: 0,
+            col: 0,
+            q_mass: 1.0,
+        }];
+        for _ in 0..10 {
+            apply_point_sources(&mut states, &sources, 0.1, 1.0, 1.0);
+        }
+        // 10 × (1 · 0.1 / 1) = 1.0 m
+        assert_relative_eq!(states[(0, 0)].h, 1.0, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn point_source_scales_inversely_with_cell_area() {
+        let mut a = Array2::from_elem((1, 1), Conserved2D::DRY);
+        let mut b = Array2::from_elem((1, 1), Conserved2D::DRY);
+        let sources = [PointSource {
+            row: 0,
+            col: 0,
+            q_mass: 1.0,
+        }];
+        apply_point_sources(&mut a, &sources, 1.0, 1.0, 1.0);
+        apply_point_sources(&mut b, &sources, 1.0, 2.0, 2.0);
+        // 4× the area → 1/4 the depth.
+        assert_relative_eq!(a[(0, 0)].h, 4.0 * b[(0, 0)].h, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn negative_q_drains_to_zero_clamping_momentum() {
+        // A sink (Q < 0) draws water out. If the sink takes more
+        // than the cell holds, depth clamps to zero and momentum is
+        // zeroed (cannot have moving water without water).
+        let mut states = Array2::from_elem((1, 1), Conserved2D::new(1.0, 5.0, 0.0));
+        let sources = [PointSource {
+            row: 0,
+            col: 0,
+            q_mass: -10.0, // wants to remove 10 m³/s
+        }];
+        // dt = 1, area = 1 → would drain 10 m, but cell only has 1.
+        apply_point_sources(&mut states, &sources, 1.0, 1.0, 1.0);
+        assert_eq!(states[(0, 0)].h, 0.0);
+        assert_eq!(states[(0, 0)].hu, 0.0);
+        assert_eq!(states[(0, 0)].hv, 0.0);
+    }
+
+    #[test]
+    fn multiple_sources_apply_independently() {
+        let mut states = Array2::from_elem((2, 2), Conserved2D::DRY);
+        let sources = [
+            PointSource {
+                row: 0,
+                col: 0,
+                q_mass: 1.0,
+            },
+            PointSource {
+                row: 1,
+                col: 1,
+                q_mass: 2.0,
+            },
+        ];
+        apply_point_sources(&mut states, &sources, 1.0, 1.0, 1.0);
+        assert_relative_eq!(states[(0, 0)].h, 1.0, epsilon = 1e-12);
+        assert_relative_eq!(states[(1, 1)].h, 2.0, epsilon = 1e-12);
+        assert_eq!(states[(0, 1)].h, 0.0);
+        assert_eq!(states[(1, 0)].h, 0.0);
+    }
+
+    #[test]
+    fn empty_sources_list_is_no_op() {
+        let mut states = Array2::from_elem((2, 2), Conserved2D::new(1.0, 0.5, -0.3));
+        let before = states.clone();
+        apply_point_sources(&mut states, &[], 0.1, 1.0, 1.0);
+        assert_eq!(states, before);
     }
 }
