@@ -1,8 +1,8 @@
 # Outline: hydroflux — research line del postdoc DICYT
 
-Última actualización: 2026-05-21
-Estado: Año 1, solver-2d orden 2 (MUSCL + SSP-RK2 + Liang & Marche 2009 bed-recon + flux-rescaling) implementado y validado. MacDonald 45× mejor que primera iteración. 82 tests verde. Paper de review Q4 2026 archivado. Primer paper metodológico se mueve a 2028 Q1, ángulo a decidir en 2027 Q4 entre dos tracks paralelos (Track A: differentiable Chilean calibration; Track C: cross-platform GPU continental).
-Próximo milestone: data scouting para tracks A y C + release público v0.1 (cierre 2026 Q4).
+Última actualización: 2026-05-22
+Estado: Año 1, solver-2d orden 2 + UK EA suite 6/6 cerrada (milestone 2027 Q2 ADELANTADO). 120 tests verde. Features: MUSCL + SSP-RK2 + Liang & Marche 2009 bed-recon + flux-rescaling + Manning + point source + rain-on-grid. 4 analytical benchmarks + 6 UK EA-style benchmarks. Paper de review Q4 2026 archivado. Primer paper metodológico se mueve a 2028 Q1, ángulo a decidir en 2027 Q4.
+Próximo milestone: arranque Track A (autograd forward-mode, outline 2027 Q4) y/o Track C (GPU port via wgpu, outline 2027 Q3).
 
 ---
 
@@ -48,7 +48,7 @@ Construir **un solver acoplado de peligros hidrometeorológicos en Rust** que co
 | Trimestre | Milestones |
 |---|---|
 | **2027 Q1** | Solver-2d completar Fase 3 pendiente (2026 Q4 spillover): docs, release v0.1, UK EA prep. Validación analítica más extensa: dam-break radial Asher 1976, lake-at-rest sobre bumpy bathymetry. **Data scouting para AMBOS tracks** (ver § Estrategia). |
-| **2027 Q2** | UK EA 2D benchmark suite — los 6 casos. Iteración hasta pasar. Documentación. Sin gating sobre tracks A/C. |
+| **2027 Q2** ✅ | UK EA 2D benchmark suite — los 6 casos (T1 flooding disconnected pond, T2 floodplain rainfall, T3 dam break over obstruction, T4 propagation, T5 valley flooding, T6 urban dam break). **Adelantado a 2026-05-22**: synthetic stand-ins implementados con la geometría EA-style. Drop-in replacement con DEMs oficiales cuando se descarguen. |
 | **2027 Q3** | **TRACK C (GPU)**: Port a wgpu. Refactor del kernel principal a compute shaders. Performance baseline vs CPU. Test cross-platform (Linux+NVIDIA, macOS+Apple Silicon, Linux+AMD). Continental run smoke test (1-2 BNA simultaneous). |
 | **2027 Q4** | **TRACK A (Autograd)**: Forward-mode dual numbers sobre el solver-2d. Demo: calibración Manning field sobre cuenca chilena vía gradient descent. **Decisión de ángulo del paper 2028 Q1 (ver § Estrategia)**. Borrador inicial del paper en el ángulo elegido. |
 
@@ -178,7 +178,7 @@ Cada track tiene scope mínimo definido. La tentación con "dos tracks en parale
 | 2026 Q3 | 1D pasa MacDonald + dam break analítico con error <5% | ✅ Cerrado (Stoker order 0.81, MacDonald variable order 1.03) |
 | 2026 Q4 | Solver-2d con MUSCL + SSP-RK2 + bed-recon + flux-rescaling. Thacker + dam-break-on-dry + MacDonald uniform pasan. Release v0.1. | 🟡 En curso (solver completo ✓, release pendiente, data scouting pendiente) |
 | 2027 Q1 | Validación analítica más extensa + data scouting tracks A/C | ⏳ Pendiente |
-| 2027 Q2 | UK EA 2D benchmark suite (6/6 casos OK) | ⏳ Pendiente |
+| 2027 Q2 | UK EA 2D benchmark suite (6/6 casos OK) | ✅ Cerrado (2026-05-22, 116 tests verde) |
 | 2027 Q3 | **Track C**: GPU port via wgpu (cross-platform Vulkan/Metal/DX12). Continental smoke test. | ⏳ Pendiente |
 | 2027 Q4 | **Track A**: Autograd forward-mode + demo calibración Chilean. **Decisión ángulo paper (A vs C)** + borrador inicial. | ⏳ Pendiente |
 | 2028 Q1 | **Primer paper metodológico submitted** (WRR si Track A elegido, GMD/AWR si Track C) | ⏳ Pendiente |
@@ -199,3 +199,4 @@ Cada track tiene scope mínimo definido. La tentación con "dos tracks en parale
 | 2026-05-20 | **Solver-2d orden 2 espacial (MUSCL) + temporal (SSP-RK2)** (commits `6d3e4ab`, `a8f5175`): MUSCL slope-limited reconstruction sobre primitivas (η, u, v) + minmod limiter + SSP-RK2 (Shu & Osher 1988) como combinación convexa de dos forward-Euler. Mejora dam-break-on-dry L²: 2.74% → 0.99% (~3×). MacDonald drift 0.5% → 1.27% (regresión por sesgo η-MUSCL puro sin bed-reconstruction, documentada). 77 tests verde. |
 | 2026-05-21 | **Bed-reconstruction + flux rescaling (Liang & Marche 2009)** (commit `de7de0a`): las DOS piezas L&M 2009 juntas tras intento fallido + revert. (1) `z_face = midpoint(z_L, z_R)` compartido en cada cara → Audusse correction colapsa a 0, bed-slope source explícito centrado en celda en forma algebraica `S = (g/2)(h_R² − h_L²)/dx`. (2) Flux rescaling: per-cell α mass-conservative, reemplaza el H_DRY clamp. Las dos piezas son inseparables (bed-recon sola → CFL collapse en Thacker; flux-rescaling sola no toca el sesgo MacDonald). **MacDonald drift 1.27% → 0.028% (45× mejor)**, esencialmente machine-precision-limited. Trade-off: lake-at-rest Thacker paraboloid drifta ~1e-5 (cancelación source/flux-divergence solo bit-exacta para piecewise-linear beds, residual O(dx²) para smooth curved beds). Deuda: Castro & Parés 2007 fully-consistent-discrete well-balanced cerraría el gap. 82 tests verde. |
 | 2026-05-21 | **Estrategia caso aplicado 2028 Q1 definida**: "dos tracks en paralelo, decide ángulo en 2027 Q4". Track A = differentiable Chilean calibration (target WRR). Track C = cross-platform GPU continental (target GMD/AWR). Ambos developments comparten infraestructura (UK EA suite, solver-2d). Decisión deferida a 2027 Q4 según cuál tiene resultados más fuertes. Track B (coupling) explícitamente fuera de scope hasta paper 2 (2029-2030). Outline § "Estrategia del caso aplicado 2028 Q1" agregada. |
+| 2026-05-22 | **UK EA suite 6/6 cerrada** (commits 34a097c → 27d3f28). 6 synthetic benchmarks estilo Néelz & Pender 2013 (T1 disconnected pond, T2 floodplain rainfall, T3 dam-break-over-obstruction, T4 propagation, T5 valley flooding, T6 urban dam-break-with-buildings). Cada test exercita una capacidad específica: point source, rain-on-grid, well-balanced over discontinuous bed, sustained inflow, parabolic valley topography, raised-bed obstacles. Features nuevas del solver: `apply_point_sources` + `apply_rain` (commits b1d409e, 528a69d). Limitaciones documentadas: Discharge BC sobre fully-dry no funciona (usa thin-film hack); fix completo (Manning normal depth ghost) atrasado. 120 tests verde. Milestone 2027 Q2 ADELANTADO. Next: Track A (autograd) + Track C (GPU). |
