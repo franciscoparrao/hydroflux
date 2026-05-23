@@ -33,7 +33,7 @@ Año 1 (2026), tras pivot estratégico 2026-05-18. **Hitos cerrados ADELANTADOS*
 
 - **Solver-1d**: HLL Riemann + Audusse well-balanced + Manning + inflow/outflow BCs. 4 benchmarks analíticos validados, 2 demos chilenas (Maule + Huasco). [2026-Q3 cerrado]
 - **Solver-2d orden 2**: HLLC + MUSCL + SSP-RK2 + Liang & Marche 2009 bed-recon + flux-rescaling + Manning + point source + rain-on-grid. 4 benchmarks analíticos (Thacker, dam-break-on-dry, MacDonald 0.028% drift, radial axisimétrico) + UK EA-style benchmark suite 6/6 (T1–T6). [2026-Q4 + 2027-Q2 ADELANTADO a 2026-05-22]
-- **`autograd` crate** (Track A scaffolding): forward-mode `Dual` con derivadas exactas para sqrt/exp/ln/sin/cos/abs/powi/powf, `Real` trait genérico sobre `f64` y `Dual`, primitivas SWE genéricas (celerity, Manning, flux 1D/2D, normal depth, critical depth), solver SWE 1D Lax-Friedrichs sobre `T: Real`. Demo `calibrate_manning_1d`: gradient descent recupera Manning a precisión de máquina en 4 iteraciones, una sola pasada forward por gradiente. AD-vs-FD locking test. [2027-Q4 scaffolding ADELANTADO a 2026-05-23]
+- **`autograd` crate** (Track A scaffolding + application iter 1): forward-mode `Dual` con derivadas exactas para sqrt/exp/ln/sin/cos/abs/powi/powf, `Real` trait genérico sobre `f64` y `Dual`, primitivas SWE genéricas (celerity, Manning, flux 1D/2D, normal depth, critical depth), solver SWE 1D Lax-Friedrichs sobre `T: Real`. Demos: (a) `calibrate_manning_1d` — gradient descent recupera Manning a precisión de máquina en 4 iter (sintético); (b) `calibrate_manning_huasco_2017` — calibración sobre evento Aluvión Atacama 2017 con forzamiento DGA real (serie Q diaria Santa Juana), recuperando n=0.04 a 0.04% rel error en 25 iter, dentro del envelope literatura Chow 1959. AD-vs-FD locking test. [2027-Q4 scaffolding + application iter 1 ADELANTADO a 2026-05-23]
 
 Estado de tests: ~213 verde. Paper de review Q4 2026 archivado; primer paper metodológico se mueve a 2028 Q1 con artifact-backing. Ver `outline.md` para el arco multi-año y milestones revisados.
 
@@ -91,8 +91,11 @@ Puede citarse y vincularse a la postdoctoral en CLAUDE.md, READMEs y futuros pap
 # Run the full workspace test suite (~213 tests).
 cargo test --workspace --release
 
-# Run the Manning calibration demo (4 iterations to machine precision).
+# Run the synthetic Manning calibration demo (4 iterations to machine precision).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_1d
+
+# Run the Aluvión Atacama 2017 calibration demo (real DGA forcing, 25 iter to 1.6e-5).
+cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017
 ```
 
 ## Licencia
