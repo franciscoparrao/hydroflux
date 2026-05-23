@@ -102,6 +102,9 @@ cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_201
 
 # DEM bed + REAL 24-hour daily blocks (21 real days, ~1 min wall time, 9 iter to 1e-8).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_realtime
+
+# Target externo (rating curve literature-derived) — diagnostica mismatch modelo vs rating.
+cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_rating
 ```
 
 ## Licencia
