@@ -329,6 +329,72 @@ mod tests {
     }
 
     #[test]
+    fn ad_gradient_matches_central_finite_difference() {
+        // Independent ground truth for the AD gradient: compute the
+        // forward map h_steady(n) at n ± ε with f64 and form the
+        // central difference. AD and FD must agree to better than
+        // 0.1 % at ε = 1e-5 — anything worse means a bug in Dual or
+        // in how the solver threads derivatives.
+        let n_cells = 80;
+        let dx = 2.0;
+        let slope = 0.001;
+        let bed = linspace_bed(n_cells, slope, dx);
+        let q_in = 1.5_f64;
+        let n0 = 0.04_f64;
+        let eps = 1.0e-5_f64;
+        let t_end = 500.0_f64;
+        let mid = n_cells / 2;
+
+        let h_n = manning_normal_depth(q_in, n0, slope);
+        let h_at = |n: f64| -> f64 {
+            let (h, _, _) = run(
+                vec![h_n; n_cells],
+                vec![q_in; n_cells],
+                &bed,
+                dx,
+                t_end,
+                n,
+                G,
+                0.4,
+                LeftBc::Dirichlet { h: h_n, q: q_in },
+                RightBc::Transmissive,
+            );
+            h[mid]
+        };
+
+        let h_plus = h_at(n0 + eps);
+        let h_minus = h_at(n0 - eps);
+        let grad_fd = (h_plus - h_minus) / (2.0 * eps);
+
+        let (h_d, _, _) = run(
+            vec![Dual::constant(h_n); n_cells],
+            vec![Dual::constant(q_in); n_cells],
+            &bed,
+            dx,
+            t_end,
+            Dual::variable(n0),
+            G,
+            0.4,
+            LeftBc::Dirichlet {
+                h: Dual::constant(h_n),
+                q: Dual::constant(q_in),
+            },
+            RightBc::Transmissive,
+        );
+        let grad_ad = h_d[mid].dval;
+
+        // Important: the FD here uses Dirichlet h_bc that DOES NOT
+        // vary with n (we want d(h_mid)/d(n) holding the BC fixed,
+        // matching the AD setup exactly). Otherwise FD vs AD compare
+        // different quantities.
+        let rel_err = (grad_ad - grad_fd).abs() / grad_fd.abs().max(1.0e-9);
+        assert!(
+            rel_err < 1.0e-3,
+            "AD vs FD mismatch: ad = {grad_ad:.6e}, fd = {grad_fd:.6e}, rel_err = {rel_err:.3e}"
+        );
+    }
+
+    #[test]
     fn gradient_d_h_steady_d_manning_n_matches_normal_depth_derivative() {
         // h_n(n) = (n·q/√S₀)^(3/5). Analytical: dh_n/dn = (3/5)·(q/√S₀)^(3/5)·n^(-2/5).
         // Run the solver with `n` as Dual::variable; the interior
