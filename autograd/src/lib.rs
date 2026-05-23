@@ -30,5 +30,8 @@
 #![warn(missing_docs)]
 
 mod dual;
+pub mod physics;
+mod real;
 
 pub use dual::Dual;
+pub use real::Real;

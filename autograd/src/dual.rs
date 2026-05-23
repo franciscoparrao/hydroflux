@@ -36,13 +36,17 @@ impl Dual {
         Self { val: x, dval: 0.0 }
     }
 
-    /// Square root. Undefined for negative `val`; returns NaN.
+    /// Square root.
+    ///
+    /// At `val = 0` the analytical derivative is infinite. The
+    /// subdifferential 0 is returned instead so a clamp-to-dry branch
+    /// upstream (`h.max(0)` then `.sqrt()`) yields a finite, zero
+    /// gradient at the wet/dry boundary instead of NaN. Negative `val`
+    /// gives NaN in both components, matching `f64::sqrt`.
     pub fn sqrt(self) -> Self {
         let s = self.val.sqrt();
-        Self {
-            val: s,
-            dval: self.dval / (2.0 * s),
-        }
+        let dval = if s == 0.0 { 0.0 } else { self.dval / (2.0 * s) };
+        Self { val: s, dval }
     }
 
     /// Natural exponential.
