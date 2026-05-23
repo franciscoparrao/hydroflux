@@ -99,6 +99,9 @@ cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_201
 
 # Same Atacama 2017 calibration but with DEM-derived channel bed (real Huasco profile, 40 iter).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_dem
+
+# DEM bed + REAL 24-hour daily blocks (21 real days, ~1 min wall time, 9 iter to 1e-8).
+cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_realtime
 ```
 
 ## Licencia
