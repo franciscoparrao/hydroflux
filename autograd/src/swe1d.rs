@@ -45,7 +45,12 @@ use crate::Real;
 #[derive(Debug, Clone, Copy)]
 pub enum LeftBc<T: Real> {
     /// Dirichlet on both `h` and `q`. Use this to drive steady inflow.
-    Dirichlet { h: T, q: T },
+    Dirichlet {
+        /// Imposed depth at the upstream ghost cell [m].
+        h: T,
+        /// Imposed discharge per unit width at the upstream ghost cell [m²/s].
+        q: T,
+    },
     /// Transmissive (zero-gradient).
     Transmissive,
 }
