@@ -103,13 +103,69 @@ pub fn max_wave_speeds(states: &Array2<Conserved2D>) -> (f64, f64) {
     (s_x, s_y)
 }
 
-/// CFL-bounded time step `dt = cfl / (s_x/dx + s_y/dy)`. Returns
-/// `f64::INFINITY` when the domain is entirely dry (no signal can
-/// propagate); callers should clamp against a problem-specific maximum.
+/// CFL-bounded time step `dt = cfl / (s_x/dx + s_y/dy)` from the
+/// interior state. Returns `f64::INFINITY` when the domain is entirely
+/// dry (no signal can propagate); callers should clamp against a
+/// problem-specific maximum.
+///
+/// Use [`cfl_time_step_with_bcs`] when starting from a fully dry
+/// domain with a wet inflow boundary — that variant peeks at the
+/// boundary ghosts so the first time step does not run away.
 ///
 /// `cfl` is typically 0.4–0.5 for an explicit FV solver with HLLC in 2D.
 pub fn cfl_time_step(states: &Array2<Conserved2D>, mesh: &Mesh2D, cfl: f64) -> f64 {
     let (s_x, s_y) = max_wave_speeds(states);
+    let denom = s_x / mesh.dx + s_y / mesh.dy;
+    if denom > 0.0 {
+        cfl / denom
+    } else {
+        f64::INFINITY
+    }
+}
+
+/// CFL-bounded time step that also considers wave activity carried by
+/// the boundary ghost cells. Use this when the interior may be dry
+/// while a [`Boundary::Discharge`] BC is injecting flow — in that
+/// case [`cfl_time_step`] returns `INFINITY` (no interior signal) and
+/// the solver would attempt a step long enough to inject unphysical
+/// mass from the wet ghost.
+///
+/// The implementation samples the four boundary ghost cells along each
+/// side and folds their wave speeds into the interior maxima. When the
+/// interior is already active, the ghost contribution is dominated by
+/// it and this function returns essentially the same value as
+/// [`cfl_time_step`].
+pub fn cfl_time_step_with_bcs(
+    states: &Array2<Conserved2D>,
+    mesh: &Mesh2D,
+    bcs: Boundaries2D,
+    cfl: f64,
+) -> f64 {
+    let (mut s_x, mut s_y) = max_wave_speeds(states);
+    let n_rows = mesh.n_rows();
+    let n_cols = mesh.n_cols();
+    let mut update_from_ghost = |ghost: Conserved2D| {
+        if ghost.h <= H_DRY {
+            return;
+        }
+        let c = (GRAVITY * ghost.h).sqrt();
+        let u = ghost.hu / ghost.h;
+        let v = ghost.hv / ghost.h;
+        s_x = s_x.max(u.abs() + c);
+        s_y = s_y.max(v.abs() + c);
+    };
+    for i in 0..n_rows {
+        let (g_w, _) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
+        update_from_ghost(g_w);
+        let (g_e, _) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
+        update_from_ghost(g_e);
+    }
+    for j in 0..n_cols {
+        let (g_n, _) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
+        update_from_ghost(g_n);
+        let (g_s, _) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
+        update_from_ghost(g_s);
+    }
     let denom = s_x / mesh.dx + s_y / mesh.dy;
     if denom > 0.0 {
         cfl / denom

@@ -53,6 +53,25 @@
 
 use crate::geometry::Mesh2D;
 use crate::state::Conserved2D;
+use crate::H_DRY;
+
+/// Below this streamwise slope magnitude the Discharge-on-dry
+/// correction (Manning normal depth ghost) is not applied: Manning
+/// normal depth `h_n ~ S₀^{-3/10}` blows up as slope goes to zero, so
+/// the threshold avoids spurious large depths at near-flat boundary
+/// cells (e.g., raised banks of UK EA Test 4 where the longitudinal
+/// slope is exactly zero). Below the threshold the ghost falls back
+/// to the legacy behaviour (`h_ghost = inner.h`), which requires the
+/// caller to pre-fill with a thin film for water to enter.
+const DRY_INFLOW_SLOPE_THRESHOLD: f64 = 5.0e-4;
+
+/// Hard cap on the Discharge-on-dry Manning-normal-depth ghost.
+/// Operational discharges in our target basins (Atacama-Huasco-style
+/// flash floods, q ≤ ~20 m²/s) give `h_n` well under 10 m even at
+/// gentle slopes (S₀ ≈ 1e-3 → h_n ≈ 4 m at q = 5). The cap absorbs
+/// the long tail at very gentle slopes without affecting the regime
+/// of interest.
+const DRY_INFLOW_H_MAX: f64 = 10.0;
 
 /// Boundary kind at one side of the 2D domain.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -146,6 +165,29 @@ impl Boundaries2D {
 /// `inner` is the adjacent inner-cell state. `idx` is the index *along*
 /// the boundary: row `i` for `West`/`East` faces, column `j` for
 /// `North`/`South` faces.
+///
+/// For a [`Boundary::Discharge`] BC over a *fully dry* inner cell,
+/// the ghost depth is set to the local Manning normal depth
+/// `h_n = (n·|q|/√S₀)^(3/5)` whenever the streamwise bed slope
+/// exceeds [`DRY_INFLOW_SLOPE_THRESHOLD`]. This lets the prescribed
+/// `q` actually enter the domain instead of meeting a dry-dry HLLC
+/// interface that returns zero flux.
+///
+/// Scope is deliberately narrow:
+/// - Engages only when `inner.h < H_DRY`. As soon as the wetting
+///   front establishes any depth in the first interior cell, the BC
+///   falls back to the legacy zero-gradient-on-`h` + prescribed
+///   `hu = q` behaviour. This keeps the override invisible to test
+///   suites that initialise with a thin film (e.g., UK EA Test 5).
+/// - Engages only when the streamwise bed slope is above the
+///   threshold. Without slope, Manning normal depth is undefined and
+///   raised-bank cells (no longitudinal slope) would otherwise
+///   receive runaway depths.
+///
+/// Callers driving cold-start inflow over a dry domain should pair
+/// this BC with [`crate::cfl_time_step_with_bcs`], which folds the
+/// wet ghost wave speeds into the CFL bound so the first time step
+/// stays sane.
 pub fn ghost_cell(
     mesh: &Mesh2D,
     inner: Conserved2D,
@@ -153,9 +195,56 @@ pub fn ghost_cell(
     side: Side,
     idx: usize,
 ) -> (Conserved2D, f64) {
-    let state = ghost_state(inner, kind, side);
+    let mut state = ghost_state(inner, kind, side);
     let bed = ghost_bed(mesh, kind, side, idx);
+
+    if let Boundary::Discharge { q } = kind {
+        if inner.h < H_DRY {
+            let slope_mag = streamwise_bed_slope_magnitude(mesh, side, idx);
+            if slope_mag > DRY_INFLOW_SLOPE_THRESHOLD {
+                let h_n = (mesh.manning * q.abs() / slope_mag.sqrt()).powf(3.0 / 5.0);
+                state.h = h_n.min(DRY_INFLOW_H_MAX);
+            }
+        }
+    }
+
     (state, bed)
+}
+
+/// Magnitude of the bed slope at the boundary cell, taken along the
+/// face normal (streamwise direction for inflow). Returns 0 when the
+/// mesh has fewer than two cells across the relevant axis.
+fn streamwise_bed_slope_magnitude(mesh: &Mesh2D, side: Side, idx: usize) -> f64 {
+    match side {
+        Side::West => {
+            if mesh.n_cols() < 2 {
+                0.0
+            } else {
+                mesh.bed_slope_x(idx, 0).abs()
+            }
+        }
+        Side::East => {
+            if mesh.n_cols() < 2 {
+                0.0
+            } else {
+                mesh.bed_slope_x(idx, mesh.n_cols() - 2).abs()
+            }
+        }
+        Side::North => {
+            if mesh.n_rows() < 2 {
+                0.0
+            } else {
+                mesh.bed_slope_y(0, idx).abs()
+            }
+        }
+        Side::South => {
+            if mesh.n_rows() < 2 {
+                0.0
+            } else {
+                mesh.bed_slope_y(mesh.n_rows() - 2, idx).abs()
+            }
+        }
+    }
 }
 
 fn ghost_state(inner: Conserved2D, kind: Boundary, side: Side) -> Conserved2D {
@@ -181,18 +270,14 @@ fn ghost_state(inner: Conserved2D, kind: Boundary, side: Side) -> Conserved2D {
             // Set the normal-direction momentum to q; keep depth and
             // tangential momentum zero-gradient.
             //
-            // Known limitation: when `inner.h = 0` (fully dry), the
-            // HLLC sees a dry-dry interface and returns zero flux —
-            // the prescribed `q` never enters the domain. The caller
-            // must either initialise with a thin film or pre-fill
-            // the cells adjacent to the inflow. A critical-depth
-            // override (`h_ghost = (q²/g)^(1/3)`) was attempted but
-            // interacts badly with raised-bed terrain (places water
-            // ABOVE the inner cell's bed elevation, generating
-            // unphysical head differences). A robust fix would
-            // require deriving `h_ghost` from local bed slope (e.g.
-            // Manning normal depth) AND clamping to not exceed the
-            // inner cell's η. Deferred.
+            // Dry-inflow correction lives in [`ghost_cell`] (see
+            // there): when `inner.h < H_DRY` AND the streamwise bed
+            // slope at this boundary cell exceeds the threshold, the
+            // depth is overridden with the local Manning normal
+            // depth so the prescribed `q` actually enters the
+            // domain. On near-flat boundary cells (raised banks
+            // without longitudinal slope) the override does not
+            // engage and callers must still pre-fill a thin film.
             if side.is_x_face() {
                 Conserved2D {
                     h: inner.h,
