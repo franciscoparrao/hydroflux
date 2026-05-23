@@ -32,6 +32,7 @@
 mod dual;
 pub mod physics;
 mod real;
+pub mod swe1d;
 
 pub use dual::Dual;
 pub use real::Real;
