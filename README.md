@@ -94,8 +94,11 @@ cargo test --workspace --release
 # Run the synthetic Manning calibration demo (4 iterations to machine precision).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_1d
 
-# Run the Aluvión Atacama 2017 calibration demo (real DGA forcing, 25 iter to 1.6e-5).
+# Run the Aluvión Atacama 2017 calibration demo (real DGA forcing, synthetic bed, 25 iter).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017
+
+# Same Atacama 2017 calibration but with DEM-derived channel bed (real Huasco profile, 40 iter).
+cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_dem
 ```
 
 ## Licencia
