@@ -1,0 +1,12 @@
+{
+  "gauge_lon": -70.6464,
+  "gauge_lat": -28.6719,
+  "n_cells_walked": 50,
+  "total_length_m": 1805.5129855222058,
+  "elevation_drop_m": 12.1690673828125,
+  "mean_slope": 0.006739950075348175,
+  "segment_slope_median": 3.0517578125e-06,
+  "fitted_slope_linear": 0.007443266780573839,
+  "elevation_start_m": 490.4969482421875,
+  "elevation_end_m": 478.327880859375
+}
