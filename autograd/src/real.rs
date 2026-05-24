@@ -62,6 +62,12 @@ pub trait Real:
 
     /// Real power with a non-differentiable exponent.
     fn powf(self, n: f64) -> Self;
+
+    /// Real power with a *differentiable* exponent (`Self^Self`).
+    /// Enables calibrating both base and exponent of a power-law
+    /// relation (e.g., cross-section top width `T(h) = c · h^p`
+    /// where both `c` and `p` are inferred parameters).
+    fn powt(self, exponent: Self) -> Self;
 }
 
 impl Real for f64 {
@@ -94,6 +100,9 @@ impl Real for f64 {
     }
     fn powf(self, n: f64) -> Self {
         f64::powf(self, n)
+    }
+    fn powt(self, exponent: f64) -> f64 {
+        f64::powf(self, exponent)
     }
 }
 
@@ -133,6 +142,9 @@ impl Real for Dual {
     }
     fn powf(self, n: f64) -> Self {
         Dual::powf(self, n)
+    }
+    fn powt(self, exponent: Dual) -> Dual {
+        Dual::powd(self, exponent)
     }
 }
 

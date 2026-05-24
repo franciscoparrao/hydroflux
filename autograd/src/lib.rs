@@ -32,6 +32,7 @@
 pub mod compound_swe1d;
 mod dual;
 pub mod physics;
+pub mod power_law_swe1d;
 mod real;
 pub mod swe1d;
 
