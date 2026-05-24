@@ -8,5 +8,11 @@
   "segment_slope_median": 3.0517578125e-06,
   "fitted_slope_linear": 0.007443266780573839,
   "elevation_start_m": 490.4969482421875,
-  "elevation_end_m": 478.327880859375
+  "elevation_end_m": 478.327880859375,
+  "hand_threshold_m": 0.5,
+  "channel_width_median_m": 42.42640687119285,
+  "channel_width_mean_m": 62.080822458921276,
+  "channel_width_p25_m": 30.0,
+  "channel_width_p75_m": 84.8528137423857,
+  "note_resolution_limit": "DEM 30 m: the narrowest resolvable channel is 1 pixel = 30 m. If the true active channel at the gauge is narrower (e.g., 5-15 m), the DEM-derived width will overestimate it. A higher-resolution DEM (LiDAR / Pleiades 0.5 m) is the only fix at this stage."
 }

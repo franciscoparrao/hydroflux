@@ -54,6 +54,17 @@ FACTORS_DIR = Path(
 DEM_PATH = FACTORS_DIR / "hydrology" / "filled.tif"
 FLOW_DIR_PATH = FACTORS_DIR / "hydrology" / "flow_direction_d8.tif"
 FLOW_ACC_PATH = FACTORS_DIR / "hydrology" / "flow_accumulation.tif"
+HAND_PATH = FACTORS_DIR / "hydrology" / "hand.tif"
+
+# HAND threshold (metres) used to define "in-channel" for the
+# connected-perpendicular width estimate. 0.5 m corresponds roughly
+# to the active channel at low-to-moderate flow; higher thresholds
+# include the floodplain. Picked conservatively because the
+# pit-filled DEM creates artificially flat HAND=0 pools that would
+# inflate the perpendicular extent if we walked through them
+# disconnectedly.
+HAND_CHANNEL_THRESHOLD_M = 0.5
+MAX_WIDTH_HALF_CELLS = 30
 
 # D8 flow-direction encoding used by the susceptibility pipeline's
 # WhiteboxTools-via-TauDEM output: integers 1-8 where 1 = E, then
@@ -95,6 +106,56 @@ def snap_to_main_stem(flow_acc, row, col, window=5):
     flat = int(patch.argmax())
     dr, dc = np.unravel_index(flat, patch.shape)
     return r_lo + int(dr), c_lo + int(dc)
+
+
+def channel_width_at(
+    hand,
+    flow_dir,
+    row,
+    col,
+    pixel_size_m=30.0,
+    threshold=HAND_CHANNEL_THRESHOLD_M,
+    max_half_cells=MAX_WIDTH_HALF_CELLS,
+):
+    """Connected-perpendicular channel width at (row, col).
+
+    Compute the perpendicular direction to the cell's D8 flow vector,
+    then walk OUT in both perpendicular senses until the first cell
+    with HAND > threshold (or the raster edge / nodata). The width is
+    the total number of consecutive in-channel cells × pixel step.
+
+    Connected walk: stops at the first out-of-channel cell, so it
+    cannot bleed into disconnected flat HAND=0 pools elsewhere in
+    the basin (a problem the pit-filled DEM creates).
+
+    For diagonal perpendiculars (flow direction NE/SE/SW/NW), the
+    perpendicular step length is `pixel · √2`; we account for that
+    in the width sum.
+    """
+    d = int(flow_dir[row, col])
+    if d not in D8_OFFSETS:
+        return float("nan")
+    dr_f, dc_f = D8_OFFSETS[d]
+    # Two perpendiculars: (-dc, dr) and (dc, -dr).
+    pdr, pdc = -dc_f, dr_f
+    step_len = pixel_size_m * (1.0 if (abs(pdr) + abs(pdc) == 1) else 2**0.5)
+    ncells = 1  # center cell
+
+    def walk(sign):
+        r, c = row, col
+        out = 0
+        for _ in range(max_half_cells):
+            r, c = r + sign * pdr, c + sign * pdc
+            if not (0 <= r < hand.shape[0] and 0 <= c < hand.shape[1]):
+                break
+            h = hand[r, c]
+            if np.isnan(h) or h > threshold:
+                break
+            out += 1
+        return out
+
+    ncells += walk(+1) + walk(-1)
+    return ncells * step_len
 
 
 def walk_downstream(flow_dir, dem, start_row, start_col, n_cells):
@@ -170,7 +231,7 @@ def main():
 
     with rasterio.open(DEM_PATH) as dem, rasterio.open(FLOW_DIR_PATH) as fdir, rasterio.open(
         FLOW_ACC_PATH
-    ) as facc:
+    ) as facc, rasterio.open(HAND_PATH) as hand_src:
         # Find and snap the gauge.
         row0, col0 = find_gauge_pixel(dem)
         print(f"Gauge raw pixel: ({row0}, {col0})")
@@ -190,7 +251,13 @@ def main():
 
         # Walk.
         flow_dir = fdir.read(1)
+        hand = hand_src.read(1)
         traj = walk_downstream(flow_dir, dem, row, col, args.n_cells)
+
+        # Per-cell channel width via connected-perpendicular HAND walk.
+        widths = np.array(
+            [channel_width_at(hand, flow_dir, r, c) for (r, c, _, _, _) in traj]
+        )
 
     if len(traj) < 2:
         raise SystemExit(
@@ -209,13 +276,15 @@ def main():
     slope = np.full_like(zs, np.nan)
     slope[:-1] = -np.diff(zs) / dx_arc  # positive when bed descends in +x
 
-    # CSV.
+    # CSV — now includes width.
     csv_path = args.output_dir / "huasco_longitudinal_profile.csv"
     with csv_path.open("w") as f:
-        f.write("distance_m,elevation_m,slope\n")
-        for d, z, s in zip(distance, zs, slope):
-            f.write(f"{d:.3f},{z:.4f},{'' if np.isnan(s) else f'{s:.6f}'}\n")
-    print(f"Wrote {csv_path} ({len(distance)} samples)")
+        f.write("distance_m,elevation_m,slope,width_m\n")
+        for d, z, s, w in zip(distance, zs, slope, widths):
+            sf = "" if np.isnan(s) else f"{s:.6f}"
+            wf = "" if np.isnan(w) else f"{w:.2f}"
+            f.write(f"{d:.3f},{z:.4f},{sf},{wf}\n")
+    print(f"Wrote {csv_path} ({len(distance)} samples, with width)")
 
     # Aggregate summary.
     total_length = float(distance[-1])
@@ -226,6 +295,12 @@ def main():
     # Best-fit linear slope through the (distance, elevation) cloud.
     poly = np.polyfit(distance, zs, 1)
     fitted_slope = float(-poly[0])  # negative gradient → positive descent rate
+
+    valid_widths = widths[~np.isnan(widths)]
+    width_median = float(np.median(valid_widths)) if len(valid_widths) > 0 else float("nan")
+    width_mean = float(np.mean(valid_widths)) if len(valid_widths) > 0 else float("nan")
+    width_p25 = float(np.percentile(valid_widths, 25)) if len(valid_widths) > 0 else float("nan")
+    width_p75 = float(np.percentile(valid_widths, 75)) if len(valid_widths) > 0 else float("nan")
 
     summary = {
         "gauge_lon": GAUGE_LON,
@@ -238,6 +313,17 @@ def main():
         "fitted_slope_linear": fitted_slope,
         "elevation_start_m": float(zs[0]),
         "elevation_end_m": float(zs[-1]),
+        "hand_threshold_m": HAND_CHANNEL_THRESHOLD_M,
+        "channel_width_median_m": width_median,
+        "channel_width_mean_m": width_mean,
+        "channel_width_p25_m": width_p25,
+        "channel_width_p75_m": width_p75,
+        "note_resolution_limit": (
+            "DEM 30 m: the narrowest resolvable channel is 1 pixel = 30 m. "
+            "If the true active channel at the gauge is narrower (e.g., 5-15 m), "
+            "the DEM-derived width will overestimate it. A higher-resolution DEM "
+            "(LiDAR / Pleiades 0.5 m) is the only fix at this stage."
+        ),
     }
     json_path = args.output_dir / "huasco_profile_summary.json"
     json_path.write_text(json.dumps(summary, indent=2))
