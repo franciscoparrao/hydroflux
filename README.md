@@ -105,6 +105,9 @@ cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_201
 
 # Target externo (rating curve literature-derived) — diagnostica mismatch modelo vs rating.
 cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_rating
+
+# Same con channel width DEM-derived (HAND-connected walk, median 42 m).
+cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_width
 ```
 
 ## Licencia
