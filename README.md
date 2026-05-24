@@ -108,6 +108,9 @@ cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_201
 
 # Same con channel width DEM-derived (HAND-connected walk, median 42 m).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_width
+
+# COMPOUND cross-section (main 30m + floodplain 85m at h_bank=1m) — n inside envelope, RMSE 0.19 m.
+cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_compound
 ```
 
 ## Licencia
