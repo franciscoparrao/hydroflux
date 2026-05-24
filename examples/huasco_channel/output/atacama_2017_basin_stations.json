@@ -1,0 +1,75 @@
+{
+  "window": {
+    "start": "2017-02-20",
+    "end": "2017-03-12"
+  },
+  "stations": {
+    "03820003": {
+      "name": "Santa Juana",
+      "elev_m": 575,
+      "valid": 21,
+      "mean_m3s": 31.847619047619045,
+      "peak_m3s": 38.9,
+      "peak_date": "2017-03-02"
+    },
+    "03825001": {
+      "name": "Huasco Pte Nicolasa",
+      "elev_m": 167,
+      "valid": 21,
+      "mean_m3s": 10.430000000000001,
+      "peak_m3s": 11.9,
+      "peak_date": "2017-03-07"
+    },
+    "03815001": {
+      "name": "Carmen Ramadillas",
+      "elev_m": 825,
+      "valid": 21,
+      "mean_m3s": 3.7138095238095237,
+      "peak_m3s": 4.62,
+      "peak_date": "2017-02-23"
+    },
+    "03815002": {
+      "name": "Carmen Pte La Majada",
+      "elev_m": 1075,
+      "valid": 19,
+      "mean_m3s": 4.763684210526316,
+      "peak_m3s": 5.37,
+      "peak_date": "2017-02-26"
+    },
+    "03814003": {
+      "name": "Carmen El Corral",
+      "elev_m": 2000,
+      "valid": 21,
+      "mean_m3s": 4.635238095238096,
+      "peak_m3s": 4.83,
+      "peak_date": "2017-02-21"
+    },
+    "03806001": {
+      "name": "Tránsito Antes Junta",
+      "elev_m": 812,
+      "valid": 0
+    },
+    "03804002": {
+      "name": "Tránsito Angostura Pinte",
+      "elev_m": 1000,
+      "valid": 21,
+      "mean_m3s": 1.5082380952380956,
+      "peak_m3s": 2.16,
+      "peak_date": "2017-02-20"
+    },
+    "03802001": {
+      "name": "Conay Las Lozas",
+      "elev_m": 0,
+      "valid": 21,
+      "mean_m3s": 4.729047619047619,
+      "peak_m3s": 5.26,
+      "peak_date": "2017-02-20"
+    }
+  },
+  "mass_balance": {
+    "santa_juana_mean_m3s": 31.847619047619045,
+    "upstream_sum_mean_m3s": 19.35001754385965,
+    "deficit_m3s": 12.497601503759395,
+    "interpretation": "Atacama 2017 was a localised event from sub-basins without DGA gauges."
+  }
+}
