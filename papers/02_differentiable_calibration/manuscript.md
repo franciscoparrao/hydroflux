@@ -200,6 +200,18 @@ The decisive empirical finding is cross-event generalisation: parameters calibra
 
 The n–shape confound is the natural next problem: stage-only calibration cannot disambiguate friction from geometry, and the recovered `n` outside the Chow envelope is an honest diagnostic of this aliasing rather than a calibration failure. Resolving the confound requires either (i) independent cross-section data from sub-30-m DEMs or field surveys, which we identify as the highest-leverage future investment for Andean flood-routing calibration; or (ii) Bayesian priors on geometry from regional hydraulic-geometry compilations, a natural extension of the present deterministic framework that the AD pipeline already supports gradient-wise. Both directions are within reach of the line of research the hydroflux project pursues toward continental-scale, GPU-native, coupled-hazard simulation.
 
+## Figures (placeholders for captions; PDFs in figures/out/)
+
+**Figure 1** (`fig01_bed_profile.pdf`). DEM-derived longitudinal bed profile along the 1.8 km Huasco reach below Santa Juana, sampled at 60 cells × 30.6 m from the pit-filled SRTM 30 m. Two main drops (≈ 2.5 m near the gauge and ≈ 9.7 m at ≈ 1.1 km downstream) are separated by long flat reaches characteristic of the pit-fill algorithm. Total elevation drop 12.17 m over 1805 m, mean slope 0.674 %.
+
+**Figure 2** (`fig02_section_schematic.pdf`). Cross-section schematics at the calibrated parameter values: (a) 2-stage rectangular compound (`w_main = 30 m`, `w_flood = 85 m`, `h_bank = 1.0 m`, iter 6); (b) continuous power-law `T(h) = 20.09 · h^{0.77}` (iter 8). Horizontal coloured segments mark water levels at stages 0.5–3.0 m. The hard step at `h_bank` (a) locks top width above bank-full; the power-law (b) widens continuously without saturation. This contrast is the visual mechanism of the cross-event generalisation result reported in §4.
+
+**Figure 3** (`fig03_fit_2017.pdf`). Atacama 2017 calibration fit. (a) Daily stage at the reach midpoint: rating-curve target (black), compound iter 6 (orange dashed), power-law iter 8 (blue). (b) Residuals `h_sim − h_rating`. Power-law fits the target to within ±0.01 m (RMSE 0.006 m); compound shows a systematic −0.3 m undershoot at low Q (days 1–9) that switches to a slight overshoot at the peak (days 11–12, RMSE 0.190 m).
+
+**Figure 4** (`fig04_fit_1998.pdf`). La Niña 1998 validation fit with parameters frozen from the 2017 calibration. Same panels as Figure 3. Compound iter 6 over-predicts by `≈ 1.4 m` throughout the high-Q sustained period (RMSE 1.297 m) — the saturation of `w_flood` at `h > h_bank` returns the cross-section to a rectangular response that the rating curve does not match. Power-law iter 8 tracks the target within 0.2 m across the entire 21-day window (RMSE 0.103 m), demonstrating that the continuous `T(h)` generalises across the 2.4× peak-Q step between calibration and validation events.
+
+**Figure 5** (`fig05_rmse_progression.pdf`). RMSE versus the literature rating curve across the eight-step progression of calibration setups, for the 2017 calibration window (blue) and 1998 validation window (orange). Twin experiments iter 1–3 are omitted (no rating-curve target). The tower at iter 7 (frozen compound on 1998, 1.297 m) versus iter 8 (power-law joint calibration, 0.103 m) condenses the methodological narrative of the paper into a single bar comparison.
+
 ## Open Research
 
 All code is released as open source at <https://github.com/franciscoparrao/hydroflux> (commit hash TODO at submission). The `autograd` crate contains the forward-mode dual numbers (`Dual`), the `Real` trait, three Saint-Venant 1D solver modules (`swe1d`, `compound_swe1d`, `power_law_swe1d`), and the nine application demos that reproduce every table and figure in this paper. Build and run:
@@ -245,8 +257,11 @@ This work is part of the DICYT postdoctoral fellowship 2026–2027 at Universida
 
 ## Notes for next draft iteration
 
-1. Introduction is the highest-effort remaining section; needs to motivate AD-in-hydrology context, cite 2025 entrants accurately, and articulate the specific gap (differentiable GEOMETRY) without overstating.
-2. Discussion needs the n–shape confound argument framed as a contribution (the AD pipeline lets us SEE the confound; previous practice treated geometry as known and put all uncertainty into n).
-3. Figures (deferred): (i) bed longitudinal profile, (ii) compound-section schematic + power-law schematic side-by-side, (iii) calibration trajectory in parameter space, (iv) iter 6 vs iter 8 fit comparison on 2017, (v) iter 6 vs iter 8 fit comparison on 1998, (vi) RMSE bar chart across the eight setups.
+1. ~~Introduction~~ ✅ drafted.
+2. ~~Discussion~~ ✅ drafted (6 subsections).
+3. Figures ✅ 5 publication-quality figs in `figures/out/` (R/ggplot2 + patchwork). One originally-listed schematic was merged into fig02 (compound + power-law side-by-side); fig03 omitted as a separate calibration-trajectory panel (could be added later as fig06 if reviewers request it).
 4. Plain Language Summary needs review — currently slightly above the 200-word lay-audience limit; tighten.
 5. Cover letter for WRR is separate file at submission time.
+6. `references.bib` in BibTeX format — currently the cites are inline Markdown; convert before LaTeX rendering.
+7. `/verify-refs` once bib is complete.
+8. `/tex-review` reasoning audit before submission.
