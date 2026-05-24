@@ -115,6 +115,10 @@ cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_201
 # Validation temporal: same parameters frozen, re-run on 1998 La Niña event — documents
 # cross-event generalization failure (RMSE 6.8× higher; 2-stage compound saturates at high Q).
 cargo run --release -p hydroflux-autograd --example validate_manning_huasco_1998
+
+# Differentiable POWER-LAW cross-section (Leopold h^p) + joint multi-param AD calibration —
+# closes the cross-event gap: RMSE 2017 = 0.006 m, RMSE 1998 = 0.103 m (12.6× mejor que compound).
+cargo run --release -p hydroflux-autograd --example calibrate_powerlaw_huasco
 ```
 
 ## Licencia
