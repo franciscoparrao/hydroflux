@@ -111,6 +111,10 @@ cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_201
 
 # COMPOUND cross-section (main 30m + floodplain 85m at h_bank=1m) — n inside envelope, RMSE 0.19 m.
 cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_compound
+
+# Validation temporal: same parameters frozen, re-run on 1998 La Niña event — documents
+# cross-event generalization failure (RMSE 6.8× higher; 2-stage compound saturates at high Q).
+cargo run --release -p hydroflux-autograd --example validate_manning_huasco_1998
 ```
 
 ## Licencia
