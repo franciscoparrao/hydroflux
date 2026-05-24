@@ -29,6 +29,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod compound_swe1d;
 mod dual;
 pub mod physics;
 mod real;
