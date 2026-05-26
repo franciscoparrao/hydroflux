@@ -64,8 +64,12 @@ make_panel <- function(snapshot_path, day_idx) {
                     maxcell = Inf, alpha = 0.85) +
     scale_fill_scico(palette = "devon", direction = -1, end = 0.85,
                      name = "Depth\n[m]",
-                     limits = c(0, 5.0),
-                     breaks = c(0, 1, 2, 3, 4, 5),
+                     # Cap at 3 m for visual contrast — actual max is
+                     # ~4.5 m at peak but most cells are 0.5–2 m, so
+                     # the lower range is what we want to discriminate.
+                     # Cells > 3 m saturate at the dark end.
+                     limits = c(0, 3.0), oob = scales::squish,
+                     breaks = c(0, 0.5, 1, 1.5, 2, 2.5, 3),
                      na.value = NA) +
     coord_sf(crs = 32719, datum = sf::st_crs(32719),
              expand = FALSE, xlim = xrange, ylim = yrange) +
