@@ -185,6 +185,17 @@ struct FaceFluxX {
     plus: FluxX,
 }
 
+impl FaceFluxX {
+    /// Zero face flux on both sides. Used as the cheap return path for
+    /// dry-dry interior faces, where the Audusse HLLC flux is exactly
+    /// zero (both `h*_L = h*_R = 0` ⇒ HLLC mass = 0, and both
+    /// `(g/2)(h² − h*²) = 0` ⇒ corrections vanish identically).
+    const ZERO: Self = Self {
+        minus: FluxX::ZERO,
+        plus: FluxX::ZERO,
+    };
+}
+
 /// Numerical fluxes at a single `y`-face. `minus` is consumed by the
 /// cell ABOVE the face (lower row index); `plus` by the cell BELOW.
 /// They share `mass` and `x_momentum` but differ in `y_momentum`.
@@ -192,6 +203,13 @@ struct FaceFluxX {
 struct FaceFluxY {
     minus: FluxY,
     plus: FluxY,
+}
+
+impl FaceFluxY {
+    const ZERO: Self = Self {
+        minus: FluxY::ZERO,
+        plus: FluxY::ZERO,
+    };
 }
 
 /// Audusse well-balanced HLLC flux on an `x`-face. See module docs for
@@ -635,6 +653,22 @@ pub fn forward_euler_step(
 
     // Precompute all x-faces and y-faces. x-faces have shape
     // (n_rows, n_cols + 1); y-faces have shape (n_rows + 1, n_cols).
+    // Interior dry-dry faces have identically zero flux: with both
+    // adjacent cells at `h ≤ H_DRY` ⇒ `h*_L = h*_R = 0` ⇒ HLLC mass
+    // & momentum vanish, and the Audusse correction `(g/2)(h² − h*²)`
+    // is also exactly zero on each side. Short-circuiting these faces
+    // skips the HLLC + MUSCL reconstruction work without changing
+    // the numerics by even a roundoff (the path is mathematically
+    // equivalent, not just "close to zero"). For Huasco-style
+    // single-reach problems where ~97 % of cells are dry, the
+    // skipped face count dominates the face-flux pass cost.
+    //
+    // Boundary faces (`j == 0` and `j == n_cols`) keep the full path:
+    // the ghost cell may carry mass via `Discharge` or `Depth` BCs
+    // independently of the interior — checking the ghost AND the
+    // interior cell for dryness is cheap but adds a branch that
+    // never fires for the Wall / Transmissive cases that dominate
+    // our event simulations, so the win there is marginal.
     let faces_x = Array2::<FaceFluxX>::from_shape_fn((n_rows, n_cols + 1), |(i, j)| {
         let z_face = z_face_x[(i, j)];
         if j == 0 {
@@ -644,6 +678,9 @@ pub fn forward_euler_step(
             let (g, _) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
             well_balanced_x_face(states[(i, n_cols - 1)], z_face, g, z_face)
         } else {
+            if states[(i, j - 1)].h <= H_DRY && states[(i, j)].h <= H_DRY {
+                return FaceFluxX::ZERO;
+            }
             let (recon_l, recon_r) = reconstruct_x_face_states(
                 states,
                 &slopes_x,
@@ -667,6 +704,9 @@ pub fn forward_euler_step(
             let (g, _) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
             well_balanced_y_face(states[(n_rows - 1, j)], z_face, g, z_face)
         } else {
+            if states[(i - 1, j)].h <= H_DRY && states[(i, j)].h <= H_DRY {
+                return FaceFluxY::ZERO;
+            }
             let (recon_t, recon_b) = reconstruct_y_face_states(
                 states,
                 &slopes_y,
@@ -814,8 +854,35 @@ pub fn forward_euler_step(
     };
 
     // FV update with scaled face fluxes + explicit bed-slope source.
+    //
+    // Isolated-dry-cell fast path: if the cell and all four immediate
+    // neighbours have `h ≤ H_DRY`, the four face fluxes around the
+    // cell are all zero by the dry-dry short-circuit above. The
+    // standard path would compute `dh = dhu = dhv = 0` and only the
+    // bed-slope source `s_hu, s_hv` could be non-zero — but those
+    // would feed momentum into a cell with `h = 0`, which the
+    // `if new_h <= H_DRY` floor below resets to `Conserved2D::DRY`
+    // anyway. Going straight to `DRY` is mathematically identical
+    // to running the full body and lets us skip ~12 FLOPs per dry
+    // interior cell. We restrict the shortcut to STRICT interior
+    // cells (`1 ≤ i ≤ n_rows − 2`, `1 ≤ j ≤ n_cols − 2`) so that
+    // boundary cells — which could receive injected mass from a
+    // `Discharge` / `Depth` ghost — keep the full path.
     for i in 0..n_rows {
         for j in 0..n_cols {
+            if states[(i, j)].h <= H_DRY
+                && i > 0
+                && i + 1 < n_rows
+                && j > 0
+                && j + 1 < n_cols
+                && states[(i - 1, j)].h <= H_DRY
+                && states[(i + 1, j)].h <= H_DRY
+                && states[(i, j - 1)].h <= H_DRY
+                && states[(i, j + 1)].h <= H_DRY
+            {
+                states[(i, j)] = Conserved2D::DRY;
+                continue;
+            }
             let fx_right = scale_x_face(i, j + 1).minus;
             let fx_left = scale_x_face(i, j).plus;
             let fy_bottom = scale_y_face(i + 1, j).minus;
