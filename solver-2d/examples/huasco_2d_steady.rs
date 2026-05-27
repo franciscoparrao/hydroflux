@@ -66,7 +66,7 @@ fn main() {
         mesh.n_cols(),
         mesh.dx,
         mesh.dy,
-        mesh.manning
+        MANNING_N
     );
     println!(
         "  bed elev range: [{:.2}, {:.2}] m",

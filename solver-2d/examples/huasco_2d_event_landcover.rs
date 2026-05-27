@@ -1,40 +1,38 @@
-//! Phase 2 iter 2: full Atacama 2017 event over 21 days at Santa
-//! Juana, with time-varying daily Q from the DGA + Manning-normal-depth
-//! warm-start on channel cells (reduces initial transient versus the
-//! thin-film start of iter 1).
+//! Atacama 2017 event with **spatially varying** Manning roughness
+//! derived from an ESA WorldCover landcover raster.
 //!
-//! # Setup vs iter 1
+//! Mirrors [`huasco_2d_event`] except for the Manning field:
 //!
-//! Same geometry / BCs / Manning as `huasco_2d_steady`:
-//! - Subset 200×67 portrait DEM (6 km N-S × 2 km E-W, gauge-centred).
-//! - W = Transmissive (outflow), N/S/E = Wall.
-//! - Single `PointSource` at the E-edge channel cell (135, 66).
-//! - Manning `n = 0.04` (gravel-bed Andean, Chow 1959).
+//! - `huasco_2d_event.rs`        — uniform `n = 0.04`, single
+//!   calibrated value from the 1D autograd run.
+//! - `huasco_2d_event_landcover.rs` (this example) — `n(x, y)` from
+//!   `huasco_subset_landcover.tif` (200×67 ESA WorldCover codes
+//!   resampled to the DEM grid) mapped through
+//!   [`esa_worldcover_to_manning`]. Channel cells (bare ground,
+//!   code 60) get `n = 0.025`, while riparian tree cover (code 10)
+//!   gets `n = 0.10` — a 4× contrast that the uniform run misses.
 //!
-//! Differences:
-//! - **Time-varying Q**: 21 daily values from DGA station 03820003,
-//!   window 2017-02-20 → 2017-03-12 (Aluvión Atacama 2017). PointSource
-//!   `q_mass` is updated once per day; intra-day Q is held constant.
-//! - **Manning warm-start**: channel cells (acc > 1e6) start with
-//!   `h_initial = h_n(Q_day1, slope_mean) = ((n · Q_day1 / W_eff) / √S₀)^(3/5)`
-//!   instead of thin film `h = 1 cm`. The mean reach slope `S₀ = 0.0074`
-//!   comes from the 1D longitudinal-profile extraction.
-//! - **Snapshot writer**: one depth GeoTIFF per simulated day, named
-//!   `huasco_2d_depth_day_NN.tif`, plus a mass-balance log row.
+//! All other physics is identical: same DEM, same BCs (W = Transmissive,
+//! N/S/E = Wall), same time-varying daily Q from DGA 03820003, same
+//! Manning-normal-depth warm-start (using a mean reference `n_ref`).
+//! The PointSource is at the same channel cell at the E edge.
 //!
-//! Two run modes:
-//! - `--days N` (default 21): how many days of the event to simulate.
-//!   Use 5 for a quick rising-limb-to-peak smoke test (~1 h wall time).
-//! - Default `--days 21` runs the full event (~4-5 h wall time, plan
-//!   for overnight or background).
+//! # How to reproduce the landcover raster
 //!
-//! Reproducir (full event):
 //! ```text
-//! cargo run --release -p hydroflux-solver-2d --example huasco_2d_event
+//! gdalwarp \
+//!   -t_srs EPSG:32719 \
+//!   -te 333620.42 6826925.80 335630.42 6832925.80 \
+//!   -tr 30 30 -r mode -ot Byte -overwrite \
+//!   /vsicurl/https://esa-worldcover.s3.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_S30W072_Map.tif \
+//!   examples/huasco_2d_phase2/output/huasco_subset_landcover.tif
 //! ```
-//! Quick test (5 days):
+//!
+//! # Reproducir
+//!
 //! ```text
-//! cargo run --release -p hydroflux-solver-2d --example huasco_2d_event -- --days 5
+//! cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover -- --days 1
+//! cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover            # full 21 days
 //! ```
 
 use std::env;
@@ -47,24 +45,23 @@ use surtgis_core::raster::Raster;
 
 use hydroflux_solver_2d::{
     Boundaries2D, Boundary, Conserved2D, PointSource, apply_point_sources, cfl_time_step_with_bcs,
-    manning_friction_step, mesh_from_geotiff, ssprk2_step, write_depth_geotiff,
+    esa_worldcover_to_manning, manning_friction_step, mesh_from_geotiff_with_landcover,
+    ssprk2_step, write_depth_geotiff,
 };
 
 const SUBSET_DEM: &str = "examples/huasco_2d_phase2/output/huasco_subset_dem.tif";
 const SUBSET_ACC: &str = "examples/huasco_2d_phase2/output/huasco_subset_acc.tif";
+const SUBSET_LC: &str = "examples/huasco_2d_phase2/output/huasco_subset_landcover.tif";
 const OUTPUT_DIR: &str = "examples/huasco_2d_phase2/output";
 
-const MANNING_N: f64 = 0.04;
+const N_REF: f64 = 0.04; // reference Manning for warm-start depth only
 const ACC_THRESHOLD: f64 = 1_000_000.0;
-const SLOPE_MEAN: f64 = 0.0074; // from 1D longitudinal-profile extraction
+const SLOPE_MEAN: f64 = 0.0074;
 const CFL: f64 = 0.4;
 const SECONDS_PER_DAY: f64 = 86_400.0;
 const INFLOW_ROW: usize = 135;
 const INFLOW_COL: usize = 66;
 
-/// Atacama 2017 daily Q at Santa Juana (DGA station 03820003),
-/// window 2017-02-20 → 2017-03-12. Same series as the 1D paper
-/// (`autograd/examples/calibrate_manning_huasco_2017.rs`).
 const Q_DAILY_M3S: [f64; 21] = [
     17.5, 18.7, 18.4, 18.5, 20.5, 31.9, 34.8, 35.5, 37.8, 38.8, 38.9, 38.1, 37.5, 37.5, 36.0, 36.0,
     35.2, 34.8, 34.9, 33.9, 33.6,
@@ -91,15 +88,31 @@ fn main() {
     let n_days = parse_days_arg().min(Q_DAILY_M3S.len());
     let t_start = Instant::now();
 
-    let (mesh, transform) = mesh_from_geotiff(SUBSET_DEM, MANNING_N)
-        .expect("failed to load DEM subset; run extract_subset.py first");
+    let (mesh, transform) =
+        mesh_from_geotiff_with_landcover(SUBSET_DEM, SUBSET_LC, esa_worldcover_to_manning)
+            .expect("failed to load DEM + landcover; check huasco_subset_landcover.tif exists");
+
+    let n_min = mesh
+        .manning
+        .iter()
+        .copied()
+        .fold(f64::INFINITY, f64::min);
+    let n_max = mesh
+        .manning
+        .iter()
+        .copied()
+        .fold(0.0_f64, f64::max);
+    let n_mean = mesh.manning.iter().sum::<f64>() / mesh.manning.len() as f64;
     println!(
-        "DEM: {}×{} cells, dx={} m, dy={} m, manning={} (uniform)",
+        "DEM: {}×{} cells, dx={} m, dy={} m",
         mesh.n_rows(),
         mesh.n_cols(),
         mesh.dx,
-        mesh.dy,
-        MANNING_N
+        mesh.dy
+    );
+    println!(
+        "Manning field: n_min={:.4}, n_mean={:.4}, n_max={:.4} (variable from landcover)",
+        n_min, n_mean, n_max
     );
 
     let acc: Raster<f64> =
@@ -114,11 +127,12 @@ fn main() {
         100.0 * n_channel as f64 / mesh.n_cells() as f64
     );
 
-    // Manning warm-start: pre-fill channel cells with h_n at day-1 Q.
-    let h_warm = manning_normal_depth(Q_DAILY_M3S[0], MANNING_N, SLOPE_MEAN, mesh.dx);
+    // Warm-start uses N_REF (uniform mean) for the depth estimate;
+    // the per-cell Manning field still governs the per-step friction.
+    let h_warm = manning_normal_depth(Q_DAILY_M3S[0], N_REF, SLOPE_MEAN, mesh.dx);
     println!(
-        "\nManning warm-start: Q_day1={} m³/s, S₀={}, dx={} m → h_n={:.3} m",
-        Q_DAILY_M3S[0], SLOPE_MEAN, mesh.dx, h_warm
+        "\nManning warm-start: Q_day1={} m³/s, n_ref={}, S₀={}, dx={} m → h_n={:.3} m",
+        Q_DAILY_M3S[0], N_REF, SLOPE_MEAN, mesh.dx, h_warm
     );
     let mut states = Array2::from_shape_fn((mesh.n_rows(), mesh.n_cols()), |(i, j)| {
         if acc_data[(i, j)] > ACC_THRESHOLD {
@@ -138,7 +152,6 @@ fn main() {
     let initial_mass: f64 = states.iter().map(|s| s.h * mesh.dx * mesh.dy).sum();
     println!("Initial wet volume (warm start): {:.2e} m³", initial_mass);
 
-    // --- Main event loop ----------------------------------------
     println!(
         "\nSimulating {} days of Atacama 2017 (peak day = 11, Q = {} m³/s)",
         n_days, Q_DAILY_M3S[10]
@@ -199,9 +212,8 @@ fn main() {
             t_total
         );
 
-        // Write per-day depth snapshot.
         let out_path = PathBuf::from(OUTPUT_DIR).join(format!(
-            "huasco_2d_depth_day_{:02}.tif",
+            "huasco_2d_depth_day_{:02}_landcover.tif",
             day + 1
         ));
         write_depth_geotiff(&out_path, &states, transform, Some(-9999.0))
@@ -214,13 +226,13 @@ fn main() {
         }
     }
 
-    // --- Final mass balance ------------------------------------
     let final_mass: f64 = states.iter().map(|s| s.h * mesh.dx * mesh.dy).sum();
     let net = final_mass - initial_mass;
     let outflow = cumulative_inflow - net;
     println!(
         "\nMass balance over {} days ({:.1} h simulated):",
-        n_days, t_total_sim / 3600.0
+        n_days,
+        t_total_sim / 3600.0
     );
     println!("  initial wet volume     : {:>12.3e} m³", initial_mass);
     println!("  cumulative inflow      : {:>12.3e} m³", cumulative_inflow);
@@ -238,7 +250,7 @@ fn main() {
 
     println!("\nTotal wall time: {:.1} min", t_start.elapsed().as_secs_f64() / 60.0);
     println!(
-        "Per-day snapshots written to {}/huasco_2d_depth_day_*.tif",
+        "Per-day snapshots written to {}/huasco_2d_depth_day_*_landcover.tif",
         OUTPUT_DIR
     );
 }
