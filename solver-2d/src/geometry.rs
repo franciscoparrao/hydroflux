@@ -13,8 +13,12 @@ use ndarray::Array2;
 ///
 /// Cross-sections within each cell are flat (single bed elevation, no
 /// sub-grid bathymetry yet) and the channel is rectangular per cell.
-/// Variable Manning, sub-grid topography, and AMR are deferred to
-/// later iterations.
+/// Sub-grid topography and AMR are deferred to later iterations.
+///
+/// Manning friction is stored as a per-cell field; pass a scalar to
+/// [`Mesh2D::new`] for uniform roughness, or build a spatially
+/// varying field separately and use [`Mesh2D::with_manning_field`]
+/// for landcover-derived friction maps.
 #[derive(Debug, Clone)]
 pub struct Mesh2D {
     /// Bed elevation `z(x, y)` at each cell centre [m]. Shape
@@ -24,12 +28,17 @@ pub struct Mesh2D {
     pub dx: f64,
     /// Cell spacing in the `y` direction [m] (between row centres).
     pub dy: f64,
-    /// Manning roughness coefficient (uniform for now).
-    pub manning: f64,
+    /// Manning roughness coefficient `n` per cell [s/m^(1/3)]. Same
+    /// shape as `bed`. For uniform roughness all entries equal the
+    /// scalar passed to [`Mesh2D::new`]; for landcover-derived maps
+    /// use [`Mesh2D::with_manning_field`].
+    pub manning: Array2<f64>,
 }
 
 impl Mesh2D {
-    /// Build a mesh from bed elevations and spacings.
+    /// Build a mesh from bed elevations and spacings with **uniform**
+    /// Manning roughness. The Manning field is filled with `manning`
+    /// in every cell — equivalent to the original scalar API.
     ///
     /// Panics if `dx <= 0`, `dy <= 0`, `manning < 0`, or `bed` is
     /// empty. These are programming errors, not runtime conditions.
@@ -41,6 +50,46 @@ impl Mesh2D {
             "Manning n must be non-negative (got {manning})"
         );
         assert!(!bed.is_empty(), "mesh must have at least one cell");
+        let manning_field = Array2::from_elem(bed.dim(), manning);
+        Self {
+            bed,
+            dx,
+            dy,
+            manning: manning_field,
+        }
+    }
+
+    /// Build a mesh with a **spatially varying** Manning roughness
+    /// field. `manning` must have the same shape as `bed`; every cell
+    /// value must be non-negative.
+    ///
+    /// Use this when the friction coefficient is derived from a
+    /// landcover raster (e.g. ESA WorldCover via
+    /// [`crate::io::mesh_from_geotiff_with_landcover`]) or when the
+    /// channel and overbank have distinct calibrated `n` values.
+    ///
+    /// Panics if `dx <= 0`, `dy <= 0`, `bed` is empty, the shapes of
+    /// `bed` and `manning` differ, or any Manning value is negative.
+    pub fn with_manning_field(
+        bed: Array2<f64>,
+        dx: f64,
+        dy: f64,
+        manning: Array2<f64>,
+    ) -> Self {
+        assert!(dx > 0.0, "dx must be strictly positive (got {dx})");
+        assert!(dy > 0.0, "dy must be strictly positive (got {dy})");
+        assert!(!bed.is_empty(), "mesh must have at least one cell");
+        assert_eq!(
+            bed.dim(),
+            manning.dim(),
+            "manning field shape {:?} must match bed shape {:?}",
+            manning.dim(),
+            bed.dim(),
+        );
+        assert!(
+            manning.iter().all(|&n| n >= 0.0),
+            "Manning n must be non-negative at every cell"
+        );
         Self {
             bed,
             dx,

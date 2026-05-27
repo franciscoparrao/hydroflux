@@ -71,7 +71,7 @@ fn run_to_t_end(mesh: &Mesh2D, mut states: Array2<Conserved2D>) -> Array2<Conser
         // sane dt instead of `INFINITY`.
         let dt = cfl_time_step_with_bcs(&states, mesh, bcs, CFL).min(T_END - t);
         ssprk2_step(&mut states, mesh, bcs, dt);
-        manning_friction_step(&mut states, MANNING, dt, 1.0e-9);
+        manning_friction_step(&mut states, mesh, dt, 1.0e-9);
         t += dt;
         steps += 1;
         if steps > 500_000 {

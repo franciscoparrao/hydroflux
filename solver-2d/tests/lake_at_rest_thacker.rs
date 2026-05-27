@@ -90,7 +90,7 @@ fn run(states: &mut Array2<Conserved2D>, mesh: &Mesh2D) {
     while t < T_END {
         let dt = cfl_time_step(states, mesh, CFL).min(T_END - t);
         ssprk2_step(states, mesh, bcs, dt);
-        manning_friction_step(states, 0.0, dt, 1.0e-9);
+        manning_friction_step(states, mesh, dt, 1.0e-9);
         t += dt;
         steps += 1;
         if steps > 500_000 {

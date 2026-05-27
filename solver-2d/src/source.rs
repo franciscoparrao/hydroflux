@@ -8,6 +8,7 @@
 //! - [`apply_point_sources`]: point inflows (e.g. UK EA Test 1).
 
 use crate::GRAVITY;
+use crate::geometry::Mesh2D;
 use crate::state::Conserved2D;
 use ndarray::Array2;
 
@@ -108,28 +109,35 @@ pub fn apply_rain(states: &mut Array2<Conserved2D>, rate: f64, dt: f64) {
 ///   `|hu|`, `|hv|` and `|U|` are non-increasing. No extra CFL beyond
 ///   the FV step.
 /// - Preserves rest (`hu = hv = 0`) and dry cells exactly.
-/// - `manning == 0` short-circuits to a no-op.
+/// - Cells with `n = 0` (Manning field zero locally) are a no-op.
 ///
-/// `manning` is the Manning roughness coefficient `n` (units
-/// s/m^(1/3)); `dry_tol` is the wet/dry threshold in metres.
+/// The Manning roughness `n` is read per cell from `mesh.manning`;
+/// `dry_tol` is the wet/dry threshold in metres.
 pub fn manning_friction_step(
     states: &mut Array2<Conserved2D>,
-    manning: f64,
+    mesh: &Mesh2D,
     dt: f64,
     dry_tol: f64,
 ) {
-    if manning == 0.0 {
-        return;
-    }
-    let n_sq = manning * manning;
-    for s in states.iter_mut() {
+    assert_eq!(
+        states.dim(),
+        mesh.manning.dim(),
+        "states shape {:?} must match mesh.manning shape {:?}",
+        states.dim(),
+        mesh.manning.dim(),
+    );
+    for ((i, j), s) in states.indexed_iter_mut() {
         if s.h <= dry_tol {
+            continue;
+        }
+        let n = mesh.manning[(i, j)];
+        if n == 0.0 {
             continue;
         }
         // |U| = √(u² + v²) = √((hu)² + (hv)²) / h. Compute directly to
         // avoid two divisions in the hot path.
         let speed = (s.hu * s.hu + s.hv * s.hv).sqrt() / s.h;
-        let factor = 1.0 + dt * GRAVITY * n_sq * speed / s.h.powf(4.0 / 3.0);
+        let factor = 1.0 + dt * GRAVITY * n * n * speed / s.h.powf(4.0 / 3.0);
         s.hu /= factor;
         s.hv /= factor;
     }
@@ -141,6 +149,13 @@ mod tests {
     use approx::assert_relative_eq;
     use ndarray::array;
 
+    /// Flat-bed mesh with uniform Manning matching `states.dim()` —
+    /// the simplest fixture for friction-step tests.
+    fn mesh_for(states: &Array2<Conserved2D>, manning: f64) -> Mesh2D {
+        let bed = Array2::<f64>::zeros(states.dim());
+        Mesh2D::new(bed, 1.0, 1.0, manning)
+    }
+
     #[test]
     fn zero_manning_is_identity() {
         let mut states = array![[
@@ -148,14 +163,16 @@ mod tests {
             Conserved2D::new(2.0, -1.5, 0.7)
         ]];
         let before = states.clone();
-        manning_friction_step(&mut states, 0.0, 0.1, 1e-9);
+        let mesh = mesh_for(&states, 0.0);
+        manning_friction_step(&mut states, &mesh, 0.1, 1e-9);
         assert_eq!(states, before);
     }
 
     #[test]
     fn rest_state_is_preserved_exactly() {
         let mut states = Array2::from_elem((3, 4), Conserved2D::new(2.0, 0.0, 0.0));
-        manning_friction_step(&mut states, 0.03, 0.1, 1e-9);
+        let mesh = mesh_for(&states, 0.03);
+        manning_friction_step(&mut states, &mesh, 0.1, 1e-9);
         for s in &states {
             assert_eq!(s.hu, 0.0);
             assert_eq!(s.hv, 0.0);
@@ -167,7 +184,8 @@ mod tests {
     fn dry_cells_are_untouched() {
         let mut states = array![[Conserved2D::DRY, Conserved2D::new(0.0, 1e-30, -1e-30)]];
         let before = states.clone();
-        manning_friction_step(&mut states, 0.03, 0.1, 1e-9);
+        let mesh = mesh_for(&states, 0.03);
+        manning_friction_step(&mut states, &mesh, 0.1, 1e-9);
         assert_eq!(states, before);
     }
 
@@ -178,13 +196,14 @@ mod tests {
         // Algebraic property of the semi-implicit factor (1 + α) ≥ 1;
         // catches sign-flip and formula bugs.
         let mut states = array![[Conserved2D::new(1.0, 2.0, -1.5)]];
+        let mesh = mesh_for(&states, 0.05);
         let initial_speed = {
             let s = states[(0, 0)];
             (s.hu * s.hu + s.hv * s.hv).sqrt() / s.h
         };
         let mut previous = initial_speed;
         for _ in 0..50 {
-            manning_friction_step(&mut states, 0.05, 0.1, 1e-9);
+            manning_friction_step(&mut states, &mesh, 0.1, 1e-9);
             let s = states[(0, 0)];
             let current = (s.hu * s.hu + s.hv * s.hv).sqrt() / s.h;
             assert!(
@@ -204,10 +223,11 @@ mod tests {
         // 2D Manning step (vector friction) from component-wise scalar
         // friction (would skew the direction toward the smaller axis).
         let mut states = array![[Conserved2D::new(1.0, 2.0, 1.0)]];
+        let mesh = mesh_for(&states, 0.05);
         let initial = states[(0, 0)];
         let initial_angle = initial.hv.atan2(initial.hu);
         for _ in 0..50 {
-            manning_friction_step(&mut states, 0.05, 0.1, 1e-9);
+            manning_friction_step(&mut states, &mesh, 0.1, 1e-9);
             let s = states[(0, 0)];
             let angle = s.hv.atan2(s.hu);
             assert_relative_eq!(angle, initial_angle, epsilon = 1e-12);
@@ -220,6 +240,7 @@ mod tests {
         // single cell with non-trivial (u, v).
         let mut s = array![[Conserved2D::new(1.0, 2.0, 1.0)]];
         let manning = 0.04_f64;
+        let mesh = mesh_for(&s, manning);
         let dt = 0.05_f64;
         let h = 1.0_f64;
         let hu = 2.0_f64;
@@ -228,7 +249,7 @@ mod tests {
         let factor = 1.0 + dt * GRAVITY * manning * manning * speed / h.powf(4.0 / 3.0);
         let expected_hu = hu / factor;
         let expected_hv = hv / factor;
-        manning_friction_step(&mut s, manning, dt, 1e-9);
+        manning_friction_step(&mut s, &mesh, dt, 1e-9);
         assert_relative_eq!(s[(0, 0)].hu, expected_hu, epsilon = 1e-12);
         assert_relative_eq!(s[(0, 0)].hv, expected_hv, epsilon = 1e-12);
         assert_relative_eq!(s[(0, 0)].h, h, epsilon = 1e-12);
@@ -240,8 +261,9 @@ mod tests {
         // spurious cross-coupling). The shared factor ensures
         // hv^{n+1} = 0 / (1 + α) = 0.
         let mut states = array![[Conserved2D::new(1.5, 3.0, 0.0)]];
+        let mesh = mesh_for(&states, 0.04);
         for _ in 0..20 {
-            manning_friction_step(&mut states, 0.04, 0.05, 1e-9);
+            manning_friction_step(&mut states, &mesh, 0.05, 1e-9);
             assert_eq!(states[(0, 0)].hv, 0.0);
             assert!(states[(0, 0)].hu > 0.0);
         }
@@ -250,11 +272,101 @@ mod tests {
     #[test]
     fn pure_y_flow_keeps_hu_at_zero() {
         let mut states = array![[Conserved2D::new(1.5, 0.0, -3.0)]];
+        let mesh = mesh_for(&states, 0.04);
         for _ in 0..20 {
-            manning_friction_step(&mut states, 0.04, 0.05, 1e-9);
+            manning_friction_step(&mut states, &mesh, 0.05, 1e-9);
             assert_eq!(states[(0, 0)].hu, 0.0);
             assert!(states[(0, 0)].hv < 0.0);
         }
+    }
+
+    #[test]
+    fn uniform_field_matches_scalar_bit_exact() {
+        // `Mesh2D::with_manning_field(bed, dx, dy, uniform_array)` must
+        // produce the SAME numerical result as `Mesh2D::new(bed, dx, dy,
+        // scalar)` when the field is filled with the scalar. Roundoff-
+        // exact equality after many steps catches any branching or
+        // ordering divergence between the two construction paths.
+        let n = 0.045_f64;
+        let mut states_scalar = array![[
+            Conserved2D::new(1.0, 2.0, -1.0),
+            Conserved2D::new(2.0, 1.5, 0.3),
+            Conserved2D::new(0.5, -0.7, 1.2),
+        ]];
+        let mut states_field = states_scalar.clone();
+        let mesh_scalar = mesh_for(&states_scalar, n);
+        let n_field = Array2::from_elem(states_field.dim(), n);
+        let mesh_field = Mesh2D::with_manning_field(
+            Array2::<f64>::zeros(states_field.dim()),
+            1.0,
+            1.0,
+            n_field,
+        );
+        for _ in 0..50 {
+            manning_friction_step(&mut states_scalar, &mesh_scalar, 0.05, 1e-9);
+            manning_friction_step(&mut states_field, &mesh_field, 0.05, 1e-9);
+        }
+        for (a, b) in states_scalar.iter().zip(states_field.iter()) {
+            assert_eq!(a.h, b.h);
+            assert_eq!(a.hu, b.hu);
+            assert_eq!(a.hv, b.hv);
+        }
+    }
+
+    #[test]
+    fn variable_field_decelerates_high_n_cell_faster() {
+        // Two adjacent cells with identical initial state. Cell A has
+        // Manning n_A = 0.10 (high roughness, like dense forest), cell
+        // B has n_B = 0.02 (smooth concrete channel). After identical
+        // dt the cell with higher n must have lost more momentum.
+        // The relation is monotonic in n²·|U|, so a 5× difference in
+        // n gives a 25× difference in deceleration ratio — easy to
+        // detect even on a single step.
+        let mut states = array![[
+            Conserved2D::new(1.0, 3.0, 0.0),
+            Conserved2D::new(1.0, 3.0, 0.0),
+        ]];
+        let n_field = ndarray::arr2(&[[0.10_f64, 0.02_f64]]);
+        let mesh = Mesh2D::with_manning_field(
+            Array2::<f64>::zeros((1, 2)),
+            1.0,
+            1.0,
+            n_field,
+        );
+        manning_friction_step(&mut states, &mesh, 0.5, 1e-9);
+        let hu_high_n = states[(0, 0)].hu;
+        let hu_low_n = states[(0, 1)].hu;
+        assert!(
+            hu_high_n < hu_low_n,
+            "high-n cell ({}) did not decelerate more than low-n cell ({})",
+            hu_high_n,
+            hu_low_n
+        );
+        // Sanity: both still positive (semi-implicit cannot overshoot
+        // zero), and the low-n cell has barely changed.
+        assert!(hu_high_n > 0.0);
+        assert!(hu_low_n > 2.9);
+    }
+
+    #[test]
+    #[should_panic(expected = "manning field shape")]
+    fn with_manning_field_panics_on_shape_mismatch() {
+        // `Mesh2D::with_manning_field` requires bed and manning to
+        // have the same shape — programming error to mismatch.
+        let _ = Mesh2D::with_manning_field(
+            Array2::<f64>::zeros((3, 4)),
+            1.0,
+            1.0,
+            Array2::<f64>::from_elem((3, 5), 0.03),
+        );
+    }
+
+    #[test]
+    #[should_panic(expected = "Manning n must be non-negative")]
+    fn with_manning_field_panics_on_negative_value() {
+        let mut n = Array2::<f64>::from_elem((2, 2), 0.03);
+        n[(0, 0)] = -0.01;
+        let _ = Mesh2D::with_manning_field(Array2::<f64>::zeros((2, 2)), 1.0, 1.0, n);
     }
 
     #[test]
@@ -271,8 +383,9 @@ mod tests {
                 Conserved2D::new(3.0, 0.0, 0.0)
             ],
         ];
+        let mesh = mesh_for(&states, 0.035);
         let depths_before: Vec<f64> = states.iter().map(|s| s.h).collect();
-        manning_friction_step(&mut states, 0.035, 0.05, 1e-9);
+        manning_friction_step(&mut states, &mesh, 0.05, 1e-9);
         let depths_after: Vec<f64> = states.iter().map(|s| s.h).collect();
         for (b, a) in depths_before.iter().zip(depths_after.iter()) {
             assert_eq!(b, a);

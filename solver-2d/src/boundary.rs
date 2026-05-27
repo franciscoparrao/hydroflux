@@ -202,13 +202,26 @@ pub fn ghost_cell(
         if inner.h < H_DRY {
             let slope_mag = streamwise_bed_slope_magnitude(mesh, side, idx);
             if slope_mag > DRY_INFLOW_SLOPE_THRESHOLD {
-                let h_n = (mesh.manning * q.abs() / slope_mag.sqrt()).powf(3.0 / 5.0);
+                let n = mesh.manning[boundary_cell_index(mesh, side, idx)];
+                let h_n = (n * q.abs() / slope_mag.sqrt()).powf(3.0 / 5.0);
                 state.h = h_n.min(DRY_INFLOW_H_MAX);
             }
         }
     }
 
     (state, bed)
+}
+
+/// Mesh-array index `(i, j)` of the boundary cell on `side` at
+/// transverse position `idx`. Used to fetch per-cell Manning
+/// roughness for the Discharge-on-dry ghost.
+fn boundary_cell_index(mesh: &Mesh2D, side: Side, idx: usize) -> (usize, usize) {
+    match side {
+        Side::West => (idx, 0),
+        Side::East => (idx, mesh.n_cols() - 1),
+        Side::North => (0, idx),
+        Side::South => (mesh.n_rows() - 1, idx),
+    }
 }
 
 /// Magnitude of the bed slope at the boundary cell, taken along the

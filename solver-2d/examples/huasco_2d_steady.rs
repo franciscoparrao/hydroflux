@@ -142,7 +142,7 @@ fn main() {
     while t < T_END {
         let dt = cfl_time_step_with_bcs(&states, &mesh, bcs, CFL).min(T_END - t);
         ssprk2_step(&mut states, &mesh, bcs, dt);
-        manning_friction_step(&mut states, MANNING_N, dt, 1.0e-9);
+        manning_friction_step(&mut states, &mesh, dt, 1.0e-9);
         apply_point_sources(&mut states, &sources, dt, mesh.dx, mesh.dy);
         t += dt;
         steps += 1;

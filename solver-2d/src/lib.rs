@@ -58,7 +58,10 @@ pub const H_DRY: f64 = 1.0e-6;
 pub use boundary::{Boundaries2D, Boundary, Side, ghost_cell};
 pub use flux::{FluxX, FluxY};
 pub use geometry::Mesh2D;
-pub use io::{depth_raster_from_states, mesh_from_geotiff, write_depth_geotiff};
+pub use io::{
+    depth_raster_from_states, esa_worldcover_to_manning, mesh_from_geotiff,
+    mesh_from_geotiff_with_landcover, write_depth_geotiff,
+};
 pub use riemann::{hllc_flux_x, hllc_flux_y};
 pub use source::{PointSource, apply_point_sources, apply_rain, manning_friction_step};
 pub use state::{Conserved2D, Primitive2D};

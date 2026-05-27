@@ -56,12 +56,11 @@ fn y_sloped_mesh(n_rows: usize, n_cols: usize, dx: f64, slope: f64, manning: f64
 }
 
 /// Run forward Euler + Manning fractional step until `t_end`, using
-/// the given BCs.
+/// the given BCs. Manning roughness is read per cell from `mesh`.
 fn run_until(
     mut states: Array2<Conserved2D>,
     mesh: &Mesh2D,
     bcs: Boundaries2D,
-    manning: f64,
     t_end: f64,
     cfl: f64,
 ) -> (Array2<Conserved2D>, usize) {
@@ -70,7 +69,7 @@ fn run_until(
     while t < t_end {
         let dt = cfl_time_step(&states, mesh, cfl).min(t_end - t);
         ssprk2_step(&mut states, mesh, bcs, dt);
-        manning_friction_step(&mut states, manning, dt, 1.0e-9);
+        manning_friction_step(&mut states, mesh, dt, 1.0e-9);
         t += dt;
         steps += 1;
         if steps > 100_000 {
@@ -123,7 +122,7 @@ fn uniform_flow_x_aligned_is_preserved() {
     let c = (G * h_n).sqrt();
     let traversal = (n_cols as f64 * dx) / (u + c);
     let t_end = 2.0 * traversal;
-    let (final_states, _) = run_until(states, &mesh, bcs, manning, t_end, 0.4);
+    let (final_states, _) = run_until(states, &mesh, bcs, t_end, 0.4);
 
     // Check uniform-flow preservation: depth must equal h_n, hu = q,
     // hv = 0, everywhere. Tolerance reflects first-order Euler over
@@ -196,7 +195,7 @@ fn uniform_flow_y_aligned_is_preserved() {
     let c = (G * h_n).sqrt();
     let traversal = (n_rows as f64 * dx) / (u + c);
     let t_end = 2.0 * traversal;
-    let (final_states, _) = run_until(states, &mesh, bcs, manning, t_end, 0.4);
+    let (final_states, _) = run_until(states, &mesh, bcs, t_end, 0.4);
 
     let mut max_dh = 0.0_f64;
     let mut max_dhv = 0.0_f64;
@@ -269,7 +268,7 @@ fn perturbation_from_normal_depth_relaxes_back() {
     let c = (G * h_n).sqrt();
     let traversal = (n_cols as f64 * dx) / (u + c);
     let t_end = 6.0 * traversal; // long enough for the perturbation to convect out
-    let (final_states, _) = run_until(states, &mesh, bcs, manning, t_end, 0.4);
+    let (final_states, _) = run_until(states, &mesh, bcs, t_end, 0.4);
 
     let final_perturbation = final_states
         .iter()

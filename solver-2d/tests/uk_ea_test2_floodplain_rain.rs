@@ -127,7 +127,7 @@ fn run_until(
         // the wave speeds are tiny early in the rainfall.
         let dt = dt_cfl.min(60.0).min(case.t_end - t);
         ssprk2_step(&mut states, mesh, bcs, dt);
-        manning_friction_step(&mut states, case.manning, dt, 1.0e-9);
+        manning_friction_step(&mut states, mesh, dt, 1.0e-9);
         apply_rain(&mut states, case.rain_rate, dt);
         t += dt;
         steps += 1;

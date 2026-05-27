@@ -134,7 +134,7 @@ fn run_until(
     while t < case.t_end {
         let dt = cfl_time_step(&states, mesh, cfl).min(case.t_end - t);
         ssprk2_step(&mut states, mesh, bcs, dt);
-        manning_friction_step(&mut states, case.manning, dt, 1.0e-9);
+        manning_friction_step(&mut states, mesh, dt, 1.0e-9);
         t += dt;
         steps += 1;
         if steps > 200_000 {
