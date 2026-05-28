@@ -1,86 +1,86 @@
-# Paper 01 — STATUS: DORMANT (paused 2026-05-18)
+# Paper 01 — STATUS: REACTIVATED as 2D-solver methods paper (2026-05-28)
 
 ## TL;DR
 
-Manuscript completo y revisado (~8500 palabras, 4 figuras paper-quality,
-27/29 issues del review pass cerradas) **NO se envía**. Se pausa
-indefinidamente. Razón: literature check 2026-05-18 reveló 3 papers
-2025 que cubren la mayor parte del wedge novelty del manuscript actual.
-El primer paper de la línea se mueve a **2028 Q1** como methods paper
-con artifact 2D + autograd, target Water Resources Research o
-Geoscientific Model Development.
+The review/positioning draft was made dormant on 2026-05-18 (novelty
+claims refuted by 2025 efforts — see history below). On 2026-05-28 the
+paper was **reactivated as a methods paper** now that the artifact it
+was waiting for exists: a verified 2D shallow-water solver
+(`solver-2d`) + the 1D autograd calibration line (`autograd`, Paper 02).
 
-## Por qué pasó
+The review draft is preserved at `manuscript_review_2026_dormant.md`.
+The new `manuscript.md` is the methods-paper draft: solver description
++ verification hierarchy + Huasco application.
 
-Después de cerrar el draft completo (incluido tex-review + paper-figures
-+ verify-refs), una pasada de literature check con WebSearch reveló:
+## Current framing (methods paper)
 
-- **Hydrograd.jl** (Liu et al., *Water Resources Research* 2025): Julia
-  differentiable SWE solver. Universal differential equations approach.
-  Open source.
-- **AegirJAX** (2025): JAX/Python differentiable nonhydrostatic SWE.
-  Bathymetry inversion, breakwater topology, neural corrections.
-- **SynxFlow** (Xia et al., *JOSS* 2024-2025): CUDA/C++/Python GPU
-  multi-hazard simulator — flood + landslide + debris flow en un solo
-  engine. Open source.
-- **r.avaflow v4** (Mergili et al., *GMD* 2025), **D-Claw extension**
-  (USGS 2025), **JAX-Fluids 2.0** (CoPhC 2025): completan el panorama.
+**Title (working)**: "hydroflux: a well-balanced, differentiable-by-
+design 2D shallow-water solver in Rust, verified against analytical and
+community benchmarks and applied to a semiarid Andean reach".
 
-El manuscript afirmaba en §1.2 / §3.5 que *"no production-grade flood
-solver was written in a language whose autograd story is mature"* y en
-§3.4 que *"no physical coupling in a single engine"*. Ambas claims son
-**factualmente refutables** contra Hydrograd, AegirJAX y SynxFlow.
+- §1 Intro — why another SW solver: *delivery + verification* within
+  the 2025 differentiable frontier (acknowledges Hydrograd, AegirJAX,
+  SynxFlow), not a gap-vacuum claim. Two design commitments:
+  differentiability by numeric genericity (Rust `Real` trait, no tracer)
+  + GIS-native verification on data-sparse basins.
+- §2 Numerics — HLLC + Audusse WB + MUSCL `(η,u,v)` + SSP-RK2 +
+  point-implicit Manning + Liang–Marche flux rescaling + cell-mask skip
+  + per-cell Manning + GeoTIFF I/O. `#![forbid(unsafe_code)]`.
+- §3 Verification — REAL numbers (run 2026-05-28): lake-at-rest 3e-16,
+  Thacker L² 0.068 % / mass 2.15e-5, Stoker L¹ 1.0 %, MacDonald < 2 %,
+  radial axisymmetry, UK EA ×6 pass.
+- §4 Application — Huasco 2017 Atacama, 200×67 30 m DEM, ESA WorldCover
+  Manning field. REAL numbers: Δh_mean +0.22 m, +25 % retained volume,
+  −4 % outflow vs uniform n (1-day peak).
+- §5 Roadmap — coupling (Iverson debris-flow) + GPU (wgpu) +
+  reverse-mode AD.
+- §6 Conclusion.
 
-## Por qué la decisión es honesta y no derrota
+**Target venue**: Computers & Geosciences (software contribution) or
+GMD (model description) — both subscription, no APC. EMS backup. (The
+AWR target of the review draft no longer fits a methods paper.)
 
-1. **Reviewer-defensa**: enviar el manuscript como está → alto riesgo de
-   tank reviews por novelty insuficiente. AWR tiene reviewers que
-   conocen WRR (donde se publicó Hydrograd 2025).
-2. **DICYT obligation**: cubierta por Paper 2 (U-Net SAR R2 en RSE).
-   No hay presión inmediata sobre hydroflux.
-3. **Fondecyt 2028**: más fuerte con un solver 2D + autograd
-   funcionando que con un paper de roadmap. Reviewers ANID Iniciación
-   premian preliminary results sustantivos.
-4. **Shelf-life**: un review paper envejece en 18-24 meses; un methods
-   paper con artifact citable se sigue citando 5+ años.
+## What survives from the review draft
 
-## Qué se reutiliza en el paper 2028
-
-| Componente actual | Reutilizable en paper 2028 |
+| Review component | Reused in methods paper |
 |---|---|
-| `state-of-the-art.md` (12 fichas + síntesis) | Section 2 del methods paper (versión condensada) |
-| Wedge canónico en outline.md | Intro / motivation del methods paper |
-| Figura 1 (intersection radar) | Probablemente sí, con scoring actualizado contra Hydrograd/AegirJAX/SynxFlow |
-| Figura 2 (Stoker convergence) | Probablemente sí, validación 1D persiste |
-| Figura 3 (MacDonald variable) | Probablemente sí |
-| Figura 4 (par insignia Maule/Huasco) | Sí, demos chilenas se mantienen |
-| `style.py` paper-figures style | Sí, reutilizable |
-| `references.bib` (36 entries verificados) | Sí, agregamos las 2025 refs (Hydrograd, AegirJAX, SynxFlow) |
-| Cover letter | A reescribir para target WRR/GMD |
-| Body sections §1, §3, §4, §5, §6 | A reescribir significativamente — el framing cambia de review a methods |
+| §1 HEC-RAS + open-source landscape | §1, condensed |
+| §2 twelve-solver survey | §1, one paragraph + 2025 efforts |
+| Roadmap arc (coupling/GPU/autograd) | §5 |
+| Figures 2 (Stoker), 3 (MacDonald) | adapt for §3 verification panel |
+| Figure 4 (Maule/Huasco flagship) | superseded by solver-2d Huasco figs |
+| `references.bib` (36 verified) | reused; add ~10 keys (see below) |
+| Cover letter (AWR) | reframe to C&G/GMD |
 
-Estimo **~60% del contenido sobrevive** en el paper 2028. El framing
-cambia de "review + roadmap" a "methods + validation + roadmap", con
-las claims sustentadas por el solver 2D + autograd en lugar de prosa.
+## Pending before submission
 
-## Qué hacer si se reactiva
+- [ ] Add missing bib keys: LiangMarche2009, Thacker1981, Chow1959,
+      ESAWorldCover2021, Liu2025 (Hydrograd), Lin2025 (AegirJAX),
+      Xia2024 (SynxFlow), Mergili2025 (r.avaflow v4), Bezgin2025
+      (JAX-Fluids 2.0), ParraPaper02 (1D companion).
+- [ ] Figures: Fig 1 (scheme schematic), Fig 2 (verification panel),
+      Fig 3 (UK EA T6 depth), Fig 4 (Huasco — reuse solver-2d
+      `fig_huasco_2d_manning_field` + `fig_huasco_2d_depth_compare`).
+- [ ] Tighten abstract + Plain Language Summary.
+- [ ] `/verify-refs` once bib complete.
+- [ ] `/tex-review` reasoning audit.
+- [ ] Reframe cover letter to C&G/GMD.
+- [ ] Pandoc → LaTeX freeze.
 
-Si en algún momento se reactiva la idea de submit un review/landscape
-paper en 2026-2027 (e.g., porque aparece una venue tipo *invited
-review* en alguna conferencia), partir desde este manuscript y agregar
-en §2 una subsección sobre los efforts 2025 reconociendo Hydrograd /
-AegirJAX / SynxFlow / r.avaflow v4 / D-Claw extension. Reescribir §3 y
-§4.1 para acknowledge que el wedge ahora es intersección estrecha y
-defendida solo por hydroflux delivery, no por gap-vacío.
+## History (why it was dormant)
 
-## Lecciones aprendidas (heurística futura)
+Drafted as a review/landscape paper (Apr–May 2026): tex-review +
+paper-figures + verify-refs passes, AWR target, cover letter. Made
+dormant 2026-05-18 after a literature check found Hydrograd.jl (WRR
+2025), AegirJAX (2025), and SynxFlow (JOSS 2024) refuting the §1.2/§3.4/
+§3.5 novelty claims ("no production-grade solver in a language with
+mature autograd", "no coupling in a single engine"). The honest call was
+to wait for the artifact rather than ship a novelty-thin review.
 
-**ANTES de finalizar cualquier paper de review o landscape, ejecutar
-WebSearch sistemático sobre cada claim de novelty específico, cubriendo
-literatura últimos 12-18 meses.** Si lo hubiéramos hecho días atrás en
-lugar de hoy, habríamos pivotado antes y no habríamos invertido 2 días
-en pulir un draft con un claim novelty insostenible.
+## Lesson reaffirmed
 
-El trabajo NO está perdido — la mayoría se reutiliza en 2028 — pero la
-heurística futura ahorra el cycle de polish + literature-discover +
-pivot.
+The methods framing is reviewer-defensible where the review was not:
+it claims *delivery + verification of a usable artifact*, acknowledges
+the 2025 frontier explicitly, and is anchored by reproducible benchmark
+numbers and a real application — not by a gap-vacuum assertion that a
+literature search can refute.

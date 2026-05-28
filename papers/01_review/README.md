@@ -1,4 +1,13 @@
-# Paper 01 — Review / positioning
+# Paper 01 — 2D-solver methods paper (reactivated 2026-05-28)
+
+> **PIVOT 2026-05-28**: este paper se reactivó como **methods paper del
+> solver 2D** (ver `STATUS.md`). El draft de review/positioning original
+> está archivado en `manuscript_review_2026_dormant.md`; el nuevo
+> `manuscript.md` describe + verifica el solver 2D y lo aplica al Huasco.
+> Target migra de AWR (review) a Computers & Geosciences / GMD (methods).
+> Lo que sigue abajo documenta el **draft de review original** (archivado).
+
+---
 
 Primera publicación de la línea hydroflux: review estructurado del landscape
 de solvers de shallow water + propuesta de roadmap para un solver acoplado,
