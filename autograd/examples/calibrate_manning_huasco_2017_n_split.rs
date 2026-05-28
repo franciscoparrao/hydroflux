@@ -351,12 +351,22 @@ fn main() {
         if flood_in { "✓ inside Chow vegetated" } else { "✗ OUTSIDE" }
     );
 
-    // Compare against iter 6's single-Manning best (≈ 0.024).
-    let iter6_n = 0.024_f64;
-    let iter6_n_d: Vec<f64> = vec![iter6_n; N_CELLS];
-    let _ = iter6_n_d;
+    // Compare against iter 6's single-Manning compound best.
+    // Iter 6 recovered a single effective n ≈ 0.0598 (RMSE 0.190 m),
+    // INSIDE the broad Chow gravel-bed envelope [0.025, 0.080].
+    // The split here decomposes that single effective roughness into
+    // a gravel main channel + vegetated floodplain pair that each
+    // sit in their NARROWER respective envelopes — but at NO RMSE
+    // improvement (0.199 vs 0.190). The stage-only rating-curve
+    // target cannot independently constrain n_main vs n_flood: many
+    // (n_main, n_flood) pairs Lotter-average to the same effective
+    // n_eq at typical stage and therefore give the same fit. This
+    // is a friction-distribution aliasing analogous to the n–shape
+    // confound of the power-law section (iter 8).
+    let iter6_n = 0.0598_f64;
+    let iter6_rmse = 0.190_f64;
     println!(
-        "\n(iter 6 single-Manning result was n ≈ {:.3} — outside Chow envelope.\n iter 9 splits the budget into main + flood so both can sit\n inside their respective Chow envelopes if the optimisation\n cooperates with the geometry.)",
-        iter6_n
+        "\n(iter 6 single-Manning compound: n ≈ {:.4}, RMSE {:.3} m — inside Chow.\n iter 9 split decomposes that into n_main (gravel) + n_flood (vegetated),\n both inside their NARROWER envelopes, but at NO RMSE gain ({:.3} vs {:.3} m).\n The rating-curve target aliases n_main against n_flood — a friction-\n distribution analogue of the n-shape confound from the power-law section.)",
+        iter6_n, iter6_rmse, rmse, iter6_rmse
     );
 }

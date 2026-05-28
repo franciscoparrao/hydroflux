@@ -141,6 +141,7 @@ The application is structured as a progression of eight numerical experiments (i
 | 6 | DEM | real | rating curve | 30/85 m | compound 2-stage | 0.0598 ✓ envelope | **0.190** | — |
 | 7 | DEM | real | rating curve | 30/85 m | compound (frozen iter 6) | 0.0598 | 0.190 | **1.297** (failed) |
 | 8 | DEM | real | rating curve | c=20.09 (joint AD) | **power-law p=0.77** | 0.0131 ✗ envelope | **0.006** | **0.103** (closed) |
+| 9 | DEM | real | rating curve | 30/85 m | compound, **split-n (joint AD)** | n_main 0.036 ✓ / n_flood 0.081 ✓ | 0.199 | — |
 
 Iter 1–3 are twin experiments validating the AD pipeline: solver runs with synthetic Manning `n_true = 0.04`, calibration recovers `n_true` to machine precision (|err| ∼ 1e-5 to 1e-8). Iter 3 is the strongest pipeline validation: 600 000+ explicit time steps per forward pass with `Dual` arithmetic, AD gradient threads end-to-end and the calibration converges in 9 iterations to |err| = 3.14e-8.
 
@@ -162,6 +163,14 @@ Crucially, the recovered Manning `n = 0.0131` lies BELOW the Chow envelope of [0
 
 Disentangling requires independent information about geometry: a sub-30 m DEM (LiDAR), a field cross-section survey at the gauge, or — at minimum — a strong prior constraining `(c, p)` to a hydraulic-geometry envelope estimated from regional data. None of these are within the scope of this paper; we report the confound as a fundamental feature of the inverse problem.
 
+### 4.5 Split-Manning on the compound section: a second, friction-only aliasing
+
+The n–shape confound of §4.4 freed the cross-section *shape* and watched friction absorb the residual. A complementary experiment (iter 9) holds the shape fixed and instead frees the *friction distribution*. The compound section's single effective `n = 0.0598` (iter 6) lumps a gravel-bed main channel together with the floodplain, yet these are physically distinct surfaces: ESA WorldCover (2021) over this reach classifies the active thalweg as riparian tree cover (Manning `n ≈ 0.10`, Chow vegetated envelope) embedded in bare/sparse Atacama ground (`n ≈ 0.025`). We therefore split the compound roughness into `(n_main, n_flood)`, combined per cell through the Lotter (1933) equivalent-roughness weighting `n_eq = (P_main + P_flood) / (P_main/n_main + P_flood/n_flood)`, and calibrate both jointly via forward-mode AD (two forward passes per iteration, one seeding each parameter).
+
+The lowest-cost iterate is `n_main = 0.036` and `n_flood = 0.081` (Figure 6), each inside its *narrower* respective Chow envelope (gravel-bed `[0.025, 0.045]`, vegetated `[0.050, 0.120]`) — a more physically resolved decomposition than the single lumped `n`. The calibration RMSE, however, is 0.199 m: marginally *worse* than the single-Manning compound (0.190 m), not better. The split adds a parameter without improving the fit because the stage-only rating-curve target cannot independently constrain the two roughnesses: at the typical event stage (`h ≈ 1.0–1.3 m`, barely above bank-full) the Lotter weighting maps a one-parameter family of `(n_main, n_flood)` pairs onto the same effective `n_eq`, and every member of that family yields the same daily stage. The gradient descent slides along this near-flat valley (Figure 6a) until the magnitude clamp and the adaptive learning rate halt it, with the objective bottoming at iteration 5 and drifting slightly above the minimum thereafter (Figure 6b).
+
+This is a *friction-only* aliasing that runs parallel to the n–shape confound: where §4.4 showed friction trading against geometry, §4.5 shows friction trading against itself across sub-sections of a fixed geometry. Both are manifestations of the same underlying limitation — a single observed output (stage) cannot resolve multiple inputs that enter the conveyance only through their combined effect. The split-Manning result is the cleaner demonstration because it isolates the aliasing within friction alone, removing geometry as a confounding variable.
+
 ## 5. Discussion
 
 ### 5.1 Differentiable cross-section as a paradigm
@@ -175,6 +184,8 @@ The methodological lesson is sharper than the specific result: the cross-section
 The recovered Manning `n = 0.013` from iter 8 falls below the Chow envelope of `[0.025, 0.080]` for gravel-bed rivers (Chow, 1959). A traditional flood modeller would report this as a calibration failure or an artefact. We interpret it differently. The result is a direct measurement of an aliasing problem that single-output (stage) calibration cannot resolve: a wider channel at any given stage carries the same discharge with proportionally less friction, so `(n, c)` are partially confounded under the rating-curve cost function. The compound section in iter 6 also suffered from this confound, but with the *shape* held fixed (`w_main = 30`, `w_flood = 85`, `h_bank = 1.0`), the entire mismatch had to be absorbed into `n`, which is precisely why the compound `n = 0.060` falls within the Chow envelope while the power-law `n` does not.
 
 This is a positive finding: the AD pipeline lets us *see* the confound by varying both kinds of parameters simultaneously, whereas standard practice with fixed geometry collapses the confound onto a single dimension and renders it invisible. The published Chow values implicitly assume a particular family of cross-section shapes (essentially rectangular wide-channel or simple compound); they are estimates of "effective friction given that assumed shape" rather than of pure roughness in isolation. The differentiable-geometry framework respects this dependence explicitly and refuses to commit to a friction estimate without admitting the geometric uncertainty that came with it.
+
+The split-Manning experiment (§4.5, Figure 6) sharpens this interpretation by isolating the aliasing within friction alone. Holding the compound shape fixed and freeing only the two sub-section roughnesses, the calibration recovers `(n_main, n_flood) = (0.036, 0.081)` — both inside their respective Chow envelopes — but with no RMSE improvement over the single lumped `n`. The stage-only target constrains the Lotter-weighted *effective* roughness, not the individual surfaces, so the descent slides freely along the one-parameter family that preserves that average. The lesson generalises beyond geometry: any inverse problem that observes only the integrated conveyance (stage, or discharge at a single section) cannot resolve sub-grid heterogeneity in the parameters that feed it, whether that heterogeneity is geometric (§4.4) or frictional (§4.5). Disambiguation requires either spatially-distributed observations — distributed stage sensors, remote-sensing inundation extent, velocity from PIV or radar — or independent characterisation of the heterogeneous field itself, such as the land-cover-derived roughness map (ESA WorldCover) that motivated the split here.
 
 ### 5.3 Limits of the rating-curve target
 
@@ -212,9 +223,11 @@ The n–shape confound is the natural next problem: stage-only calibration canno
 
 **Figure 5** (`fig05_rmse_progression.pdf`). RMSE versus the literature rating curve across the eight-step progression of calibration setups, for the 2017 calibration window (blue) and 1998 validation window (orange). Twin experiments iter 1–3 are omitted (no rating-curve target). The tower at iter 7 (frozen compound on 1998, 1.297 m) versus iter 8 (power-law joint calibration, 0.103 m) condenses the methodological narrative of the paper into a single bar comparison.
 
+**Figure 6** (`fig06_n_split_convergence.pdf`). Joint calibration of the split compound Manning `(n_main, n_flood)` (iter 9, §4.5). (a) Parameter-space trajectory of the forward-mode gradient descent, points coloured by cost, with the Chow 1959 envelopes for gravel-bed channel (`n_main ∈ [0.025, 0.045]`) and vegetated floodplain (`n_flood ∈ [0.050, 0.120]`) shown as shaded bands; the descent moves inside the intersection of both envelopes, the open marker being the final iterate (`0.034, 0.082`) and the lowest-cost iterate (the reported result, `0.036, 0.081`) lying just upstream of it. (b) Objective (Σ Δh²) versus iteration on a log axis, with the true minimum at iteration 5 highlighted — the adaptive-learning-rate descent overshoots the flat optimum slightly thereafter. (c) `n_main` and `n_flood` versus iteration against their Chow bands. The near-horizontal trajectory in (a) — `n_main` moves while `n_flood` is almost stationary — is the visual signature of the friction-distribution aliasing: the cost gradient is steep in the lumped effective roughness but nearly flat along the `(n_main, n_flood)` direction that preserves the Lotter average.
+
 ## Open Research
 
-All code is released as open source at <https://github.com/franciscoparrao/hydroflux> (commit hash TODO at submission). The `autograd` crate contains the forward-mode dual numbers (`Dual`), the `Real` trait, three Saint-Venant 1D solver modules (`swe1d`, `compound_swe1d`, `power_law_swe1d`), and the nine application demos that reproduce every table and figure in this paper. Build and run:
+All code is released as open source at <https://github.com/franciscoparrao/hydroflux> (commit hash TODO at submission). The `autograd` crate contains the forward-mode dual numbers (`Dual`), the `Real` trait, three Saint-Venant 1D solver modules (`swe1d`, `compound_swe1d`, `power_law_swe1d`), and the ten application demos that reproduce every table and figure in this paper. Build and run:
 
 ```bash
 cargo test --workspace --release  # ~238 tests, runs in ≈ 5 min
@@ -259,7 +272,7 @@ This work is part of the DICYT postdoctoral fellowship 2026–2027 at Universida
 
 1. ~~Introduction~~ ✅ drafted.
 2. ~~Discussion~~ ✅ drafted (6 subsections).
-3. Figures ✅ 5 publication-quality figs in `figures/out/` (R/ggplot2 + patchwork). One originally-listed schematic was merged into fig02 (compound + power-law side-by-side); fig03 omitted as a separate calibration-trajectory panel (could be added later as fig06 if reviewers request it).
+3. Figures ✅ 6 publication-quality figs in `figures/out/` (R/ggplot2 + patchwork). One originally-listed schematic was merged into fig02 (compound + power-law side-by-side). fig06 (split-Manning convergence, §4.5) added; its trajectory CSV is regenerated by the `calibrate_manning_huasco_2017_n_split` example via `make data/n_split_trajectory.csv`.
 4. Plain Language Summary needs review — currently slightly above the 200-word lay-audience limit; tighten.
 5. Cover letter for WRR is separate file at submission time.
 6. `references.bib` in BibTeX format — currently the cites are inline Markdown; convert before LaTeX rendering.
