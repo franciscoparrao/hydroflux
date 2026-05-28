@@ -12,7 +12,8 @@ figures/
 │   ├── fig02_section_schematic.R  # compound vs power-law cross-sections
 │   ├── fig03_fit_2017.R       # calibration fit on Atacama 2017
 │   ├── fig04_fit_1998.R       # validation fit on La Niña 1998
-│   └── fig05_rmse_progression.R   # RMSE bar chart, iter 4-8
+│   ├── fig05_rmse_progression.R   # RMSE bar chart, iter 4-8
+│   └── fig06_n_split_convergence.R # split-Manning (n_main, n_flood) calibration, iter 9
 ├── data/                       # CSV inputs (generated)
 ├── out/                        # PDFs + PNGs (output)
 └── Makefile                    # regenerate all

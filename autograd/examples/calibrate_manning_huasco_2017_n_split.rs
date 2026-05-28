@@ -36,12 +36,18 @@
 //!   --example calibrate_manning_huasco_2017_n_split
 //! ```
 
+use std::fs::File;
+use std::io::Write;
+use std::path::Path;
 use std::time::Instant;
 
 use hydroflux_autograd::{
     Dual, Real,
     compound_swe1d::{self, CompoundSection, LeftBc, RightBc},
 };
+
+const TRAJECTORY_CSV: &str =
+    "papers/02_differentiable_calibration/figures/data/n_split_trajectory.csv";
 
 const HUASCO_BED_M: [f64; 60] = [
     490.4969, 488.8318, 488.0484, 488.0483, 488.0483, 488.0482, 488.0481, 488.0480, 488.0480,
@@ -157,6 +163,24 @@ fn forward_pass(
     (cost.val, cost.dval)
 }
 
+fn write_trajectory_csv(
+    path: &Path,
+    rows: &[(usize, f64, f64, f64, f64, f64)],
+) -> std::io::Result<()> {
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let mut f = File::create(path)?;
+    writeln!(f, "iter,n_main,n_flood,cost,grad_main,grad_flood")?;
+    for (iter, n_main, n_flood, cost, g_main, g_flood) in rows {
+        writeln!(
+            f,
+            "{iter},{n_main:.6},{n_flood:.6},{cost:.6e},{g_main:.6e},{g_flood:.6e}"
+        )?;
+    }
+    Ok(())
+}
+
 fn main() {
     let n_main_initial = 0.040_f64; // gravel-bed Andean, Chow mid
     let n_flood_initial = 0.080_f64; // vegetated overbank, Chow upper
@@ -197,7 +221,13 @@ fn main() {
     let mut prev_cost = f64::INFINITY;
     let mut lr = lr_base;
     let t0 = Instant::now();
-    let (mut final_main, mut final_flood) = (n_main_guess, n_flood_guess);
+    // Track the BEST (lowest-cost) iterate, not just the last — the
+    // adaptive-lr descent can overshoot a flat optimum and settle
+    // slightly above the minimum it passed through.
+    let mut best_cost = f64::INFINITY;
+    let (mut best_main, mut best_flood) = (n_main_guess, n_flood_guess);
+    // Trajectory log for the convergence figure (fig06).
+    let mut trajectory: Vec<(usize, f64, f64, f64, f64, f64)> = Vec::with_capacity(max_iters);
     for iter in 0..max_iters {
         let ti = Instant::now();
         // Pass 1: seed n_main, freeze n_flood. Get ∂cost/∂n_main.
@@ -213,11 +243,16 @@ fn main() {
         println!(
             "{iter:>4} {n_main_guess:>10.6} {n_flood_guess:>10.6} {cost_val:>14.6e} {grad_main:>+11.3e} {grad_flood:>+11.3e} {dt_i:>8.2}"
         );
+        trajectory.push((iter, n_main_guess, n_flood_guess, cost_val, grad_main, grad_flood));
+
+        if cost_val < best_cost {
+            best_cost = cost_val;
+            best_main = n_main_guess;
+            best_flood = n_flood_guess;
+        }
 
         if cost_val < tol {
             println!("\nConverged: cost = {cost_val:.3e} < tol {tol:.0e}");
-            final_main = n_main_guess;
-            final_flood = n_flood_guess;
             break;
         }
         // Adaptive learning rate: halve when cost increases.
@@ -234,10 +269,18 @@ fn main() {
         // Bounds: positive, reasonable range.
         n_main_guess = n_main_guess.max(0.005).min(0.20);
         n_flood_guess = n_flood_guess.max(0.005).min(0.30);
-        final_main = n_main_guess;
-        final_flood = n_flood_guess;
     }
     let elapsed = t0.elapsed();
+
+    // Report the BEST iterate (lowest cost over the trajectory).
+    let (final_main, final_flood) = (best_main, best_flood);
+
+    // Write the trajectory CSV for the convergence figure (fig06).
+    if let Err(e) = write_trajectory_csv(Path::new(TRAJECTORY_CSV), &trajectory) {
+        eprintln!("warning: could not write trajectory CSV: {e}");
+    } else {
+        println!("Trajectory written to {TRAJECTORY_CSV}");
+    }
 
     // Final fit.
     let h_sim_final =
@@ -287,8 +330,8 @@ fn main() {
         elapsed.as_secs_f64() / 60.0
     );
     println!(
-        "Final: n_main = {:.6}, n_flood = {:.6}",
-        final_main, final_flood
+        "Best (lowest-cost) iterate: n_main = {:.6}, n_flood = {:.6} (cost = {:.6e})",
+        final_main, final_flood, best_cost
     );
 
     // Quick reference: Chow 1959 envelopes per land use.
