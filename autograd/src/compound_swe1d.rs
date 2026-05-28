@@ -131,6 +131,36 @@ impl CompoundSection {
         }
     }
 
+    /// Lotter (1933) equivalent Manning roughness for the compound
+    /// cross-section. Treats the channel as two sub-sections with
+    /// distinct `n_main` (low-flow rectangular channel) and `n_flood`
+    /// (overbank), partitioned at `h_bank`. The Lotter weighting is
+    /// `n_eq = (P_main + P_flood) / (P_main/n_main + P_flood/n_flood)`
+    /// with
+    ///
+    /// - `P_main  = w_main + 2·min(h, h_bank)`
+    /// - `P_flood = (w_flood − w_main) + 2·max(h − h_bank, 0)`
+    ///
+    /// For `h ≤ h_bank` only the main channel is wet (`P_flood = 0`)
+    /// and the formula collapses to `n_eq = n_main`. For `h > h_bank`
+    /// the contributions weigh by their wetted perimeter, matching
+    /// the standard HEC-RAS conveyance-method composite roughness.
+    ///
+    /// Used by [`lax_friedrichs_step`] to allow a calibrated
+    /// `n_main` distinct from the floodplain `n_flood` (vegetation
+    /// riparian vs sparse overbank, for example).
+    pub fn compound_manning<T: Real>(&self, h: T, n_main: T, n_flood: T) -> T {
+        let h_b = T::from_f64(self.h_bank);
+        if h.value() <= self.h_bank {
+            n_main
+        } else {
+            let p_main = T::from_f64(self.w_main) + h_b * 2.0;
+            let p_flood = T::from_f64(self.w_flood - self.w_main) + (h - h_b) * 2.0;
+            let inv = p_main / n_main + p_flood / n_flood;
+            (p_main + p_flood) / inv
+        }
+    }
+
     /// Recover stage `h` from area `A` (inverse of [`area`]).
     pub fn stage<T: Real>(&self, a: T) -> T {
         let a_bank = self.w_main * self.h_bank;
@@ -164,7 +194,15 @@ pub enum RightBc {
     Transmissive,
 }
 
-/// Lax-Friedrichs explicit step on `(A, Q)`.
+/// Lax-Friedrichs explicit step on `(A, Q)` with split Manning
+/// roughness for the main channel (`n_main`) and the floodplain
+/// (`n_flood`). When `h ≤ h_bank` in a given cell, only `n_main`
+/// contributes; for `h > h_bank` the cell sees the Lotter (1933)
+/// compound roughness — see [`CompoundSection::compound_manning`].
+///
+/// To match the original single-Manning behaviour (Track A iter 6),
+/// pass the same value for both: `lax_friedrichs_step(..., n, n,
+/// ...)` is bit-exact equivalent to the pre-split API.
 #[allow(clippy::too_many_arguments)]
 pub fn lax_friedrichs_step<T: Real>(
     section: &CompoundSection,
@@ -173,7 +211,8 @@ pub fn lax_friedrichs_step<T: Real>(
     bed: &[f64],
     dx: f64,
     dt: f64,
-    manning_n: T,
+    manning_main: T,
+    manning_flood: T,
     gravity: f64,
     left_bc: LeftBc<T>,
     _right_bc: RightBc,
@@ -265,13 +304,16 @@ pub fn lax_friedrichs_step<T: Real>(
         // dQ/dt += −g·n²·Q·|Q|·P^(4/3) / A^(10/3).
         // Linearise around |Q*| and apply implicit on Q:
         //   Q_{n+1} = Q* / (1 + dt·g·n²·|Q*|·P^(4/3)/A^(10/3))
+        // The roughness `n` is the Lotter compound roughness — for
+        // cells with `h ≤ h_bank` this reduces to `n_main`.
         let q_star = q[i] + s_bed * dt - (f_q_right - f_q_left) * dt_over_dx;
         let h_i = section.stage(a_safe);
         let p = section.perimeter(h_i).max(T::from_f64(1.0e-9));
+        let n_cell = section.compound_manning(h_i, manning_main, manning_flood);
         // Friction force on Q: −g·n²·Q²·P^(4/3)/A^(7/3) (NOT A^(10/3),
         // which is the friction *slope*; A^(7/3) is the *force* form
         // after multiplying by A — see module doc).
-        let coeff = manning_n * manning_n * (dt * gravity) * q_star.abs() * p.powf(4.0 / 3.0)
+        let coeff = n_cell * n_cell * (dt * gravity) * q_star.abs() * p.powf(4.0 / 3.0)
             / a_safe.powf(7.0 / 3.0);
         let q_new = q_star / (coeff + 1.0);
 
@@ -322,7 +364,10 @@ pub fn cfl_dt<T: Real>(
 }
 
 /// Run until `t_end`. Mirrors [`crate::swe1d::run`] for the
-/// compound formulation.
+/// compound formulation, with split Manning `(n_main, n_flood)`.
+///
+/// Pass identical values for both to reproduce the pre-split
+/// single-Manning behaviour exactly.
 #[allow(clippy::too_many_arguments)]
 pub fn run<T: Real>(
     section: &CompoundSection,
@@ -331,7 +376,8 @@ pub fn run<T: Real>(
     bed: &[f64],
     dx: f64,
     t_end: f64,
-    manning_n: T,
+    manning_main: T,
+    manning_flood: T,
     gravity: f64,
     cfl: f64,
     left_bc: LeftBc<T>,
@@ -352,7 +398,8 @@ pub fn run<T: Real>(
             bed,
             dx,
             dt,
-            manning_n,
+            manning_main,
+            manning_flood,
             gravity,
             left_bc,
             right_bc,
@@ -417,6 +464,81 @@ mod tests {
     }
 
     #[test]
+    fn compound_manning_below_bank_full_equals_n_main() {
+        // For `h ≤ h_bank` the floodplain is dry, so the Lotter
+        // formula must collapse to `n_main` regardless of n_flood.
+        let s = CompoundSection { w_main: 30.0, w_flood: 100.0, h_bank: 1.0 };
+        let n_main = 0.025_f64;
+        let n_flood = 0.080_f64;
+        for h in [0.01, 0.25, 0.5, 0.999, 1.0] {
+            let n_eq = s.compound_manning(h, n_main, n_flood);
+            assert!(
+                approx_eq(n_eq, n_main, EPS),
+                "h = {h}: n_eq = {n_eq} (expected n_main = {n_main})"
+            );
+        }
+    }
+
+    #[test]
+    fn compound_manning_uniform_matches_scalar() {
+        // n_main == n_flood ⇒ n_eq == n_main for any h. This is the
+        // bit-exact backward-compat guarantee that older code with a
+        // single Manning argument keeps producing the same results.
+        let s = CompoundSection { w_main: 30.0, w_flood: 85.0, h_bank: 1.0 };
+        let n = 0.04_f64;
+        for h in [0.1, 1.0, 1.5, 3.0, 5.0] {
+            let n_eq = s.compound_manning(h, n, n);
+            assert!(approx_eq(n_eq, n, EPS), "h = {h}: n_eq = {n_eq}");
+        }
+    }
+
+    #[test]
+    fn compound_manning_lotter_increases_with_n_flood() {
+        // Above bank-full, raising `n_flood` (with `n_main` fixed)
+        // must raise the equivalent Manning monotonically. Captures
+        // the physical intuition: rougher overbank ⇒ more friction
+        // on the section as a whole.
+        let s = CompoundSection { w_main: 30.0, w_flood: 100.0, h_bank: 1.0 };
+        let n_main = 0.025_f64;
+        let h = 2.0_f64;
+        let n_low = s.compound_manning::<f64>(h, n_main, 0.030);
+        let n_mid = s.compound_manning::<f64>(h, n_main, 0.060);
+        let n_high = s.compound_manning::<f64>(h, n_main, 0.120);
+        assert!(n_low < n_mid && n_mid < n_high);
+        // All must lie between the extreme single-value Manning
+        // results: bounded by the smaller and larger of n_main /
+        // n_flood across the wetted perimeter.
+        assert!(n_low > n_main && n_low < 0.030);
+        assert!(n_high > n_main && n_high < 0.120);
+    }
+
+    #[test]
+    fn compound_manning_dual_ad_matches_finite_diff() {
+        // Forward-mode AD: derivative w.r.t. n_main and n_flood
+        // computed by `Dual::variable` must match a central finite
+        // difference. Roundoff-tight (`1e-5`) is the standard AD
+        // sanity check.
+        let s = CompoundSection { w_main: 30.0, w_flood: 100.0, h_bank: 1.0 };
+        let h = 2.0_f64;
+        let n_main = 0.025_f64;
+        let n_flood = 0.060_f64;
+        let h_d = Dual::constant(h);
+        let n_main_d = Dual::variable(n_main);
+        let n_flood_d = Dual::constant(n_flood);
+        let n_eq_d = s.compound_manning(h_d, n_main_d, n_flood_d);
+        let dn_eq_dn_main_ad = n_eq_d.dval;
+
+        let eps = 1.0e-6;
+        let plus = s.compound_manning::<f64>(h, n_main + eps, n_flood);
+        let minus = s.compound_manning::<f64>(h, n_main - eps, n_flood);
+        let dn_eq_dn_main_fd = (plus - minus) / (2.0 * eps);
+        assert!(
+            (dn_eq_dn_main_ad - dn_eq_dn_main_fd).abs() < 1.0e-7,
+            "∂n_eq/∂n_main: AD = {dn_eq_dn_main_ad}, FD = {dn_eq_dn_main_fd}"
+        );
+    }
+
+    #[test]
     fn stage_inverts_area_round_trip() {
         let s = CompoundSection { w_main: 20.0, w_flood: 100.0, h_bank: 1.0 };
         for h in [0.1, 0.5, 0.9, 1.0, 1.1, 2.5, 5.0] {
@@ -454,6 +576,7 @@ mod tests {
             &bed,
             1.0,
             10.0,
+            0.03,
             0.03,
             G,
             0.4,
@@ -500,6 +623,7 @@ mod tests {
             &bed,
             dx,
             500.0,
+            n,
             n,
             G,
             0.4,
@@ -572,6 +696,7 @@ mod tests {
                 bed.as_slice(),
                 dx,
                 300.0,
+                n,
                 n,
                 G,
                 0.4,

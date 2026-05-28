@@ -124,7 +124,7 @@ fn simulate_compound(q_series: &[f64]) -> Vec<f64> {
     for q_block in q_series {
         let h_bc = compound_normal_depth::<f64>(&section, *q_block, N_COMPOUND, SLOPE_EFFECTIVE);
         let (a_new, q_new, _) = compound_swe1d::run::<f64>(
-            &section, a, q, &bed, DX, BLOCK_SECONDS, N_COMPOUND, G, CFL,
+            &section, a, q, &bed, DX, BLOCK_SECONDS, N_COMPOUND, N_COMPOUND, G, CFL,
             CLeftBc::Dirichlet { h: h_bc, q: *q_block },
             CRightBc::Transmissive,
         );

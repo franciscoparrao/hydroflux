@@ -148,6 +148,7 @@ fn simulate_event(n: f64, q_daily_total: &[f64]) -> Vec<f64> {
             DX,
             BLOCK_SECONDS,
             n,
+            n,
             G,
             CFL,
             LeftBc::Dirichlet { h: h_bc, q: *q_block },

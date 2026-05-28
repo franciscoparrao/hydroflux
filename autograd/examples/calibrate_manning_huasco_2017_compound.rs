@@ -139,6 +139,7 @@ fn simulate_event<T: Real>(n: T, q_daily_total: &[T]) -> Vec<T> {
             DX,
             BLOCK_SECONDS,
             n,
+            n,
             G,
             CFL,
             LeftBc::Dirichlet { h: h_bc, q: *q_block },
