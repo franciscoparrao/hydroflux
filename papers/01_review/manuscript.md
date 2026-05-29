@@ -421,11 +421,21 @@ radial dam-break axisymmetry. *(adapt from review fig2/fig3 + new)*
 **Figure 3.** UK EA Test 6 urban dam-break depth field through the
 building array at peak. *(to draft from the report_depth_snapshot)*
 
-**Figure 4.** Huasco application: (a) DEM + reach; (b) ESA WorldCover
-land cover; (c) derived Manning field; (d) inundation depth at peak,
-uniform vs variable `n`, with the difference panel. *(reuse
-`fig_huasco_2d_manning_field` + `fig_huasco_2d_depth_compare` from the
-solver-2d example figures)*
+**Figure 4** (`fig04_huasco_application.pdf`). Huasco 2017 Atacama
+application, 200 × 67-cell 30 m subset (UTM 19S), one-day peak. Five
+panels sharing the reach extent: (a) ESA WorldCover 2021 land cover —
+riparian tree and shrub vegetation tracks the thalweg within bare
+Atacama hillslopes; (b) the derived Manning field `n(x, y)` mapping
+land cover to roughness (`n = 0.025` bare to `0.10` tree); (c)
+inundation depth with a single uniform `n = 0.04`; (d) inundation
+depth with the variable `n(x, y)`; (e) the difference `Δh = (d) − (c)`,
+hill-shaded base, divergent scale. Panels (c)–(e) share a hillshade
+underlay. The positive Δh (warm) concentrated in the channel shows the
+riparian roughness deepening and retaining the flow — the +0.22 m mean
+channel deepening and +25 % retained volume reported in §4.3. Generated
+by `fig04_huasco_application.R`, which reuses the solver-2d example
+rasters (`huasco_subset_{dem,landcover}.tif`,
+`huasco_2d_depth_day_01{,_landcover}.tif`).
 
 # Open Research
 
@@ -479,9 +489,11 @@ Mergili2025 r.avaflow v4, Bezgin2025 JAX-Fluids 2.0, ParraPaper02 the
    huasco_2d_event_landcover, 1-day Atacama peak): Δh_mean +0.22 m,
    +25 % retained volume, −4 % outflow, n_wet 278→286.
 4. Missing bib keys flagged in References — add before /verify-refs.
-5. Figures: reuse the solver-2d example figs (manning_field,
-   depth_compare) for Fig 4; draft Fig 1 (scheme) and Fig 3 (UK EA T6);
-   adapt review fig2/fig3 for Fig 2.
+5. Figures: Fig 4 ✅ done (`fig04_huasco_application.R`, 5-panel
+   composite reusing the solver-2d Huasco rasters). Still to draft:
+   Fig 1 (scheme schematic), Fig 2 (verification panel — adapt review
+   fig2 Stoker / fig3 MacDonald + add Thacker), Fig 3 (UK EA T6 depth
+   from `report_depth_snapshot`).
 6. Target venue: Computers & Geosciences (software contribution) or
    GMD (model description) — both subscription, no APC. EMS a backup.
    Cover letter (`cover_letter_awr.md`) to be reframed from AWR review

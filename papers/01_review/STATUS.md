@@ -58,9 +58,13 @@ AWR target of the review draft no longer fits a methods paper.)
       ESAWorldCover2021, Liu2025 (Hydrograd), Lin2025 (AegirJAX),
       Xia2024 (SynxFlow), Mergili2025 (r.avaflow v4), Bezgin2025
       (JAX-Fluids 2.0), ParraPaper02 (1D companion).
-- [ ] Figures: Fig 1 (scheme schematic), Fig 2 (verification panel),
-      Fig 3 (UK EA T6 depth), Fig 4 (Huasco — reuse solver-2d
-      `fig_huasco_2d_manning_field` + `fig_huasco_2d_depth_compare`).
+- [x] Fig 4 (Huasco) — `figures/R/fig04_huasco_application.R`, 5-panel
+      composite (land cover → Manning → depth uniform → depth variable
+      → Δh), reuses the solver-2d Huasco rasters. Output in
+      `figures/out/`.
+- [ ] Figures still to draft: Fig 1 (scheme schematic), Fig 2
+      (verification panel — adapt review Stoker/MacDonald + Thacker),
+      Fig 3 (UK EA T6 depth from `report_depth_snapshot`).
 - [ ] Tighten abstract + Plain Language Summary.
 - [ ] `/verify-refs` once bib complete.
 - [ ] `/tex-review` reasoning audit.
