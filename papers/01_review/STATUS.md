@@ -62,9 +62,11 @@ AWR target of the review draft no longer fits a methods paper.)
       composite (land cover → Manning → depth uniform → depth variable
       → Δh), reuses the solver-2d Huasco rasters. Output in
       `figures/out/`.
-- [ ] Figures still to draft: Fig 1 (scheme schematic), Fig 2
-      (verification panel — adapt review Stoker/MacDonald + Thacker),
-      Fig 3 (UK EA T6 depth from `report_depth_snapshot`).
+- [x] Fig 2 (verification) — `figures/R/fig02_verification.R`, 3-panel
+      Stoker + MacDonald + Thacker (sim vs analytical). Data from the
+      `gen_verification_data` solver-2d example → `figures/data/`.
+- [ ] Figures still to draft: Fig 1 (scheme schematic), Fig 3 (UK EA
+      T6 depth from `report_depth_snapshot`).
 - [ ] Tighten abstract + Plain Language Summary.
 - [ ] `/verify-refs` once bib complete.
 - [ ] `/tex-review` reasoning audit.
