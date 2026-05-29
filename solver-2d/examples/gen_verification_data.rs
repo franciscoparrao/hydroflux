@@ -174,6 +174,86 @@ fn gen_thacker(out: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+// --- UK EA Test 6: urban dam-break through a building array --------
+
+/// Building footprints (x_min, x_max, y_min, y_max) in metres, matching
+/// the integration test `uk_ea_test6_urban_dam_break.rs`.
+const BUILDINGS: [(f64, f64, f64, f64); 6] = [
+    (150.0, 170.0, 20.0, 40.0),
+    (150.0, 170.0, 60.0, 80.0),
+    (200.0, 220.0, 40.0, 60.0),
+    (250.0, 270.0, 20.0, 40.0),
+    (250.0, 270.0, 60.0, 80.0),
+    (320.0, 360.0, 35.0, 65.0),
+];
+
+fn inside_building(x: f64, y: f64) -> bool {
+    BUILDINGS
+        .iter()
+        .any(|&(xa, xb, ya, yb)| x >= xa && x <= xb && y >= ya && y <= yb)
+}
+
+fn gen_uk_ea_t6(out: &Path) -> std::io::Result<()> {
+    let (length_x, length_y) = (500.0_f64, 100.0_f64);
+    let (building_h, h_up, x_dam, manning, t_end) =
+        (5.0_f64, 2.0_f64, 100.0_f64, 0.03_f64, 30.0_f64);
+    // 250×50 (dx = dy = 2 m): same resolution as the mass-balance
+    // assert test; finer 500×100 would 4× the wall time for no visual
+    // gain at figure scale.
+    let (n_x, n_y) = (250usize, 50usize);
+    let dx = length_x / n_x as f64;
+    let dy = length_y / n_y as f64;
+
+    let bed = Array2::from_shape_fn((n_y, n_x), |(i, j)| {
+        let x = (j as f64 + 0.5) * dx;
+        let y = (i as f64 + 0.5) * dy;
+        if inside_building(x, y) { building_h } else { 0.0 }
+    });
+    let mesh = Mesh2D::new(bed.clone(), dx, dy, manning);
+
+    let mut states = Array2::from_shape_fn((n_y, n_x), |(i, j)| {
+        let x = (j as f64 + 0.5) * dx;
+        let y = (i as f64 + 0.5) * dy;
+        if inside_building(x, y) {
+            Conserved2D::DRY
+        } else if x < x_dam {
+            Conserved2D::new(h_up, 0.0, 0.0)
+        } else {
+            Conserved2D::DRY
+        }
+    });
+    let bcs = Boundaries2D {
+        west: Boundary::Wall,
+        east: Boundary::Transmissive,
+        north: Boundary::Wall,
+        south: Boundary::Wall,
+    };
+
+    let mut t = 0.0;
+    while t < t_end {
+        let dt = cfl_time_step(&states, &mesh, 0.4).min(t_end - t);
+        ssprk2_step(&mut states, &mesh, bcs, dt);
+        manning_friction_step(&mut states, &mesh, dt, 1.0e-9);
+        t += dt;
+    }
+
+    // Grid CSV in the solver's own coordinates (x = (j+0.5)·dx,
+    // y = (i+0.5)·dy). `is_building` flags raised-bed cells for the
+    // overlay; `h` is the depth (0 on dry / building cells).
+    let mut f = File::create(out)?;
+    writeln!(f, "x,y,h,is_building")?;
+    for i in 0..n_y {
+        for j in 0..n_x {
+            let x = (j as f64 + 0.5) * dx;
+            let y = (i as f64 + 0.5) * dy;
+            let h = states[(i, j)].h;
+            let b = if bed[(i, j)] > 0.5 { 1 } else { 0 };
+            writeln!(f, "{x:.3},{y:.3},{h:.5},{b}")?;
+        }
+    }
+    Ok(())
+}
+
 fn main() {
     fs::create_dir_all(OUT_DIR).expect("create data dir");
     let dir = Path::new(OUT_DIR);
@@ -183,5 +263,7 @@ fn main() {
     println!("wrote verif_macdonald.csv");
     gen_thacker(&dir.join("verif_thacker.csv")).expect("thacker");
     println!("wrote verif_thacker.csv");
+    gen_uk_ea_t6(&dir.join("verif_uk_ea_t6.csv")).expect("uk_ea_t6");
+    println!("wrote verif_uk_ea_t6.csv");
     println!("Verification profiles written to {OUT_DIR}/");
 }
