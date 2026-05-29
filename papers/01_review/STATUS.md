@@ -87,8 +87,18 @@ AWR target of the review draft no longer fits a methods paper.)
 - [x] `/verify-refs` on new entries (2026-05-29): 5 verified, Chow
       reprint-edition note, ParraPaper02 in-prep; 3 hallucinations
       caught + removed (see finding above).
+- [x] `/tex-review` reasoning audit (2026-05-29): 7-dimension pass.
+      Applied textual fixes — MacDonald reframed (degenerate
+      uniform-flow limit, not "non-trivial inverse-designed"; reported
+      at measured ~0.03 %); mass-2e-5 scoped to closed-domain Thacker;
+      "25 % more water" given one-day/sensitivity caveat; "halves" →
+      "−38 % (1.6×)"; Castro–Parés "conjecture" reattributed; UK EA
+      mass claim scoped to open boundaries. Two non-textual gaps left
+      for the user: (a) mesh-refinement convergence study, (b) a
+      head-to-head vs an existing solver (HEC-RAS/ANUGA).
+- [ ] Convergence study (mesh refinement, L² vs Δx) — reviewer-likely.
+- [ ] Optional: head-to-head vs HEC-RAS / ANUGA on a shared benchmark.
 - [ ] Tighten abstract + Plain Language Summary.
-- [ ] `/tex-review` reasoning audit.
 - [ ] Reframe cover letter to C&G/GMD.
 - [ ] Pandoc → LaTeX freeze.
 

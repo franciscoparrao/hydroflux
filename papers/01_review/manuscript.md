@@ -35,21 +35,25 @@ hierarchy of references: lake-at-rest on smooth and bumpy beds
 (preserved to machine precision, `‖η − η₀‖∞ ≈ 3·10⁻¹⁶`), the Thacker
 oscillating paraboloid (relative L² error 0.068 %, mass conserved to
 2·10⁻⁵), the Stoker/Ritter dam-break (L¹ error 1.0 %), a radial
-dam-break (axisymmetry preserved), MacDonald inverse-designed steady
-flow, and the six UK Environment Agency 2D benchmark tests. We then
+dam-break (axisymmetry preserved), steady Manning uniform flow (a
+MacDonald-family bed-slope/friction balance), and the six UK
+Environment Agency 2D benchmark tests. We then
 apply the solver to the Río Huasco at Santa Juana — a semiarid Andean
 reach with a 92-year DGA record — simulating the 2017 Aluvión Atacama
 event on a 30 m DEM, and demonstrate a land-cover-derived spatially
-variable Manning field from ESA WorldCover. The solver, its test
-suite, and the application scripts are released open-source as the
-verified 2D foundation of a multi-year programme toward differentiable,
-GPU-native, coupled hydrometeorological hazard simulation.
+variable Manning field from ESA WorldCover. As a sensitivity
+demonstration (not a calibrated hindcast), the variable field retains
+~25 % more water in the reach over a one-day peak than a uniform value.
+The solver, its test suite, and the application scripts are released
+open-source as the verified 2D foundation of a multi-year programme
+toward differentiable, GPU-native, coupled hydrometeorological hazard
+simulation.
 
 # Key Points
 
 1. A 2D shallow-water finite-volume solver written generic over the numeric type evaluates the identical code in `f64` and in forward-mode dual numbers, making the entire forward model differentiable by construction without a separate adjoint implementation.
-2. The well-balanced HLLC/Audusse scheme preserves lake-at-rest to machine precision on arbitrary beds and passes a hierarchy of analytical (Thacker, Stoker, MacDonald) and community (UK EA ×6) benchmarks, with mass conserved to `2·10⁻⁵` on a moving wet/dry front.
-3. Applied to the 2017 Aluvión Atacama event on the Río Huasco, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field in which riparian vegetation (`n ≈ 0.10`) retains 25 % more water in the reach than a single calibrated value.
+2. The well-balanced HLLC/Audusse scheme preserves lake-at-rest to machine precision on arbitrary beds and passes a hierarchy of analytical (Thacker, Stoker, MacDonald) and community (UK EA ×6) benchmarks, conserving mass to `2·10⁻⁵` on the closed-domain Thacker oscillation, whose wet/dry shoreline moves continuously.
+3. Applied to the 2017 Aluvión Atacama event on the Río Huasco, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field; in a one-day-peak sensitivity demonstration (not a validated hindcast) the riparian vegetation it places in the channel (`n ≈ 0.10`) retains ~25 % more water in the reach than a single uniform value.
 
 # Plain Language Summary
 
@@ -169,7 +173,8 @@ linearly to the face midpoint following Liang & Marche [@LiangMarche2009],
 which moves the bed-slope source from the face flux into a cell-centred
 algebraic term `S = (g/2)(h²_{R,\\text{face}} − h²_{L,\\text{face}})/\\Delta x`
 that cancels the pressure-flux divergence exactly at rest (the
-C-property; verified to machine precision in §3.1).
+C-property — exact preservation of a flat free surface over an
+arbitrary bed; verified to machine precision in §3.1).
 
 ## 2.3 Second-order reconstruction and time integration
 
@@ -235,8 +240,9 @@ adjacent cells dry return zero flux without evaluating the HLLC or
 the MUSCL reconstruction (the dry–dry flux is identically zero, not
 merely small, so the skip is exact), and strictly-interior cells with
 all four neighbours dry skip the cell update. On the Huasco application
-(§4), where ~97 % of cells are dry, this halves the wall time (1.6×
-speed-up) with bit-identical results. The solver is `#![forbid(unsafe_code)]`.
+(§4), where ~97 % of cells are dry, this cuts the wall time by ~38 %
+(a 1.6× speed-up) with bit-identical results. The solver is
+`#![forbid(unsafe_code)]`.
 
 # 3. Verification
 
@@ -257,7 +263,7 @@ the `report_*` informational tests.
 | Stoker/Ritter dam-break | analytical transient | 400×3 | L¹ on `h` | 1.0 % |
 | Stoker/Ritter dam-break | analytical transient | 400×3 | L∞ on `h` | 2.2 % |
 | Radial dam-break | symmetry | 160×160 | axisymmetry | preserved |
-| MacDonald uniform flow | inverse-designed steady | — | steady-state `h` | < 2 % |
+| MacDonald uniform flow | steady, well-balanced | — | steady-state `h` | ~0.03 % (guard 2 %) |
 | UK EA Tests 1–6 | community suite | various | qualitative + mass | pass |
 
 ## 3.1 Well-balancedness (lake-at-rest)
@@ -268,10 +274,10 @@ scheme preserves `η = h + z_b` and zero momentum to machine precision
 (`‖η − η₀‖∞ ≈ 3·10⁻¹⁶`, `‖q‖∞ ≈ 2·10⁻¹⁵` after 60 s). The
 cell-centred algebraic bed-slope source of §2.2 is bit-exact for *any*
 bed shape — including smooth curved beds — provided every cell stays
-wet, disproving an earlier conjecture that smooth beds required a
-Castro–Parés path-conservative correction. The cancellation is
-self-consistent in the face beds `z_face`, not in the underlying bed
-function.
+wet, correcting an earlier working assumption in our own development
+that smooth curved beds would require a Castro–Parés path-conservative
+treatment. The cancellation is self-consistent in the face beds
+`z_face`, not in the underlying bed function.
 
 ## 3.2 Thacker oscillating paraboloid
 
@@ -293,14 +299,20 @@ The forward-Euler integrator gives a comparable L¹ (1.1 %) and a
 slightly larger front lag (3.2 m), confirming that the spatial scheme,
 not the time integrator, dominates the error budget.
 
-## 3.4 MacDonald inverse-designed steady flow
+## 3.4 Steady Manning uniform flow (MacDonald-family balance)
 
-MacDonald's method [@MacDonald1997] prescribes a steady depth profile
-and inverts the SW equations for the bed that sustains it under a given
-Manning `n` and discharge, yielding an exact non-trivial steady state.
-The solver preserves the prescribed uniform-flow profile to within 2 %
-— a 45× improvement over a `(η, hu, hv)`-momentum reconstruction, which
-motivated the primitive `(η, u, v)` choice of §2.3.
+We use the degenerate limit of the MacDonald inverse-design family
+[@MacDonald1997]: steady Manning uniform flow at constant normal depth
+`h_n` on a uniformly sloped bed, where the bed-slope gravity term is
+balanced exactly by Manning friction. The target profile is flat, but
+the test is non-trivial in what it exercises simultaneously — the
+well-balanced bed-slope source, the point-implicit friction step, and
+the Discharge (upstream) and Depth (downstream) boundary conditions —
+and it is the configuration on which momentum-vector reconstruction
+visibly fails. The solver holds the prescribed `h_n` to ~0.03 %
+(against a 2 % regression guard), a 45× improvement over a
+`(η, hu, hv)`-momentum reconstruction, which motivated the primitive
+`(η, u, v)` choice of §2.3.
 
 ## 3.5 Radial dam-break and isotropy
 
@@ -318,10 +330,11 @@ low-lying pond (Test 1), rainfall on a floodplain (Test 2), flow past
 an obstruction (Test 3), long-wave propagation in a valley (Test 4),
 valley flooding with multiple inflows (Test 5), and an urban dam-break
 through a building array (Test 6). The solver passes all six, with
-buildings remaining dry, mass tracked consistently with imposed
-inflow, and no spurious oscillations at the wet/dry fronts. Test 6 in
-particular exercises the wetting/drying and the cell-mask skip on a
-realistically heterogeneous domain.
+buildings remaining dry and no spurious oscillations at the wet/dry
+fronts (the strict mass-conservation figures are reported for the
+closed-domain tests in §3.1–§3.2; the UK EA cases use open inflow/
+outflow boundaries). Test 6 in particular exercises the wetting/drying
+and the cell-mask skip on a realistically heterogeneous domain.
 
 # 4. Application: the 2017 Aluvión Atacama on the Río Huasco
 
@@ -406,8 +419,9 @@ against a hierarchy of analytical (lake-at-rest, Thacker, Stoker,
 MacDonald) and community (UK EA ×6) benchmarks. It ingests standard
 public GIS products directly and, applied to the 2017 Aluvión Atacama
 event on the Río Huasco, demonstrates a land-cover-derived spatially
-variable Manning field that retains 25 % more water in the reach than a
-single calibrated roughness. The contribution is a verified, open
+variable Manning field that, in a one-day-peak sensitivity test (not a
+validated hindcast), retains ~25 % more water in the reach than a
+single uniform roughness. The contribution is a verified, open
 artifact — the differentiable-by-design 2D foundation of a multi-year
 programme toward coupled, GPU-native, continental-scale hazard
 simulation — released for the community to build on.
@@ -524,7 +538,7 @@ Feng2022, Tsai2021] plus the verified JAX-Fluids and SynxFlow.)*
    data-backed by the solver-2d test suite + this session's Huasco runs.
 2. Verification numbers in Table 1 / §3 are REAL (from the solver-2d
    `report_*` tests, run 2026-05-28): lake-at-rest 3e-16, Thacker L²
-   0.068 % / mass 2.15e-5, Stoker L¹ 1.0 %, MacDonald < 2 %, radial
+   0.068 % / mass 2.15e-5, Stoker L¹ 1.0 %, MacDonald ~0.03 % (guard 2 %), radial
    axisymmetric, UK EA ×6 pass.
 3. Application numbers (§4.3) are REAL (huasco_2d_event vs
    huasco_2d_event_landcover, 1-day Atacama peak): Δh_mean +0.22 m,
@@ -542,4 +556,15 @@ Feng2022, Tsai2021] plus the verified JAX-Fluids and SynxFlow.)*
    to C&G/GMD methods.
 7. Abstract + Plain Language Summary are first drafts; tighten before
    submission.
-8. `/tex-review` + `/verify-refs` once the bib is complete.
+8. `/verify-refs` ✅ done (2026-05-29; 3 hallucinated refs removed).
+   `/tex-review` ✅ done (2026-05-29): applied textual fixes — MacDonald
+   reframed as the degenerate uniform-flow limit (was overclaimed as
+   "non-trivial inverse-designed"); mass-2e-5 claim scoped to the
+   closed-domain Thacker; "25 % more water" given a one-day/sensitivity
+   caveat in abstract + Key Point 3 + §6; MacDonald reported at the
+   measured ~0.03 % (guard 2 %); "halves" → "−38 % (1.6×)";
+   Castro–Parés "conjecture" reattributed to an internal working
+   assumption; UK EA mass claim scoped to open-boundary caveat.
+   PENDING (need new experiments, not textual): a mesh-refinement
+   convergence study (reviewer-likely) and a head-to-head against an
+   existing solver (HEC-RAS / ANUGA) on a shared benchmark.
