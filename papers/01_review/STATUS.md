@@ -68,9 +68,9 @@ AWR target of the review draft no longer fits a methods paper.)
 - [x] Fig 3 (UK EA Test 6) — `figures/R/fig03_uk_ea_t6.R`, urban
       dam-break depth field + building footprints. Same example writes
       `verif_uk_ea_t6.csv`.
-- [ ] Figures still to draft: Fig 1 (scheme schematic — HLLC + Audusse
-      reconstruction + cell-centred source diagram; Inkscape/tikz, not
-      data-driven).
+- [x] Fig 1 (scheme schematic) — `figures/R/fig01_scheme.R`, to-scale
+      ggplot2 diagram of the Audusse reconstruction + HLLC flux +
+      cell-centred source at an x-face. ALL FOUR figures now done.
 - [ ] Tighten abstract + Plain Language Summary.
 - [ ] `/verify-refs` once bib complete.
 - [ ] `/tex-review` reasoning audit.
