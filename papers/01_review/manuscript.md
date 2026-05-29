@@ -15,12 +15,13 @@ keywords: [shallow water equations, finite volume, well-balanced,
 *(~250 words — draft)*
 
 Two-dimensional shallow-water solvers underpin operational flood
-hazard mapping, yet the open-source landscape remains split between
+hazard mapping, yet the open-source landscape remains dominated by
 legacy-language production kernels (FORTRAN, C++) with no ergonomic
-path to automatic differentiation and a recent generation of
-differentiable solvers (Hydrograd.jl, AegirJAX) that have not yet
-been hardened against the full community benchmark suite on real,
-data-sparse basins. We present *hydroflux*, a 2D shallow-water
+path to automatic differentiation, even as differentiable modelling
+becomes a unifying inverse-problem framework across the geosciences.
+A 2D flood solver that is differentiable by construction, GPU-targeted,
+and verified on the standard community benchmark suite with a real
+data-sparse application remains comparatively under-served. We present *hydroflux*, a 2D shallow-water
 finite-volume solver written in Rust and generic over the numeric
 type, so that the identical code path evaluates in `f64` for
 production and in forward-mode dual numbers for gradient extraction.
@@ -89,29 +90,32 @@ choice is not incidental: it places automatic differentiation (AD),
 now a first-class capability in scientific computing, behind a
 substantial re-engineering cost.
 
-The last two years have seen the first SW solvers built deliberately
-around differentiability. Hydrograd.jl [@Liu2025TODO] implements 2D
-shallow water in Julia with reverse-mode AD (Zygote/Enzyme) and
-demonstrates gradient-based bathymetry inversion; AegirJAX
-[@Lin2025TODO] implements non-hydrostatic SW in JAX with applications
-to topology optimisation and neural-network closures; SynxFlow
-[@Xia2024TODO] is a CUDA/C++/Python multi-hazard simulator coupling
-flood, landslide, and debris flow; r.avaflow v4 [@Mergili2025TODO]
-and JAX-Fluids 2.0 [@Bezgin2025TODO] round out the differentiable and
-multi-hazard frontier. The paradigm these works share is clear: the
-*forward solver* becomes differentiable, and inverse problems —
+Differentiable modelling has emerged over the last few years as a
+unifying inverse-problem framework across the geosciences
+[@Shen2023], with hydrology an early adopter: differentiable,
+learnable process-based models now approach state-of-the-art
+streamflow accuracy [@Feng2022] and the "calibration to parameter
+learning" shift harnesses big-data scaling in distributed geoscientific
+models [@Tsai2021]. In the fluid-dynamics core, JAX-Fluids
+[@Bezgin2023] demonstrates a fully-differentiable high-order CFD solver
+in JAX, and on the multi-hazard side SynxFlow [@Xia2025] couples flood,
+landslide, and debris flow in a single GPU-accelerated engine. The
+paradigm these works share is clear: the *forward solver* becomes
+differentiable (or GPU-native, or both), and inverse problems —
 parameter estimation, bathymetry inversion, learned closures — inherit
-efficient gradients.
+efficient gradients. What remains comparatively under-served is a 2D
+shallow-water flood solver that is differentiable *by construction*,
+GPU-targeted, and verified on the standard community benchmark suite
+with a real data-sparse application — the niche this paper occupies.
 
 This paper does not claim to open that frontier; it claims to
 **deliver and verify** a solver positioned within it, with two
-specific design commitments that the existing differentiable solvers
-make differently or not at all. First, *differentiability by numeric
-genericity*: rather than relying on a host language's tracing AD
-(Julia's Zygote, JAX's tracing), hydroflux is generic over a `Real`
-trait, so the identical source compiles to `f64` for production and
-to a forward-mode `Dual` type for gradient extraction, with no tracer
-overhead and no separate adjoint code to maintain. Second, *GIS-native
+specific design commitments. First, *differentiability by numeric
+genericity*: rather than relying on a host language's tracing-based
+AD (as in JAX or PyTorch/Julia toolchains), hydroflux is generic over
+a `Real` trait, so the identical source compiles to `f64` for
+production and to a forward-mode `Dual` type for gradient extraction,
+with no tracer overhead and no separate adjoint code to maintain. Second, *GIS-native
 verification on data-sparse basins*: the solver ingests DEM and
 land-cover GeoTIFFs directly and is exercised against the full UK
 Environment Agency 2D benchmark suite [@NeelzPender2013] plus analytical
@@ -161,7 +165,7 @@ $$h^*_L = \\max(h_L + z_L - z_{\\max}, 0), \\quad h^*_R = \\max(h_R + z_R - z_{\
 with `z_max = max(z_L, z_R)` feed the HLLC flux, and the
 hydrostatic-pressure correction `(g/2)(h² − h*²)` is added to the
 face-normal momentum component on each side. The bed is reconstructed
-linearly to the face midpoint following Liang & Marche [@LiangMarche2009TODO],
+linearly to the face midpoint following Liang & Marche [@LiangMarche2009],
 which moves the bed-slope source from the face flux into a cell-centred
 algebraic term `S = (g/2)(h²_{R,\\text{face}} − h²_{L,\\text{face}})/\\Delta x`
 that cancels the pressure-flux divergence exactly at rest (the
@@ -221,7 +225,7 @@ implementations are used: `f64` for production, and a forward-mode
 operation. The derivative of any output with respect to a single seed
 input is recovered as `result.dval` after one forward pass; the same
 mechanism calibrates Manning and cross-section parameters in the 1D
-companion line [@ParraPaper02TODO]. Reverse-mode AD, required when the
+companion line [@ParraPaper02]. Reverse-mode AD, required when the
 parameter count grows beyond ~10 (e.g. a per-cell roughness field), is
 identified as future work (§5).
 
@@ -337,8 +341,8 @@ are warm-started at the Manning normal depth for the day-1 discharge.
 ## 4.2 Spatially variable Manning from land cover
 
 The solver ingests an ESA WorldCover 2021 land-cover raster
-[@ESAWorldCover2021TODO] resampled to the DEM grid and maps each class
-to a Manning coefficient through a published lookup (Chow [@Chow1959TODO]
+[@ESAWorldCover2021] resampled to the DEM grid and maps each class
+to a Manning coefficient through a published lookup (Chow [@Chow1959]
 and compilations therein): bare/sparse ground (66 % of the domain,
 `n = 0.025`), grassland (14 %, `n = 0.040`), tree cover (8 %,
 `n = 0.100`), and shrubland (8 %, `n = 0.060`), among minor classes.
@@ -386,7 +390,7 @@ differentiation*, required to calibrate spatially distributed fields
 (per-cell roughness, bathymetry corrections) whose parameter count
 exceeds the forward-mode break-even. The 1D companion line already
 demonstrates forward-mode calibration of Manning and cross-section
-parameters against real gauge data [@ParraPaper02TODO]; the n–shape and
+parameters against real gauge data [@ParraPaper02]; the n–shape and
 n–bathymetry confounds it identifies motivate the spatially distributed
 observations (remote-sensing inundation extent, distributed stage) that
 the 2D solver is designed to assimilate. The terminal goal is
@@ -487,7 +491,7 @@ cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover -
 DGA streamflow data are public via the CR2 archive
 (<https://www.cr2.cl/>). The DEM is SRTM 30 m (USGS) pit-filled with
 the SurtGIS pipeline [@SurtgisRef]; the land cover is ESA WorldCover
-2021 v200 [@ESAWorldCover2021TODO].
+2021 v200 [@ESAWorldCover2021].
 
 # Acknowledgements
 
@@ -498,11 +502,16 @@ pipeline.
 
 # References
 
-*(BibTeX in ../../references.bib; keys marked TODO need adding via
-/verify-refs before submission: LiangMarche2009, Thacker1981, Chow1959,
-ESAWorldCover2021, Liu2025 Hydrograd, Lin2025 AegirJAX, Xia2024 SynxFlow,
-Mergili2025 r.avaflow v4, Bezgin2025 JAX-Fluids 2.0, ParraPaper02 the
-1D companion methods paper.)*
+*(BibTeX in ../../references.bib. Added + verified 2026-05-29 via
+verify-refs/CrossRef: LiangMarche2009, Thacker1981, Chow1959 (book),
+Xia2025 (SynxFlow), Bezgin2023 (JAX-Fluids), ParraPaper02 (companion,
+in prep). ESAWorldCover2021 has a Zenodo/DataCite DOI not indexed in
+CrossRef — verify against Zenodo before submit. NB: "Hydrograd.jl",
+"AegirJAX", "r.avaflow v4 (2025)", and "JAX-Fluids 2.0" — cited in
+the earlier dormant review draft — could NOT be found in OpenAlex
+(2026-05-29) and were removed as likely fabrications; the §1 framing
+now rests on verified differentiable-modelling references [Shen2023,
+Feng2022, Tsai2021] plus the verified JAX-Fluids and SynxFlow.)*
 
 ---
 

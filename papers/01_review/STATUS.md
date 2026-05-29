@@ -54,10 +54,23 @@ AWR target of the review draft no longer fits a methods paper.)
 
 ## Pending before submission
 
-- [ ] Add missing bib keys: LiangMarche2009, Thacker1981, Chow1959,
-      ESAWorldCover2021, Liu2025 (Hydrograd), Lin2025 (AegirJAX),
-      Xia2024 (SynxFlow), Mergili2025 (r.avaflow v4), Bezgin2025
-      (JAX-Fluids 2.0), ParraPaper02 (1D companion).
+- [x] Bib keys added + verified (2026-05-29, verify-refs/CrossRef):
+      LiangMarche2009 ✓, Thacker1981 ✓, Chow1959 (book, canonical
+      1959; API matches a 2006 reprint), Xia2025 SynxFlow ✓,
+      Bezgin2023 JAX-Fluids ✓, ESAWorldCover2021 (Zenodo DOI),
+      ParraPaper02 (@unpublished companion, correctly not in any DB).
+- [!] **HALLUCINATION FINDING (2026-05-29).** Three references cited
+      in the *dormant review draft* could NOT be found in OpenAlex
+      under any query: **Hydrograd.jl** (claimed Liu et al., WRR 2025),
+      **AegirJAX** (claimed 2025), and **r.avaflow v4 / JAX-Fluids 2.0**
+      (2025 versions). Only JAX-Fluids 1.0 (Bezgin 2023) and SynxFlow
+      (Xia 2025) are real. These were almost certainly fabricated by a
+      prior WebSearch session — and they were part of the May
+      dormancy rationale. The methods-paper §1 + abstract were
+      rewritten to drop them and rest on verified differentiable-
+      modelling refs (Shen2023, Feng2022, Tsai2021) + the verified
+      JAX-Fluids + SynxFlow. If real arXiv preprints for Hydrograd /
+      AegirJAX exist, re-add them; otherwise the framing stands as is.
 - [x] Fig 4 (Huasco) — `figures/R/fig04_huasco_application.R`, 5-panel
       composite (land cover → Manning → depth uniform → depth variable
       → Δh), reuses the solver-2d Huasco rasters. Output in
@@ -71,8 +84,10 @@ AWR target of the review draft no longer fits a methods paper.)
 - [x] Fig 1 (scheme schematic) — `figures/R/fig01_scheme.R`, to-scale
       ggplot2 diagram of the Audusse reconstruction + HLLC flux +
       cell-centred source at an x-face. ALL FOUR figures now done.
+- [x] `/verify-refs` on new entries (2026-05-29): 5 verified, Chow
+      reprint-edition note, ParraPaper02 in-prep; 3 hallucinations
+      caught + removed (see finding above).
 - [ ] Tighten abstract + Plain Language Summary.
-- [ ] `/verify-refs` once bib complete.
 - [ ] `/tex-review` reasoning audit.
 - [ ] Reframe cover letter to C&G/GMD.
 - [ ] Pandoc → LaTeX freeze.

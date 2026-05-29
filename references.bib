@@ -498,3 +498,99 @@
              Piñero-Feliciangeli, Laura (no Lorena); Poblete, Fernando
              (no Felipe).}
 }
+
+% =============================================================================
+% N. ADICIONES — methods paper 2D solver (Paper 01 reactivado 2026-05-28)
+% Verificadas con verify-refs/CrossRef 2026-05-29 salvo nota.
+% =============================================================================
+
+@article{LiangMarche2009,
+  author  = {Liang, Qiuhua and Marche, Fabien},
+  title   = {Numerical resolution of well-balanced shallow water equations with
+             complex source terms},
+  journal = {Advances in Water Resources},
+  volume  = {32},
+  number  = {6},
+  pages   = {873--884},
+  year    = {2009},
+  doi     = {10.1016/j.advwatres.2009.02.010},
+  note    = {Flux rescaling para wetting/drying + well-balanced source con bed
+             reconstruction. Core del esquema solver-2d (§2.2). DOI verificado
+             CrossRef 2026-05-29.}
+}
+
+@article{Thacker1981,
+  author  = {Thacker, William Carlisle},
+  title   = {Some exact solutions to the nonlinear shallow-water wave equations},
+  journal = {Journal of Fluid Mechanics},
+  volume  = {107},
+  pages   = {499--508},
+  year    = {1981},
+  doi     = {10.1017/S0022112081001882},
+  note    = {Soluciones analíticas 2D (planar oscillation en paraboloid).
+             Benchmark §3.2. DOI verificado CrossRef 2026-05-29.}
+}
+
+@book{Chow1959,
+  author    = {Chow, Ven Te},
+  title     = {Open-Channel Hydraulics},
+  publisher = {McGraw-Hill},
+  address   = {New York},
+  year      = {1959},
+  note      = {Tablas de Manning n por tipo de canal/cobertura. Referencia
+               clásica universal; sin DOI (libro 1959). Usado para el lookup
+               landcover→n (§4.2). verify-refs (2026-05-29) matchea una
+               reedición 2006 (DOI 10.1016/b978-0-7506-6857-6.x5000-0); se
+               mantiene la cita canónica al original 1959.}
+}
+
+@article{Xia2025,
+  author  = {Xia, Xilin and Ming, Xiaodong},
+  title   = {{SynxFlow}: A {GPU}-accelerated {Python} package for multi-hazard
+             simulations},
+  journal = {Journal of Open Source Software},
+  volume  = {10},
+  number  = {110},
+  pages   = {7586},
+  year    = {2025},
+  doi     = {10.21105/joss.07586},
+  note    = {Simulador multi-hazard GPU (flood + landslide + debris flow).
+             DOI verificado CrossRef 2026-05-29. Reemplaza la clave provisional
+             Xia2024.}
+}
+
+@article{Bezgin2023,
+  author  = {Bezgin, Deniz A. and Buhendwa, Aaron B. and Adams, Nikolaus A.},
+  title   = {{JAX-Fluids}: A fully-differentiable high-order computational fluid
+             dynamics solver for compressible two-phase flows},
+  journal = {Computer Physics Communications},
+  volume  = {282},
+  pages   = {108527},
+  year    = {2023},
+  doi     = {10.1016/j.cpc.2022.108527},
+  note    = {Differentiable CFD en JAX. DOI verificado CrossRef 2026-05-29
+             (año de publicación 2023, online-first 2022). NB: una "JAX-Fluids
+             2.0 (2025)" NO se encontró en OpenAlex; sólo existe esta versión.}
+}
+
+@misc{ESAWorldCover2021,
+  author       = {Zanaga, Daniele and Van De Kerchove, Ruben and Daems, Dirk
+                  and others},
+  title        = {{ESA WorldCover} 10 m 2021 v200},
+  year         = {2022},
+  publisher    = {Zenodo},
+  doi          = {10.5281/zenodo.7254221},
+  note         = {Producto landcover global 10 m (11 clases). Fuente del campo
+                  Manning n(x,y) en §4.2. DOI Zenodo/DataCite (NO indexado en
+                  CrossRef); verificar contra Zenodo antes de submit.}
+}
+
+@unpublished{ParraPaper02,
+  author = {Parra Olea, Francisco},
+  title  = {Differentiable hydraulic geometry: bridging the cross-event
+            generalisation gap in 1D shallow-water flood routing},
+  note   = {Companion 1D differentiable-calibration paper (in preparation,
+            hydroflux line). Cross-reference; actualizar a cita formal cuando
+            esté submitted/published.},
+  year   = {2026}
+}
