@@ -100,7 +100,11 @@ AWR target of the review draft no longer fits a methods paper.)
       32²→256², orders L1 1.81 / L2 1.68 (front-limited, expected
       for SSP-RK2 + MUSCL with moving wet/dry shoreline). §3.7 +
       Table 2 + Fig 5 + `gen_convergence` example.
-- [ ] Optional: head-to-head vs HEC-RAS / ANUGA on a shared benchmark.
+- [x] Head-to-head vs ANUGA on Stoker dam-break (2026-05-30): matched
+      Δx = 1 m, both reproduce Ritter analytical; L1 4.1 % hydroflux
+      vs 2.6 % ANUGA, same accuracy class, gap closes under
+      refinement (hydroflux 400-cell L1 1.0 %). §3.8 + Fig 6 +
+      `anuga_stoker_compare.py` + `gen_stoker_coarse`.
 - [ ] Tighten abstract + Plain Language Summary.
 - [ ] Reframe cover letter to C&G/GMD.
 - [ ] Pandoc → LaTeX freeze.
