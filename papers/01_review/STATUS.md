@@ -96,7 +96,10 @@ AWR target of the review draft no longer fits a methods paper.)
       mass claim scoped to open boundaries. Two non-textual gaps left
       for the user: (a) mesh-refinement convergence study, (b) a
       head-to-head vs an existing solver (HEC-RAS/ANUGA).
-- [ ] Convergence study (mesh refinement, L² vs Δx) — reviewer-likely.
+- [x] Mesh-refinement convergence study (2026-05-29): Thacker
+      32²→256², orders L1 1.81 / L2 1.68 (front-limited, expected
+      for SSP-RK2 + MUSCL with moving wet/dry shoreline). §3.7 +
+      Table 2 + Fig 5 + `gen_convergence` example.
 - [ ] Optional: head-to-head vs HEC-RAS / ANUGA on a shared benchmark.
 - [ ] Tighten abstract + Plain Language Summary.
 - [ ] Reframe cover letter to C&G/GMD.
