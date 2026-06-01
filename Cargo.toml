@@ -26,6 +26,8 @@ ndarray = "0.16"
 approx  = "0.5"
 thiserror = "2"
 tempfile = "3"
+# Internal workspace members exposed as deps to siblings.
+hydroflux-autograd = { path = "autograd" }
 # SurtGIS path dependency. Mientras seamos el único dev, path dep está bien.
 # Antes del primer release público (Q4 2026) migrar a git dep con tag fijo
 # para que terceros puedan compilar sin clonar surtgis manualmente.

@@ -4,12 +4,23 @@
 //! [`crate::update`] (Audusse hydrostatic reconstruction in 2D). This
 //! module covers the remaining cell-local sources:
 //!
-//! - [`manning_friction_step`]: semi-implicit Manning friction.
+//! - [`manning_friction_step`]: semi-implicit Manning friction
+//!   (generic over `T: Real` — propagates derivatives w.r.t. Manning n
+//!   and the state through the friction step).
 //! - [`apply_point_sources`]: point inflows (e.g. UK EA Test 1).
+//! - [`apply_rain`]: uniform rainfall on grid (e.g. UK EA Test 2).
+//!
+//! `apply_point_sources` and `apply_rain` operate on `f64` states only:
+//! they represent external forcings (boundary conditions in disguise)
+//! which the solver does not differentiate against. Calibration over
+//! a rainfall multiplier or a discharge boundary is a downstream
+//! concern handled at the caller side, not at the source-step level.
+
+use hydroflux_autograd::Real;
 
 use crate::GRAVITY;
-use crate::geometry::Mesh2D;
-use crate::state::Conserved2D;
+use crate::geometry::Mesh2DG;
+use crate::state::{Conserved2D, Conserved2DG};
 use ndarray::Array2;
 
 /// A point inflow source: adds water mass to a single cell at a
@@ -89,8 +100,9 @@ pub fn apply_rain(states: &mut Array2<Conserved2D>, rate: f64, dt: f64) {
     }
 }
 
-/// Semi-implicit Manning friction step in 2D. In-place point-implicit
-/// update applied independently in each cell:
+/// Semi-implicit Manning friction step in 2D, generic over the scalar
+/// type. In-place point-implicit update applied independently in each
+/// cell:
 ///
 /// ```text
 ///   |U|^n      = √((hu^n)² + (hv^n)²) / h^n
@@ -112,10 +124,12 @@ pub fn apply_rain(states: &mut Array2<Conserved2D>, rate: f64, dt: f64) {
 /// - Cells with `n = 0` (Manning field zero locally) are a no-op.
 ///
 /// The Manning roughness `n` is read per cell from `mesh.manning`;
-/// `dry_tol` is the wet/dry threshold in metres.
-pub fn manning_friction_step(
-    states: &mut Array2<Conserved2D>,
-    mesh: &Mesh2D,
+/// `dry_tol` is the wet/dry threshold in metres. The branch on
+/// dryness uses `.value()` so control flow stays scalar; the
+/// derivative propagates through whichever branch is taken.
+pub fn manning_friction_step<T: Real>(
+    states: &mut Array2<Conserved2DG<T>>,
+    mesh: &Mesh2DG<T>,
     dt: f64,
     dry_tol: f64,
 ) {
@@ -129,29 +143,33 @@ pub fn manning_friction_step(
     // Linear-zip iteration avoids the `Array2::[(i, j)]` indexing
     // overhead and lets the auto-vectoriser see two flat slices.
     // For uniform Manning fields this matches the original scalar
-    // loop's wall time (~1% diff); the per-cell branch only adds
-    // a memory read + the `n == 0.0` skip.
+    // loop's wall time (~1% diff for f64); generic dispatch adds no
+    // measurable overhead with `T = f64` (the monomorphic instance
+    // collapses to the original code) and ~2-3× for `T = Dual` from
+    // carrying the derivative pair.
     let dt_g = dt * GRAVITY;
     for (s, &n) in states.iter_mut().zip(mesh.manning.iter()) {
-        if s.h <= dry_tol {
+        if s.h.value() <= dry_tol {
             continue;
         }
-        if n == 0.0 {
+        if n.value() == 0.0 {
             continue;
         }
         // |U| = √(u² + v²) = √((hu)² + (hv)²) / h. Compute directly to
         // avoid two divisions in the hot path.
         let speed = (s.hu * s.hu + s.hv * s.hv).sqrt() / s.h;
-        let factor = 1.0 + dt_g * n * n * speed / s.h.powf(4.0 / 3.0);
-        s.hu /= factor;
-        s.hv /= factor;
+        let factor = n * n * speed / s.h.powf(4.0 / 3.0) * dt_g + 1.0;
+        s.hu = s.hu / factor;
+        s.hv = s.hv / factor;
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::Mesh2D;
     use approx::assert_relative_eq;
+    use hydroflux_autograd::Dual;
     use ndarray::array;
 
     /// Flat-bed mesh with uniform Manning matching `states.dim()` —
@@ -395,6 +413,63 @@ mod tests {
         for (b, a) in depths_before.iter().zip(depths_after.iter()) {
             assert_eq!(b, a);
         }
+    }
+
+    // ----- Generic-over-Real: differentiating through Manning friction. -----
+
+    #[test]
+    fn manning_step_with_dual_n_seed_ad_matches_finite_difference() {
+        // The wedge claim made concrete on the 2D solver: differentiate
+        // the post-friction x-momentum of a single cell w.r.t. Manning
+        // n, comparing the AD result against central finite differences
+        // on the f64 path. Single-cell, single-step problem keeps the
+        // setup trivial.
+        fn one_step<T: hydroflux_autograd::Real>(n_seed: T) -> T {
+            let h = T::from_f64(1.0);
+            let hu = T::from_f64(3.0);
+            let hv = T::from_f64(0.0);
+            let mut s = Array2::from_elem(
+                (1, 1),
+                Conserved2DG::<T>::new_generic(h, hu, hv),
+            );
+            let bed = Array2::<T>::from_elem((1, 1), T::zero());
+            let mesh = Mesh2DG::<T>::new(bed, 1.0, 1.0, n_seed);
+            manning_friction_step(&mut s, &mesh, 0.1, 1e-9);
+            s[(0, 0)].hu
+        }
+        let n_val = 0.04_f64;
+        let eps = 1e-5_f64;
+        let fd =
+            (one_step::<f64>(n_val + eps) - one_step::<f64>(n_val - eps)) / (2.0 * eps);
+        let ad = one_step::<Dual>(Dual::variable(n_val));
+        assert_relative_eq!(ad.dval, fd, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn manning_step_with_dual_h_seed_ad_matches_finite_difference() {
+        // Same locking but seeding depth h instead of n. Exercises the
+        // h^{4/3} branch and the (hu, hv) / h speed computation.
+        fn one_step<T: hydroflux_autograd::Real>(h_seed: T) -> T {
+            // Use h_seed × constant velocity so hu = h · u remains seeded.
+            let u = T::from_f64(2.0);
+            let v = T::from_f64(-1.0);
+            let hu = h_seed * u;
+            let hv = h_seed * v;
+            let mut s = Array2::from_elem(
+                (1, 1),
+                Conserved2DG::<T>::new_generic(h_seed, hu, hv),
+            );
+            let bed = Array2::<T>::from_elem((1, 1), T::zero());
+            let mesh = Mesh2DG::<T>::new(bed, 1.0, 1.0, T::from_f64(0.04));
+            manning_friction_step(&mut s, &mesh, 0.1, 1e-9);
+            s[(0, 0)].hu
+        }
+        let h_val = 1.5_f64;
+        let eps = 1e-5_f64;
+        let fd =
+            (one_step::<f64>(h_val + eps) - one_step::<f64>(h_val - eps)) / (2.0 * eps);
+        let ad = one_step::<Dual>(Dual::variable(h_val));
+        assert_relative_eq!(ad.dval, fd, epsilon = 1e-6);
     }
 
     // -----------------------------------------------------------------

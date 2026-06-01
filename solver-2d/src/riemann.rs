@@ -52,10 +52,20 @@
 //! with depth at or below the numerical noise floor — at this
 //! threshold the celerity `√(g·h)` falls below 10⁻⁴ m/s and the
 //! distinction between "dry" and "wet" wave speeds is meaningful.
+//!
+//! # Differentiability
+//!
+//! The solver is generic over a [`Real`] scalar so that the identical
+//! source compiles to `f64` for production and to `Dual` for
+//! forward-mode AD. Branching on wet/dry uses `.value()` (the scalar
+//! component of the dual), keeping control flow real-valued; the
+//! arithmetic on each branch propagates derivatives normally.
+
+use hydroflux_autograd::Real;
 
 use crate::GRAVITY;
-use crate::flux::{FluxX, FluxY};
-use crate::state::Conserved2D;
+use crate::flux::{FluxXG, FluxYG};
+use crate::state::Conserved2DG;
 
 /// Wet/dry threshold used internally by the Riemann solver to detect
 /// dry cells when picking wave-speed estimates. Tighter than the
@@ -67,12 +77,12 @@ const DRY_TOL: f64 = 1.0e-12;
 /// and right state `ur`. Mass and `x`-momentum (normal) flow are
 /// computed by HLLC; the `y`-momentum (tangential) flux advects with
 /// the contact wave.
-pub fn hllc_flux_x(ul: Conserved2D, ur: Conserved2D) -> FluxX {
+pub fn hllc_flux_x<T: Real>(ul: Conserved2DG<T>, ur: Conserved2DG<T>) -> FluxXG<T> {
     // x-face: normal direction is x, so normal momentum = hu and
     // tangential momentum = hv.
     let (mass, normal_mom, tangential_mom) =
         hllc_normal_flux(ul.h, ul.hu, ul.hv, ur.h, ur.hu, ur.hv);
-    FluxX {
+    FluxXG {
         mass,
         x_momentum: normal_mom,
         y_momentum: tangential_mom,
@@ -84,12 +94,12 @@ pub fn hllc_flux_x(ul: Conserved2D, ur: Conserved2D) -> FluxX {
 /// (higher row index). Mass and `y`-momentum (normal) flow are
 /// computed by HLLC; the `x`-momentum (tangential) flux advects with
 /// the contact wave.
-pub fn hllc_flux_y(ul: Conserved2D, ur: Conserved2D) -> FluxY {
+pub fn hllc_flux_y<T: Real>(ul: Conserved2DG<T>, ur: Conserved2DG<T>) -> FluxYG<T> {
     // y-face: normal direction is y, so normal momentum = hv and
     // tangential momentum = hu.
     let (mass, normal_mom, tangential_mom) =
         hllc_normal_flux(ul.h, ul.hv, ul.hu, ur.h, ur.hv, ur.hu);
-    FluxY {
+    FluxYG {
         mass,
         x_momentum: tangential_mom,
         y_momentum: normal_mom,
@@ -101,28 +111,28 @@ pub fn hllc_flux_y(ul: Conserved2D, ur: Conserved2D) -> FluxY {
 /// Inputs are decomposed into normal / tangential momentum components.
 /// Returns `(mass_flux, normal_momentum_flux, tangential_momentum_flux)`
 /// at the face.
-fn hllc_normal_flux(
-    h_l: f64,
-    qn_l: f64,
-    qt_l: f64,
-    h_r: f64,
-    qn_r: f64,
-    qt_r: f64,
-) -> (f64, f64, f64) {
-    let h_l_wet = h_l > DRY_TOL;
-    let h_r_wet = h_r > DRY_TOL;
+fn hllc_normal_flux<T: Real>(
+    h_l: T,
+    qn_l: T,
+    qt_l: T,
+    h_r: T,
+    qn_r: T,
+    qt_r: T,
+) -> (T, T, T) {
+    let h_l_wet = h_l.value() > DRY_TOL;
+    let h_r_wet = h_r.value() > DRY_TOL;
 
     // Both sides dry: no flux, no Riemann problem to solve.
     if !h_l_wet && !h_r_wet {
-        return (0.0, 0.0, 0.0);
+        return (T::zero(), T::zero(), T::zero());
     }
 
-    let cl = if h_l_wet { (GRAVITY * h_l).sqrt() } else { 0.0 };
-    let cr = if h_r_wet { (GRAVITY * h_r).sqrt() } else { 0.0 };
-    let un_l = if h_l_wet { qn_l / h_l } else { 0.0 };
-    let un_r = if h_r_wet { qn_r / h_r } else { 0.0 };
-    let ut_l = if h_l_wet { qt_l / h_l } else { 0.0 };
-    let ut_r = if h_r_wet { qt_r / h_r } else { 0.0 };
+    let cl = if h_l_wet { (h_l * GRAVITY).sqrt() } else { T::zero() };
+    let cr = if h_r_wet { (h_r * GRAVITY).sqrt() } else { T::zero() };
+    let un_l = if h_l_wet { qn_l / h_l } else { T::zero() };
+    let un_r = if h_r_wet { qn_r / h_r } else { T::zero() };
+    let ut_l = if h_l_wet { qt_l / h_l } else { T::zero() };
+    let ut_r = if h_r_wet { qt_r / h_r } else { T::zero() };
 
     // Wave-speed estimate. The Davis (1988) bound is correct for two
     // wet states; at a wet/dry interface the leading edge of the
@@ -131,38 +141,46 @@ fn hllc_normal_flux(
     // pattern to use the right estimate.
     let (sl, sr) = match (h_l_wet, h_r_wet) {
         (true, true) => ((un_l - cl).min(un_r - cr), (un_l + cl).max(un_r + cr)),
-        (false, true) => (un_r - 2.0 * cr, un_r + cr),
-        (true, false) => (un_l - cl, un_l + 2.0 * cl),
+        (false, true) => (un_r - cr * 2.0, un_r + cr),
+        (true, false) => (un_l - cl, un_l + cl * 2.0),
         (false, false) => unreachable!("handled by the both-dry early return above"),
     };
 
     // Physical fluxes in the normal direction. Tangential flux is
     // qn · u_t (advected by the normal velocity).
     let (fm_l, fn_l, ft_l) = if h_l_wet {
-        (qn_l, qn_l * un_l + 0.5 * GRAVITY * h_l * h_l, qn_l * ut_l)
+        (
+            qn_l,
+            qn_l * un_l + h_l * h_l * (0.5 * GRAVITY),
+            qn_l * ut_l,
+        )
     } else {
-        (0.0, 0.0, 0.0)
+        (T::zero(), T::zero(), T::zero())
     };
     let (fm_r, fn_r, ft_r) = if h_r_wet {
-        (qn_r, qn_r * un_r + 0.5 * GRAVITY * h_r * h_r, qn_r * ut_r)
+        (
+            qn_r,
+            qn_r * un_r + h_r * h_r * (0.5 * GRAVITY),
+            qn_r * ut_r,
+        )
     } else {
-        (0.0, 0.0, 0.0)
+        (T::zero(), T::zero(), T::zero())
     };
 
-    if sl >= 0.0 {
+    if sl.value() >= 0.0 {
         return (fm_l, fn_l, ft_l);
     }
-    if sr <= 0.0 {
+    if sr.value() <= 0.0 {
         return (fm_r, fn_r, ft_r);
     }
 
     // Contact wave speed s* (Toro §10.3). For wet-wet states with
     // sl < 0 < sr the denominator is bounded away from zero.
     let denom = h_r * (un_r - sr) - h_l * (un_l - sl);
-    let s_star = if denom.abs() > 1.0e-12 {
-        (sl * h_r * (un_r - sr) - sr * h_l * (un_l - sl)) / denom
+    let s_star = if denom.value().abs() > 1.0e-12 {
+        (h_r * (un_r - sr) * sl - h_l * (un_l - sl) * sr) / denom
     } else {
-        0.5 * (sl + sr)
+        (sl + sr) * 0.5
     };
 
     // Star-state depths.
@@ -170,17 +188,17 @@ fn hllc_normal_flux(
     let h_star_r = h_r * (sr - un_r) / (sr - s_star);
 
     // HLLC sampling at the face (xi = 0 in the similarity variable).
-    if s_star >= 0.0 {
+    if s_star.value() >= 0.0 {
         // In the F_L* region: F* = F_L + sL · (U_L* - U_L).
-        let mass = fm_l + sl * (h_star_l - h_l);
-        let normal = fn_l + sl * (h_star_l * s_star - qn_l);
+        let mass = fm_l + (h_star_l - h_l) * sl;
+        let normal = fn_l + (h_star_l * s_star - qn_l) * sl;
         // Tangential velocity advects through the contact: u_t* = u_t_L.
-        let tangential = ft_l + sl * (h_star_l * ut_l - qt_l);
+        let tangential = ft_l + (h_star_l * ut_l - qt_l) * sl;
         (mass, normal, tangential)
     } else {
-        let mass = fm_r + sr * (h_star_r - h_r);
-        let normal = fn_r + sr * (h_star_r * s_star - qn_r);
-        let tangential = ft_r + sr * (h_star_r * ut_r - qt_r);
+        let mass = fm_r + (h_star_r - h_r) * sr;
+        let normal = fn_r + (h_star_r * s_star - qn_r) * sr;
+        let tangential = ft_r + (h_star_r * ut_r - qt_r) * sr;
         (mass, normal, tangential)
     }
 }
@@ -188,7 +206,10 @@ fn hllc_normal_flux(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::flux::{FluxX, FluxXG, FluxY};
+    use crate::state::{Conserved2D, Conserved2DG};
     use approx::assert_relative_eq;
+    use hydroflux_autograd::Dual;
 
     #[test]
     fn x_consistency_identical_states() {
@@ -378,5 +399,89 @@ mod tests {
         assert_relative_eq!(f.mass, 0.0, epsilon = 1e-12);
         assert_relative_eq!(f.x_momentum, 0.5 * GRAVITY * h * h, epsilon = 1e-12);
         assert_relative_eq!(f.y_momentum, 0.0, epsilon = 1e-12);
+    }
+
+    // ----- Generic-over-Real instantiations: AD-ready HLLC. -----
+
+    #[test]
+    fn hllc_dual_value_matches_f64_on_same_inputs() {
+        // The wedge: identical numerical result regardless of T.
+        let ul_f = Conserved2D::new(2.0, 1.0, 0.5);
+        let ur_f = Conserved2D::new(0.7, 0.3, -0.2);
+        let ul_d = Conserved2DG::<Dual>::new_generic(
+            Dual::constant(2.0),
+            Dual::constant(1.0),
+            Dual::constant(0.5),
+        );
+        let ur_d = Conserved2DG::<Dual>::new_generic(
+            Dual::constant(0.7),
+            Dual::constant(0.3),
+            Dual::constant(-0.2),
+        );
+        let f = hllc_flux_x(ul_f, ur_f);
+        let d = hllc_flux_x(ul_d, ur_d);
+        assert_relative_eq!(f.mass, d.mass.val, epsilon = 1e-12);
+        assert_relative_eq!(f.x_momentum, d.x_momentum.val, epsilon = 1e-12);
+        assert_relative_eq!(f.y_momentum, d.y_momentum.val, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn hllc_ad_matches_central_finite_difference_on_h_l() {
+        // Seed h_L as the differentiated variable. Verify that the
+        // AD derivative of mass flux matches a central finite
+        // difference over a generic dam-break configuration where
+        // both states are wet (HLLC star region active).
+        fn run<T: hydroflux_autograd::Real>(h_l: T) -> T {
+            let ul = Conserved2DG::<T>::new_generic(h_l, T::zero(), T::zero());
+            let ur = Conserved2DG::<T>::new_generic(
+                T::from_f64(0.5),
+                T::zero(),
+                T::zero(),
+            );
+            hllc_flux_x(ul, ur).mass
+        }
+        let h_val = 2.0_f64;
+        let eps = 1e-5_f64;
+        let f_plus = run::<f64>(h_val + eps);
+        let f_minus = run::<f64>(h_val - eps);
+        let fd = (f_plus - f_minus) / (2.0 * eps);
+        let ad = run::<Dual>(Dual::variable(h_val));
+        // Relative match: 2nd-order central FD is O(eps²) accurate, AD
+        // is exact, so the gap is ~eps². With eps=1e-5 we expect ~1e-10
+        // relative; allow 1e-7 to be very safe against the quadratic
+        // truncation.
+        assert_relative_eq!(ad.dval, fd, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn hllc_ad_matches_fd_on_h_r_dry_bed_branch() {
+        // Same locking but with the right side wet and the left side
+        // dry — exercises the (false, true) wave-speed branch where
+        // s_L = u_n_R − 2·c_R.
+        fn run<T: hydroflux_autograd::Real>(h_r: T) -> T {
+            let ul = Conserved2DG::<T>::dry();
+            let ur = Conserved2DG::<T>::new_generic(h_r, T::zero(), T::zero());
+            hllc_flux_x(ul, ur).mass
+        }
+        let h_val = 1.0_f64;
+        let eps = 1e-5_f64;
+        let fd = (run::<f64>(h_val + eps) - run::<f64>(h_val - eps)) / (2.0 * eps);
+        let ad = run::<Dual>(Dual::variable(h_val));
+        assert_relative_eq!(ad.dval, fd, epsilon = 1e-7);
+    }
+
+    #[test]
+    fn hllc_zero_under_both_dry_dual_returns_zero_derivative() {
+        // Both states dry — early-return branch. Derivative must be
+        // zero regardless of dval input.
+        let ul = Conserved2DG::<Dual>::new_generic(
+            Dual { val: 0.0, dval: 1.0 },
+            Dual::constant(0.0),
+            Dual::constant(0.0),
+        );
+        let ur = ul;
+        let f: FluxXG<Dual> = hllc_flux_x(ul, ur);
+        assert_eq!(f.mass.val, 0.0);
+        assert_eq!(f.mass.dval, 0.0);
     }
 }
