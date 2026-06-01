@@ -224,16 +224,56 @@ picks a sane first time step.
 
 ## 2.5 Differentiability and performance
 
-The solver is generic over a `Real` trait abstracting the arithmetic
-surface (`+`, `−`, `×`, `/`, `sqrt`, `powf`, `max`, `min`, `abs`). Two
-implementations are used: `f64` for production, and a forward-mode
-`Dual {val, dval}` propagating `(value, derivative)` through every
-operation. The derivative of any output with respect to a single seed
-input is recovered as `result.dval` after one forward pass; the same
-mechanism calibrates Manning and cross-section parameters in the 1D
-companion line [@ParraPaper02]. Reverse-mode AD, required when the
-parameter count grows beyond ~10 (e.g. a per-cell roughness field), is
-identified as future work (§5).
+The 2D solver is generic over a `Real` trait abstracting the
+arithmetic surface (`+`, `−`, `×`, `/`, `sqrt`, `powf`, `max`, `min`,
+`abs`). Two implementations are used: `f64` for production, and a
+forward-mode `Dual {val, dval}` propagating `(value, derivative)`
+through every operation. The state (`Conserved2DG<T>`), the mesh
+(`Mesh2DG<T>`), the HLLC Riemann flux, the Audusse hydrostatic
+reconstruction, the MUSCL slopes, the Liang–Marche flux rescaling, the
+point-implicit Manning step, and both time integrators
+(`forward_euler_step`, `ssprk2_step`) all dispatch over `T: Real`. The
+derivative of any output with respect to a single seed input is
+recovered as `result.dval` after one forward pass; there is no
+separate adjoint code to maintain. Branching on dryness uses
+`T::value()` so control flow stays scalar; on each branch the
+arithmetic propagates the derivative through whichever side is taken.
+
+We verify this end-to-end with an AD-vs-FD locking suite that
+compares forward-mode AD against second-order central finite
+differences on independent gradients across every layer of the
+discretisation. On the HLLC Riemann flux (wet/wet star branch and
+the dry-bed two-rarefaction branch), the Manning friction step
+(seeded on both `n` and `h`), the full forward-Euler update, and the
+SSP-RK2 update, AD matches central FD to better than `10⁻⁶` relative
+on derivatives whose magnitudes span six orders of magnitude. The
+SSP-RK2 test additionally recovers an exact analytical invariance:
+the derivative of total mass with respect to a uniform bed-elevation
+shift is `−(n_rows · n_cols · dx · dy)` to `10⁻⁸` — mass conservation
+under reference-level change holds in the gradient, not just the value.
+
+Beyond locking, we exercise the wedge on a small inverse problem. A
+friction-damped dam-break on a 3×60 channel with
+`(h_L, h_R) = (1.0, 0.1)` m is simulated to `t = 20` s; the
+depth-weighted centroid of the wet region serves as the
+observation. Picking `n_true = 0.040` produces a synthetic centroid
+at `x = 27.65` m. Starting from `n_init = 0.080` (a 2× over-estimate)
+and updating
+`n ← n − (c_pred(n) − c_obs) · (∂c_pred/∂n)⁻¹` with the gradient from
+one forward pass of `T = Dual`, Newton converges to
+`n_final = 0.040 000` (relative error `< 10⁻¹⁵`) in five iterations.
+
+The arithmetic overhead of the wedge is measured on a 64×64 cell
+domain over 200 SSP-RK2 + Manning steps. The Dual-typed run takes
+1.98× the wall-clock of the `f64` run (`1338` vs `676` ns per
+cell-step, post-warm-up, release build). This is within the expected
+2-3× band for forward-mode AD on compiled code and lower than
+tracer-based AD on the same problem class.
+
+The 1D companion line [@ParraPaper02] uses the same `Real` trait and
+the same `Dual` type, exposed through the autograd crate. Reverse-mode
+AD, required when the parameter count grows beyond ~10 (e.g. a
+per-cell roughness field), is identified as future work (§5).
 
 A cell-mask early-skip optimisation exploits the fact that arid-basin
 simulations are dominated by dry cells: interior faces with both

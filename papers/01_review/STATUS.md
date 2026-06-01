@@ -132,14 +132,24 @@ gold OA (user needs hybrid). Cover letter at `cover_letter_ems.md`
       and added explicit JAX/PyTorch/Julia framing; §4.2 added
       Manning lookup sensitivity caveat (`n²` scaling, direction
       robust, magnitude not).
-- [ ] **M1 — AD demo**: AD-vs-FD locking + 1-variable inverse
-      (recover Manning from synthetic hydrograph) + `f64` vs `Dual<f64>`
-      wall-clock timing. Required by EMS reviewer (the wedge is asserted
-      not demonstrated in this paper). ~2-3 days code work.
+- [x] **M1 — AD wedge delivered end-to-end (2026-06-01)**. The
+      `Real` trait was generified through state/flux/riemann/source/
+      geometry/boundary/update (commits aef0e6d, 2628422, b101630,
+      bea41c1). All seven 2D modules dispatch over `T: Real`. Six
+      AD-vs-FD locking tests live in the lib suite (HLLC wet/wet star
+      branch, HLLC dry-bed branch, Manning friction on n and h,
+      forward Euler on h, SSP-RK2 invariance on bed elevation), all
+      matching central FD to < 1e-6 relative. M1b
+      (`examples/m1_inverse_manning_demo.rs`): 2D friction-damped dam
+      break, Newton converges from n_init=0.08 to n_true=0.040 with
+      relative error < 1e-15 in five iterations. M1c
+      (`examples/m1_timing_f64_vs_dual.rs`): Dual<f64> overhead is
+      1.98× over f64 on a 64×64 / 200-step bench. §2.5 of manuscript
+      updated to deliver, not assert, the wedge.
 - [ ] **M2 — Performance**: CPU thread scaling + larger-grid
       (1000²) benchmark + ANUGA wall-clock at matched grid. Required
-      by EMS reviewer set; current 1.61× cell-mask is the only
-      performance number. ~3-5 days.
+      by EMS reviewer set; current 1.61× cell-mask + 1.98× Dual ratio
+      are the only performance numbers. ~3-5 days.
 - [ ] M3 deferred: Huasco gauge validation at Santa Juana DGA record
       (weeks; only if R1 framing is pushed back).
 - [ ] Pandoc → LaTeX (elsarticle) freeze.
