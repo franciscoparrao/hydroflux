@@ -36,9 +36,19 @@ community benchmarks and applied to a semiarid Andean reach".
   reverse-mode AD.
 - §6 Conclusion.
 
-**Target venue**: Computers & Geosciences (software contribution) or
-GMD (model description) — both subscription, no APC. EMS backup. (The
-AWR target of the review draft no longer fits a methods paper.)
+**Target venue** (decided 2026-05-31): **Environmental Modelling &
+Software (EMS, Elsevier, hybrid)**. Chosen over C&G after honest
+comparison (EMS-calibrated peer review run 2026-05-31): dramatically
+stronger board fit (Costabile/Samadi/Demir/Razavi/Galelli/Gualtieri all
+AE with direct topic overlap), 6 near-twin solver-acceleration papers
+in `recent.bib` (Rak 2024, Saleem & Norman 2024, Chen 2025,
+Caviedes-Voullième circle), and a positive editorial antecedent: the
+**SurtGIS companion paper is currently in Major Revisions at EMS**
+(separate manuscript, GeoTIFF I/O backbone used by hydroflux). C&G was
+discarded because of a documented Reviewer 2 AI-paranoia incident on
+the user's prior Paper 1 submission. GMD was discarded for being full
+gold OA (user needs hybrid). Cover letter at `cover_letter_ems.md`
+(the AWR draft is retained as `cover_letter_awr.md` for history).
 
 ## What survives from the review draft
 
@@ -105,9 +115,35 @@ AWR target of the review draft no longer fits a methods paper.)
       vs 2.6 % ANUGA, same accuracy class, gap closes under
       refinement (hydroflux 400-cell L1 1.0 %). §3.8 + Fig 6 +
       `anuga_stoker_compare.py` + `gen_stoker_coarse`.
-- [ ] Tighten abstract + Plain Language Summary.
-- [ ] Reframe cover letter to C&G/GMD.
-- [ ] Pandoc → LaTeX freeze.
+- [x] Tighten abstract + Plain Language Summary (2026-05-31):
+      abstract 285→255 w (removed GPU-targeted overclaim, added
+      head-to-head ANUGA mention, compressed scheme list); PLS
+      190→184 w (added comparison vs alternative + concrete 25 %).
+- [x] Cover letter reframed to EMS (2026-05-31): `cover_letter_ems.md`
+      acknowledges SurtGIS companion at EMS MR; suggested reviewers
+      Caviedes-Voullième / Roberts (ANUGA) / García-Navarro (Iber) /
+      Shen (differentiable hydrology) / Escauriaza (Andean hydraulics);
+      honest declaration of AI-assisted writing + verify-refs catch.
+- [x] EMS Highlights added (2026-05-31): 5 bullets ≤80 chars each.
+- [x] EMS-specific textual fixes (M4+M6, 2026-05-31): §3.4 title
+      dropped "(MacDonald-family balance)" parenthetical; §2.3 now
+      cites Liang-Marche 2009 for the `(η, u, v)` primitive choice;
+      §1 "What remains under-served" sentence dropped "GPU-targeted"
+      and added explicit JAX/PyTorch/Julia framing; §4.2 added
+      Manning lookup sensitivity caveat (`n²` scaling, direction
+      robust, magnitude not).
+- [ ] **M1 — AD demo**: AD-vs-FD locking + 1-variable inverse
+      (recover Manning from synthetic hydrograph) + `f64` vs `Dual<f64>`
+      wall-clock timing. Required by EMS reviewer (the wedge is asserted
+      not demonstrated in this paper). ~2-3 days code work.
+- [ ] **M2 — Performance**: CPU thread scaling + larger-grid
+      (1000²) benchmark + ANUGA wall-clock at matched grid. Required
+      by EMS reviewer set; current 1.61× cell-mask is the only
+      performance number. ~3-5 days.
+- [ ] M3 deferred: Huasco gauge validation at Santa Juana DGA record
+      (weeks; only if R1 framing is pushed back).
+- [ ] Pandoc → LaTeX (elsarticle) freeze.
+- [ ] Graphical abstract (EMS valued, not required).
 
 ## History (why it was dormant)
 

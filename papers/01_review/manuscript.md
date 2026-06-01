@@ -10,44 +10,42 @@ keywords: [shallow water equations, finite volume, well-balanced,
            flood modelling, Chile]
 ---
 
+# Highlights
+
+- A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
+- HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
+- Verified on Thacker, Stoker, MacDonald, UK EA ×6; head-to-head against ANUGA.
+- Convergence L¹ 1.81 / L² 1.68 on Thacker; mass to 2·10⁻⁵ on closed domain.
+- Applied to 2017 Aluvión Atacama (Río Huasco) with ESA WorldCover Manning.
+
 # Abstract
 
-*(~250 words — draft)*
-
-Two-dimensional shallow-water solvers underpin operational flood
-hazard mapping, yet the open-source landscape remains dominated by
-legacy-language production kernels (FORTRAN, C++) with no ergonomic
+Two-dimensional shallow-water solvers underpin flood hazard mapping,
+but open-source production kernels in FORTRAN or C++ offer no ergonomic
 path to automatic differentiation, even as differentiable modelling
-becomes a unifying inverse-problem framework across the geosciences.
-A 2D flood solver that is differentiable by construction, GPU-targeted,
-and verified on the standard community benchmark suite with a real
-data-sparse application remains comparatively under-served. We present *hydroflux*, a 2D shallow-water
-finite-volume solver written in Rust and generic over the numeric
-type, so that the identical code path evaluates in `f64` for
-production and in forward-mode dual numbers for gradient extraction.
-The scheme combines an HLLC approximate Riemann solver, the Audusse
-hydrostatic reconstruction for well-balancedness, MUSCL slope-limited
-reconstruction on the primitive `(η, u, v)` vector, a strong-stability-
-preserving Runge–Kutta time integrator, a point-implicit Manning
-friction step, and a Liang–Marche flux rescaling for strictly mass-
-conservative wetting and drying. We verify the solver against a
-hierarchy of references: lake-at-rest on smooth and bumpy beds
-(preserved to machine precision, `‖η − η₀‖∞ ≈ 3·10⁻¹⁶`), the Thacker
-oscillating paraboloid (relative L² error 0.068 %, mass conserved to
-2·10⁻⁵), the Stoker/Ritter dam-break (L¹ error 1.0 %), a radial
-dam-break (axisymmetry preserved), steady Manning uniform flow (a
-MacDonald-family bed-slope/friction balance), and the six UK
-Environment Agency 2D benchmark tests. We then
-apply the solver to the Río Huasco at Santa Juana — a semiarid Andean
-reach with a 92-year DGA record — simulating the 2017 Aluvión Atacama
-event on a 30 m DEM, and demonstrate a land-cover-derived spatially
-variable Manning field from ESA WorldCover. As a sensitivity
+unifies geoscientific inverse problems.
+We present *hydroflux*, a 2D shallow-water finite-volume solver written
+in Rust and generic over the numeric type: the identical code path
+evaluates in `f64` for production and in forward-mode dual numbers for
+gradient extraction. The scheme couples an HLLC Riemann
+solver, Audusse hydrostatic reconstruction for well-balancedness, MUSCL
+slope-limited reconstruction on `(η, u, v)`, an SSP Runge–Kutta time
+integrator, a point-implicit Manning step, and a Liang–Marche flux
+rescaling for strictly mass-conservative wetting and drying. We verify against a benchmark
+hierarchy — lake-at-rest preserved to machine precision
+(`‖η − η₀‖∞ ≈ 3·10⁻¹⁶`), the Thacker oscillating paraboloid
+(relative L² 0.068 %, mass 2·10⁻⁵), the Stoker/Ritter dam-break
+(L¹ 1.0 %), a radial dam-break, steady Manning uniform flow, and the
+six UK Environment Agency 2D benchmarks — and a matched head-to-head
+against ANUGA on Stoker recovers the same accuracy class. We apply the solver to the 2017 Aluvión
+Atacama event on the Río Huasco — a semiarid Andean reach with a
+92-year DGA record — at 30 m, with a spatially variable Manning field
+derived from ESA WorldCover. As a one-day-peak sensitivity
 demonstration (not a calibrated hindcast), the variable field retains
-~25 % more water in the reach over a one-day peak than a uniform value.
-The solver, its test suite, and the application scripts are released
-open-source as the verified 2D foundation of a multi-year programme
-toward differentiable, GPU-native, coupled hydrometeorological hazard
-simulation.
+~25 % more water in the reach than a uniform value. The solver, its test suite, and the
+application scripts are released open-source as the verified 2D
+foundation of a multi-year programme toward differentiable, GPU-native,
+coupled hydrometeorological hazard simulation.
 
 # Key Points
 
@@ -57,25 +55,24 @@ simulation.
 
 # Plain Language Summary
 
-*(GMD/WRR optional, ≤200 words, lay audience — draft)*
-
 Computer models that predict where rivers flood solve the same
 physical equations, but the software that does so is usually written
-in old programming languages that cannot easily be combined with
-modern machine-learning tools, and it is rarely tested transparently
-on freely available data. We built a new flood model, *hydroflux*, in
-the Rust language, designed so that the same code can both run a
-simulation and automatically compute how its outputs depend on its
-inputs — the key ingredient for calibrating models with machine
-learning. We checked the model carefully against textbook problems
-that have exact mathematical answers and against an international set
-of standard test cases, confirming it conserves water mass and
-reproduces known flood waves accurately. We then ran it on a real
-flood, the 2017 Atacama event on the Río Huasco in northern Chile,
-feeding it public elevation and land-cover maps. The model shows that
-accounting for riverside vegetation, which slows the flow, keeps
-noticeably more water in the channel than assuming a single uniform
-roughness. The code and all test cases are released openly.
+in older programming languages with limited compatibility with modern
+machine-learning tools, and is rarely tested transparently on freely
+available data. We built a new flood model, *hydroflux*, in Rust,
+designed so that the same code can both run a simulation and
+automatically compute how its outputs depend on its inputs — the key
+ingredient for calibrating models against observations. We checked it
+against textbook problems with exact mathematical answers and against
+an international set of standard test cases, confirming it conserves
+water mass and reproduces known flood waves accurately, with errors
+comparable to those of an established open-source alternative. We then
+ran it on a real flood — the 2017 Atacama event on the Río Huasco in
+northern Chile — feeding it public elevation and land-cover maps. The
+model shows that accounting for riverside vegetation, which slows the
+flow, keeps about a quarter more water in the channel than assuming a
+single uniform roughness. The code and all test cases are released
+openly.
 
 # 1. Introduction
 
@@ -107,10 +104,12 @@ landslide, and debris flow in a single GPU-accelerated engine. The
 paradigm these works share is clear: the *forward solver* becomes
 differentiable (or GPU-native, or both), and inverse problems —
 parameter estimation, bathymetry inversion, learned closures — inherit
-efficient gradients. What remains comparatively under-served is a 2D
-shallow-water flood solver that is differentiable *by construction*,
-GPU-targeted, and verified on the standard community benchmark suite
-with a real data-sparse application — the niche this paper occupies.
+efficient gradients. The differentiable layer typically sits in a
+host language with mature AD (JAX, PyTorch, Julia). What remains
+comparatively under-served is a 2D shallow-water flood solver that is
+differentiable *by construction in a compiled systems language*,
+verified on the standard community benchmark suite, and exercised on
+a real data-sparse application — the niche this paper occupies.
 
 This paper does not claim to open that frontier; it claims to
 **deliver and verify** a solver positioned within it, with two
@@ -181,14 +180,16 @@ arbitrary bed; verified to machine precision in §3.1).
 Second-order spatial accuracy uses MUSCL reconstruction with the
 minmod limiter applied to the **primitive** vector `(η, u, v)`, where
 `η = h + z_b` is the free-surface elevation — not the conserved
-variables and not `(η, hu, hv)`. Reconstructing velocities rather than
-momenta is what makes the scheme well-balanced on flows with non-uniform
-depth over a sloped bed: when the analytical solution has uniform `u`
-but varying `h` (e.g. Manning normal flow), `(η, u, v)`-MUSCL gives
-equal velocity on both sides of every face and the HLLC sees a
-consistent state, eliminating an `O(\\Delta x\\, S_0/h_n)` steady-state
-drift that momentum-reconstruction incurs (§3.4 measures a 45×
-reduction versus `(η, hu, hv)`-MUSCL on MacDonald uniform flow).
+variables and not `(η, hu, hv)`. The choice follows the well-balancing
+argument of Liang and Marche [@LiangMarche2009]: reconstructing
+velocities rather than momenta is what makes the scheme well-balanced
+on flows with non-uniform depth over a sloped bed. When the analytical
+solution has uniform `u` but varying `h` (e.g. Manning normal flow),
+`(η, u, v)`-MUSCL gives equal velocity on both sides of every face and
+the HLLC sees a consistent state, eliminating an
+`O(\\Delta x\\, S_0/h_n)` steady-state drift that momentum-reconstruction
+incurs (§3.4 measures a 45× reduction versus `(η, hu, hv)`-MUSCL on
+the steady Manning uniform-flow test).
 
 Time integration uses the strong-stability-preserving Runge–Kutta
 second-order method (SSP-RK2; Heun), written as the convex combination
@@ -299,7 +300,7 @@ The forward-Euler integrator gives a comparable L¹ (1.1 %) and a
 slightly larger front lag (3.2 m), confirming that the spatial scheme,
 not the time integrator, dominates the error budget.
 
-## 3.4 Steady Manning uniform flow (MacDonald-family balance)
+## 3.4 Steady Manning uniform flow
 
 We use the degenerate limit of the MacDonald inverse-design family
 [@MacDonald1997]: steady Manning uniform flow at constant normal depth
@@ -412,7 +413,16 @@ The land cover is not random with respect to the channel: riparian
 tree and shrub vegetation (`n = 0.06`–`0.10`) tracks the thalweg, while
 the surrounding hillslopes are bare desert (`n = 0.025`). The resulting
 field has `n_{\\min} = 0.015`, `n_{\\text{mean}} = 0.036`,
-`n_{\\max} = 0.100`.
+`n_{\\max} = 0.100`. The mapping is illustrative rather than
+calibrated: the absolute values are within the standard Manning ranges
+[@Chow1959] but a regional friction survey or a literature compilation
+with narrower-than-Chow uncertainties (e.g. Arcement and Schneider's
+USGS compilation) would tighten the lookup. Because Manning friction
+enters the momentum equation as `n²`, the headline storage and
+discharge changes reported in §4.3 scale roughly linearly with shifts
+in the channel-class values; the qualitative direction (riparian
+vegetation retains water) is robust to plausible lookup choices, the
+quantitative magnitude is not.
 
 ## 4.3 Results
 
