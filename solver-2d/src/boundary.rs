@@ -51,8 +51,10 @@
 //! restored uniform-flow preservation in the 1D solver and is essential
 //! for analytical steady-state benchmarks on a slope.
 
-use crate::geometry::Mesh2D;
-use crate::state::Conserved2D;
+use hydroflux_autograd::Real;
+
+use crate::geometry::Mesh2DG;
+use crate::state::Conserved2DG;
 use crate::H_DRY;
 
 /// Below this streamwise slope magnitude the Discharge-on-dry
@@ -188,23 +190,27 @@ impl Boundaries2D {
 /// this BC with [`crate::cfl_time_step_with_bcs`], which folds the
 /// wet ghost wave speeds into the CFL bound so the first time step
 /// stays sane.
-pub fn ghost_cell(
-    mesh: &Mesh2D,
-    inner: Conserved2D,
+pub fn ghost_cell<T: Real>(
+    mesh: &Mesh2DG<T>,
+    inner: Conserved2DG<T>,
     kind: Boundary,
     side: Side,
     idx: usize,
-) -> (Conserved2D, f64) {
-    let mut state = ghost_state(inner, kind, side);
-    let bed = ghost_bed(mesh, kind, side, idx);
+) -> (Conserved2DG<T>, T) {
+    let mut state = ghost_state::<T>(inner, kind, side);
+    let bed = ghost_bed::<T>(mesh, kind, side, idx);
 
     if let Boundary::Discharge { q } = kind {
-        if inner.h < H_DRY {
-            let slope_mag = streamwise_bed_slope_magnitude(mesh, side, idx);
+        if inner.h.value() < H_DRY {
+            let slope_mag = streamwise_bed_slope_magnitude::<T>(mesh, side, idx);
             if slope_mag > DRY_INFLOW_SLOPE_THRESHOLD {
-                let n = mesh.manning[boundary_cell_index(mesh, side, idx)];
-                let h_n = (n * q.abs() / slope_mag.sqrt()).powf(3.0 / 5.0);
-                state.h = h_n.min(DRY_INFLOW_H_MAX);
+                let n = mesh.manning[boundary_cell_index::<T>(mesh, side, idx)];
+                // (n * |q|) / √S₀, then raised to 3/5. q and slope_mag
+                // are operational scalars (f64); n carries the seed when
+                // T = Dual, so the dry-inflow ghost is correctly
+                // differentiable w.r.t. roughness.
+                let h_n = (n * (q.abs() / slope_mag.sqrt())).powf(3.0 / 5.0);
+                state.h = h_n.min(T::from_f64(DRY_INFLOW_H_MAX));
             }
         }
     }
@@ -215,7 +221,7 @@ pub fn ghost_cell(
 /// Mesh-array index `(i, j)` of the boundary cell on `side` at
 /// transverse position `idx`. Used to fetch per-cell Manning
 /// roughness for the Discharge-on-dry ghost.
-fn boundary_cell_index(mesh: &Mesh2D, side: Side, idx: usize) -> (usize, usize) {
+fn boundary_cell_index<T: Real>(mesh: &Mesh2DG<T>, side: Side, idx: usize) -> (usize, usize) {
     match side {
         Side::West => (idx, 0),
         Side::East => (idx, mesh.n_cols() - 1),
@@ -226,53 +232,62 @@ fn boundary_cell_index(mesh: &Mesh2D, side: Side, idx: usize) -> (usize, usize) 
 
 /// Magnitude of the bed slope at the boundary cell, taken along the
 /// face normal (streamwise direction for inflow). Returns 0 when the
-/// mesh has fewer than two cells across the relevant axis.
-fn streamwise_bed_slope_magnitude(mesh: &Mesh2D, side: Side, idx: usize) -> f64 {
+/// mesh has fewer than two cells across the relevant axis. The
+/// streamwise-slope magnitude is reduced to its `value()` here because
+/// the dry-inflow threshold is a deliberately discontinuous engineering
+/// override (Manning normal-depth ghost) rather than a smooth
+/// constitutive law; treating the slope magnitude as a scalar input
+/// avoids feeding a derivative through a hard threshold.
+fn streamwise_bed_slope_magnitude<T: Real>(mesh: &Mesh2DG<T>, side: Side, idx: usize) -> f64 {
     match side {
         Side::West => {
             if mesh.n_cols() < 2 {
                 0.0
             } else {
-                mesh.bed_slope_x(idx, 0).abs()
+                mesh.bed_slope_x(idx, 0).value().abs()
             }
         }
         Side::East => {
             if mesh.n_cols() < 2 {
                 0.0
             } else {
-                mesh.bed_slope_x(idx, mesh.n_cols() - 2).abs()
+                mesh.bed_slope_x(idx, mesh.n_cols() - 2).value().abs()
             }
         }
         Side::North => {
             if mesh.n_rows() < 2 {
                 0.0
             } else {
-                mesh.bed_slope_y(0, idx).abs()
+                mesh.bed_slope_y(0, idx).value().abs()
             }
         }
         Side::South => {
             if mesh.n_rows() < 2 {
                 0.0
             } else {
-                mesh.bed_slope_y(mesh.n_rows() - 2, idx).abs()
+                mesh.bed_slope_y(mesh.n_rows() - 2, idx).value().abs()
             }
         }
     }
 }
 
-fn ghost_state(inner: Conserved2D, kind: Boundary, side: Side) -> Conserved2D {
+fn ghost_state<T: Real>(
+    inner: Conserved2DG<T>,
+    kind: Boundary,
+    side: Side,
+) -> Conserved2DG<T> {
     match kind {
         Boundary::Transmissive => inner,
         Boundary::Wall => {
             // Reverse the normal component, preserve the tangential.
             if side.is_x_face() {
-                Conserved2D {
+                Conserved2DG {
                     h: inner.h,
                     hu: -inner.hu,
                     hv: inner.hv,
                 }
             } else {
-                Conserved2D {
+                Conserved2DG {
                     h: inner.h,
                     hu: inner.hu,
                     hv: -inner.hv,
@@ -291,29 +306,33 @@ fn ghost_state(inner: Conserved2D, kind: Boundary, side: Side) -> Conserved2D {
             // domain. On near-flat boundary cells (raised banks
             // without longitudinal slope) the override does not
             // engage and callers must still pre-fill a thin film.
+            //
+            // `q` lifts to a constant in T: BC parameters are not
+            // currently differentiation seeds (calibration in this
+            // version targets the per-cell Manning field).
             if side.is_x_face() {
-                Conserved2D {
+                Conserved2DG {
                     h: inner.h,
-                    hu: q,
+                    hu: T::from_f64(q),
                     hv: inner.hv,
                 }
             } else {
-                Conserved2D {
+                Conserved2DG {
                     h: inner.h,
                     hu: inner.hu,
-                    hv: q,
+                    hv: T::from_f64(q),
                 }
             }
         }
-        Boundary::Depth { h } => Conserved2D {
-            h,
+        Boundary::Depth { h } => Conserved2DG {
+            h: T::from_f64(h),
             hu: inner.hu,
             hv: inner.hv,
         },
     }
 }
 
-fn ghost_bed(mesh: &Mesh2D, kind: Boundary, side: Side, idx: usize) -> f64 {
+fn ghost_bed<T: Real>(mesh: &Mesh2DG<T>, kind: Boundary, side: Side, idx: usize) -> T {
     let n_rows = mesh.n_rows();
     let n_cols = mesh.n_cols();
     match kind {
@@ -329,19 +348,19 @@ fn ghost_bed(mesh: &Mesh2D, kind: Boundary, side: Side, idx: usize) -> f64 {
             // only on programming errors (single-cell domains).
             Side::North => {
                 debug_assert!(n_rows >= 2, "linear bed extrapolation requires n_rows ≥ 2");
-                2.0 * mesh.bed[(0, idx)] - mesh.bed[(1, idx)]
+                mesh.bed[(0, idx)] * 2.0 - mesh.bed[(1, idx)]
             }
             Side::South => {
                 debug_assert!(n_rows >= 2, "linear bed extrapolation requires n_rows ≥ 2");
-                2.0 * mesh.bed[(n_rows - 1, idx)] - mesh.bed[(n_rows - 2, idx)]
+                mesh.bed[(n_rows - 1, idx)] * 2.0 - mesh.bed[(n_rows - 2, idx)]
             }
             Side::West => {
                 debug_assert!(n_cols >= 2, "linear bed extrapolation requires n_cols ≥ 2");
-                2.0 * mesh.bed[(idx, 0)] - mesh.bed[(idx, 1)]
+                mesh.bed[(idx, 0)] * 2.0 - mesh.bed[(idx, 1)]
             }
             Side::East => {
                 debug_assert!(n_cols >= 2, "linear bed extrapolation requires n_cols ≥ 2");
-                2.0 * mesh.bed[(idx, n_cols - 1)] - mesh.bed[(idx, n_cols - 2)]
+                mesh.bed[(idx, n_cols - 1)] * 2.0 - mesh.bed[(idx, n_cols - 2)]
             }
         },
     }
@@ -350,6 +369,8 @@ fn ghost_bed(mesh: &Mesh2D, kind: Boundary, side: Side, idx: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::geometry::Mesh2D;
+    use crate::state::Conserved2D;
     use approx::assert_relative_eq;
     use ndarray::array;
 
