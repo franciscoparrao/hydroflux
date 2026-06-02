@@ -146,10 +146,21 @@ gold OA (user needs hybrid). Cover letter at `cover_letter_ems.md`
       (`examples/m1_timing_f64_vs_dual.rs`): Dual<f64> overhead is
       1.98× over f64 on a 64×64 / 200-step bench. §2.5 of manuscript
       updated to deliver, not assert, the wedge.
-- [ ] **M2 — Performance**: CPU thread scaling + larger-grid
-      (1000²) benchmark + ANUGA wall-clock at matched grid. Required
-      by EMS reviewer set; current 1.61× cell-mask + 1.98× Dual ratio
-      are the only performance numbers. ~3-5 days.
+- [x] **M2 — Performance characterised honestly (2026-06-02)**.
+      Serial throughput: 1.1-1.2 Mcell-steps/s across 256²/512²/1024²
+      (commit eac96f1, `examples/m2_perf_large_grid.rs`). Wall-clock
+      head-to-head against ANUGA on a matched Stoker dam-break
+      (200 m × 5 m, Δx_eff = 0.5 m, t_end = 8 s): hydroflux 1.07 s
+      wall vs ANUGA 6.91 s wall — **6.5× faster per simulated
+      second** (commit f4c54bc, `examples/m2_anuga_wallclock.py` +
+      `examples/m2_hydroflux_wallclock.rs`).
+      CPU multi-threaded parallelism attempted via `rayon` over the
+      face-flux pass — even at 8 threads, slower than serial baseline
+      due to small per-face arithmetic vs rayon dispatch overhead.
+      That negative result is reported in §3.9 as motivation for the
+      GPU port being the next throughput layer rather than CPU
+      parallelism. §5 reordered accordingly: GPU acceleration is now
+      item (i), prioritised over coupling.
 - [ ] M3 deferred: Huasco gauge validation at Santa Juana DGA record
       (weeks; only if R1 framing is pushed back).
 - [ ] Pandoc → LaTeX (elsarticle) freeze.

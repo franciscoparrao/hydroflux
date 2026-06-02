@@ -15,7 +15,7 @@ keywords: [shallow water equations, finite volume, well-balanced,
 - A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
 - HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
 - Verified on Thacker, Stoker, MacDonald, UK EA ×6; head-to-head against ANUGA.
-- Convergence L¹ 1.81 / L² 1.68 on Thacker; mass to 2·10⁻⁵ on closed domain.
+- Forward-mode AD costs 1.98× f64; 6.5× faster wall-clock than ANUGA on Stoker.
 - Applied to 2017 Aluvión Atacama (Río Huasco) with ESA WorldCover Manning.
 
 # Abstract
@@ -426,6 +426,66 @@ solvers are therefore in the same accuracy class on this canonical
 dry-front benchmark; the (modest) coarse-grid gap closes under
 refinement, as the convergence rates predict.
 
+## 3.9 Computational performance
+
+We characterise serial throughput on synthetic grids and report a
+wall-clock comparison against ANUGA on the same Stoker problem the
+accuracy comparison above used. All numbers are from a release build
+on a single x86-64 workstation (16-core but single-threaded
+measurements only; see below); the corresponding benchmark scripts
+(`m2_perf_large_grid.rs`, `m2_hydroflux_wallclock.rs`,
+`m2_anuga_wallclock.py`) are released with the code.
+
+**Serial throughput.** On smooth Gaussian-bump initial conditions
+(no dry interior — the cell-mask early-skip optimisation cannot
+artificially flatter the timing), the solver sustains
+`1.1`–`1.2` Mcell-steps per second at `f64` precision across grids
+from `256²` to `1024²`: `918`, `801` and `853` ns per cell-step
+respectively at the three sizes. The throughput is consistent with the
+single-threaded CPU references cited by the Caviedes-Voullième-circle
+GPU papers [@Rak2024; @SaleemNorman2024] and falls in the band
+typical of HLLC + MUSCL + SSP-RK2 implementations on cache-resident
+problems.
+
+**`f64` vs `Dual<f64>` overhead.** On a `64²` grid over `200` SSP-RK2 +
+Manning steps, the forward-mode AD instance takes `1.98 ×` the
+wall-clock of the `f64` instance (`676` vs `1338` ns per cell-step,
+§2.5). The ratio is inside the expected 2-3× band for forward-mode AD
+on compiled code and below the 3-5× typical of tracer-based AD on
+similar problem classes. We treat this as the AD overhead headline.
+
+**Wall-clock vs ANUGA on a matched Stoker problem.** On the Stoker
+dam-break scaled to `200 m × 5 m`, `t_end = 8 s` at matched effective
+`Δx = 0.5 m`, hydroflux integrates the eight simulated seconds in
+`1.07 s` of wall-clock (`0.13` s wall per simulated second); ANUGA
+integrates the same physical problem in `6.91 s` of wall-clock (`0.86`
+s wall per simulated second). The ratio is `6.5×` in hydroflux's
+favour per simulated second. The two solvers run different mesh
+topologies (rectangular cells versus the
+`rectangular_cross`-triangulated `4 ×` denser mesh that ANUGA's
+solver requires) so cell-count throughput is not directly comparable;
+the simulated-second metric is the meaningful one because the user-
+visible cost of running a flood event scales with this quantity.
+
+**Bottleneck and next layer.** Profiling the forward Euler step (rough
+profile from `cargo flamegraph` on the `512²` Gaussian bump) shows
+that the `well_balanced_x_face` + `well_balanced_y_face` assembly
+takes ~60 % of the wall-clock, the cell update (with the explicit
+bed-slope source) ~25 %, and the cell-mask + MUSCL slope pass the
+remainder. Both dominant pieces are embarrassingly parallel on a
+per-face/per-cell basis. We attempted a CPU-parallel face-flux pass
+via `rayon` for this submission and found that the per-face
+arithmetic (`~200-500` ns at the FV face level) is small relative to
+the rayon task-dispatch and Vec-collect overhead — even at 8 threads,
+the multi-threaded version was slower than the serial baseline by
+about 2× on `512²`. The conclusion we draw is the opposite of the
+naive one: this scheme's next throughput layer is not CPU
+parallelisation but GPU offload, where the face- and cell-loops map
+to a single-instruction multiple-thread kernel without the per-task
+overhead that defeats CPU rayon on a fine-grained per-face workload.
+Section §5 carries the GPU port (via `wgpu` compute shaders) as the
+immediate next deliverable.
+
 # 4. Application: the 2017 Aluvión Atacama on the Río Huasco
 
 ## 4.1 Setup
@@ -492,15 +552,22 @@ that a continental-scale, multi-basin programme requires.
 # 5. Roadmap
 
 The verified 2D solver is the foundation of a staged programme. The
-immediate next layers are: (i) *physical coupling* — rainfall →
-slope-failure → granular propagation → inundation in a single engine,
-beginning with an Iverson-type debris-flow source [@Iverson2000;
-@Christen2010] feeding the SW momentum; (ii) *GPU acceleration* via
-`wgpu` compute shaders, for which the cell-mask skip and the explicit
-time stepping are already structured; and (iii) *reverse-mode automatic
-differentiation*, required to calibrate spatially distributed fields
-(per-cell roughness, bathymetry corrections) whose parameter count
-exceeds the forward-mode break-even. The 1D companion line already
+immediate next layers are: (i) **GPU acceleration** via `wgpu` compute
+shaders, prioritised by the §3.9 finding that CPU-side parallelism
+(`rayon` over the per-face FV work) is defeated by the small
+per-face arithmetic relative to task-dispatch overhead — the next
+throughput layer is SIMT, not multi-threaded; both the well-balanced
+flux assembly and the cell-mask skip map naturally to per-face/per-cell
+kernels, and the `Real`-trait dispatch shown to work at no run-time
+cost in §2.5 is one of the structural assumptions that should carry
+through unchanged on the GPU side. (ii) *Physical coupling* — rainfall
+→ slope-failure → granular propagation → inundation in a single
+engine, beginning with an Iverson-type debris-flow source
+[@Iverson2000; @Christen2010] feeding the SW momentum. (iii)
+*Reverse-mode automatic differentiation*, required to calibrate
+spatially distributed fields (per-cell roughness, bathymetry
+corrections) whose parameter count exceeds the forward-mode
+break-even. The 1D companion line already
 demonstrates forward-mode calibration of Manning and cross-section
 parameters against real gauge data [@ParraPaper02]; the n–shape and
 n–bathymetry confounds it identifies motivate the spatially distributed
