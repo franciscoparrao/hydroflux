@@ -1,0 +1,28 @@
+# LaTeX build artifacts
+*.aux
+*.log
+*.bbl
+*.blg
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.nav
+*.snm
+*.vrb
+*.lof
+*.lot
+*.idx
+*.ilg
+*.ind
+
+# Pandoc intermediates (regenerable by `make body`)
+manuscript_pandoc.tex
+body_raw.tex
+body_from_intro.tex
+body_clean.tex.tmp
+
+# Final PDF — built locally, not stored in git
+paper.pdf
+paper.spl

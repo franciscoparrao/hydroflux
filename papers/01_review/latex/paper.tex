@@ -1,0 +1,144 @@
+%% hydroflux methods paper for Environmental Modelling & Software (EMS)
+%% Using elsarticle with Harvard (author-year) bibliography style.
+%%
+%% Compile with xelatex (native unicode in monospace + math fonts):
+%%   xelatex paper && bibtex paper && xelatex paper && xelatex paper
+%%
+\documentclass[preprint,review,12pt,authoryear]{elsarticle}
+
+%% --- Font / unicode setup for xelatex ---
+\usepackage{fontspec}
+\setmainfont{Latin Modern Roman}
+\setsansfont{Latin Modern Sans}
+\setmonofont[Scale=0.95]{DejaVu Sans Mono}
+\usepackage{unicode-math}
+\setmathfont{Latin Modern Math}
+
+%% --- Math, tables, references, code ---
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{calc}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{array}
+% pandoc helpers for longtable column widths
+\newlength{\hfdcw}
+\setlength{\hfdcw}{\columnwidth}
+\providecommand{\real}[1]{#1}
+\usepackage{lineno}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{siunitx}
+
+\journal{Environmental Modelling \& Software}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{hydroflux: A Well-Balanced, Differentiable-by-Design 2D
+Shallow-Water Solver in Rust, Verified Against Analytical and Community
+Benchmarks and Applied to a Semiarid Andean Reach}
+
+\author[usach]{Francisco Parra Orellana\corref{cor1}}
+\ead{francisco.parra.o@usach.cl}
+\cortext[cor1]{Corresponding author}
+
+\affiliation[usach]{organization={Departamento de Ingeniería Informática,
+Universidad de Santiago de Chile},%
+            city={Santiago},%
+            country={Chile}}
+
+\begin{abstract}
+Two-dimensional shallow-water solvers underpin flood hazard mapping, but
+open-source production kernels in FORTRAN or C++ offer no ergonomic path
+to automatic differentiation, even as differentiable modelling unifies
+geoscientific inverse problems. We present \emph{hydroflux}, a 2D
+shallow-water finite-volume solver written in Rust and generic over the
+numeric type: the identical code path evaluates in \texttt{f64} for
+production and in forward-mode dual numbers for gradient extraction. The
+scheme couples an HLLC Riemann solver, Audusse hydrostatic
+reconstruction for well-balancedness, MUSCL slope-limited reconstruction
+on $(\eta, u, v)$, an SSP Runge--Kutta time integrator, a point-implicit
+Manning step, and a Liang--Marche flux rescaling for strictly
+mass-conservative wetting and drying. We verify against a benchmark
+hierarchy --- lake-at-rest preserved to machine precision
+($\|\eta-\eta_0\|_\infty \approx 3 \times 10^{-16}$), the Thacker
+oscillating paraboloid (relative $L^2$ 0.068\%, mass
+$2 \times 10^{-5}$), the Stoker/Ritter dam-break ($L^1$ 1.0\%), a
+radial dam-break, steady Manning uniform flow, and the six UK
+Environment Agency 2D benchmarks --- and a matched head-to-head against
+ANUGA on Stoker recovers the same accuracy class. We apply the solver
+to the 2017 Aluvión Atacama event on the Río Huasco --- a semiarid
+Andean reach with a 92-year DGA record --- at 30~m, with a spatially
+variable Manning field derived from ESA WorldCover. As a one-day-peak
+sensitivity demonstration (not a calibrated hindcast), the variable
+field retains $\sim$25\% more water in the reach than a uniform value.
+Forward-mode automatic differentiation through the full 2D solver
+costs $1.98\times$ the \texttt{f64} wall-clock; on a matched Stoker
+dam-break hydroflux integrates at $6.5\times$ the wall-clock speed of
+ANUGA per simulated second. The solver, its test suite, and the
+application scripts are released open-source as the verified 2D
+foundation of a multi-year programme toward differentiable, GPU-native,
+coupled hydrometeorological hazard simulation.
+\end{abstract}
+
+\begin{highlights}
+\item A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
+\item HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
+\item Verified on Thacker, Stoker, MacDonald, UK~EA $\times 6$; head-to-head against ANUGA.
+\item Forward-mode AD costs $1.98\times$ f64; $6.5\times$ faster wall-clock than ANUGA on Stoker.
+\item Applied to 2017 Aluvión Atacama (Río Huasco) with ESA WorldCover Manning.
+\end{highlights}
+
+\begin{keyword}
+shallow-water equations \sep flood modelling \sep finite volume \sep
+automatic differentiation \sep Rust \sep well-balanced schemes
+\end{keyword}
+
+\end{frontmatter}
+
+\linenumbers
+
+\input{body_clean}
+
+\section*{Open Research}
+
+The solver source code (Rust), the test suite, all benchmark
+configurations (lake-at-rest, Thacker, Stoker, MacDonald, radial
+dam-break, UK EA tests 1--6, the mesh-refinement convergence study,
+the head-to-head versus ANUGA, and the M1 / M2 examples for §2.5 and
+§3.9), the Huasco application notebook, and the figure-generation
+scripts are released under the MIT OR Apache-2.0 dual licence at
+\url{https://github.com/franciscoparrao/hydroflux}. A Zenodo snapshot
+DOI of the version associated with this manuscript will be minted at
+acceptance and added to this section in proof.
+
+The ESA WorldCover 2021 land-cover raster used in §4 is available at
+\url{https://esa-worldcover.org/} \citep{ESAWorldCover2021}. The
+30~m SRTM DEM is publicly available from the USGS. The DGA gauge
+record at Santa Juana (03820003) is available on request from the
+Dirección General de Aguas, Chile.
+
+\section*{Declaration of competing interest}
+
+The author declares no competing financial or personal interests.
+
+\section*{Acknowledgements}
+
+This work was supported by the Postdoctoral DICYT 2026--2027 programme
+of the Universidad de Santiago de Chile.
+
+\section*{Declaration on generative AI use}
+
+Generative AI tools were used to assist drafting, refactoring, and
+reference verification. All content was reviewed and validated by the
+author. Three references in an earlier draft (Hydrograd.jl, AegirJAX,
+r.avaflow v4) failed verify-refs / OpenAlex checks and were removed
+before submission.
+
+\bibliographystyle{elsarticle-harv}
+\bibliography{references}
+
+\end{document}
