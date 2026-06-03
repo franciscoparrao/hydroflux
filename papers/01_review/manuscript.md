@@ -141,11 +141,11 @@ roadmap toward coupling, GPU acceleration, and native autodifferentiation
 The 2D shallow-water equations in conservative form, with bed-slope
 and friction source terms:
 
-$$\\partial_t h + \\partial_x (hu) + \\partial_y (hv) = 0$$
+$$\partial_t h + \partial_x (hu) + \partial_y (hv) = 0$$
 
-$$\\partial_t (hu) + \\partial_x\\!\\left(hu^2 + \\tfrac{1}{2}g h^2\\right) + \\partial_y (huv) = -g h\\, \\partial_x z_b - g h S_{fx}$$
+$$\partial_t (hu) + \partial_x\!\left(hu^2 + \tfrac{1}{2}g h^2\right) + \partial_y (huv) = -g h\, \partial_x z_b - g h S_{fx}$$
 
-$$\\partial_t (hv) + \\partial_x (huv) + \\partial_y\\!\\left(hv^2 + \\tfrac{1}{2}g h^2\\right) = -g h\\, \\partial_y z_b - g h S_{fy}$$
+$$\partial_t (hv) + \partial_x (huv) + \partial_y\!\left(hv^2 + \tfrac{1}{2}g h^2\right) = -g h\, \partial_y z_b - g h S_{fy}$$
 
 with depth `h`, velocities `(u, v)`, bed elevation `z_b(x, y)`,
 gravity `g`, and Manning friction slopes `S_{fx}, S_{fy}`. The state
@@ -163,7 +163,7 @@ y-face). The bed-slope source is treated in the well-balanced
 hydrostatic-reconstruction framework of Audusse et al. [@Audusse2004]:
 at each face the reconstructed depths
 
-$$h^*_L = \\max(h_L + z_L - z_{\\max}, 0), \\quad h^*_R = \\max(h_R + z_R - z_{\\max}, 0)$$
+$$h^*_L = \max(h_L + z_L - z_{\max}, 0), \quad h^*_R = \max(h_R + z_R - z_{\max}, 0)$$
 
 with `z_max = max(z_L, z_R)` feed the HLLC flux, and the
 hydrostatic-pressure correction $(g/2)(h^{2} - h*^{2})$ is added to the
