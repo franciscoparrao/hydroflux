@@ -94,12 +94,12 @@ well-balanced hydrostatic-reconstruction framework of Audusse et al.
 \[h^*_L = \\max(h_L + z_L - z_{\\max}, 0), \\quad h^*_R = \\max(h_R + z_R - z_{\\max}, 0)\]
 
 with \texttt{z\_max\ =\ max(z\_L,\ z\_R)} feed the HLLC flux, and the
-hydrostatic-pressure correction \texttt{(g/2)(h$^{2}$\ −\ h*²)} is added to
+hydrostatic-pressure correction \((g/2)(h^{2} - h*^{2})\) is added to
 the face-normal momentum component on each side. The bed is
 reconstructed linearly to the face midpoint following Liang \& Marche
 \citep{LiangMarche2009}, which moves the bed-slope source from the face
 flux into a cell-centred algebraic term
-\texttt{S\ =\ (g/2)(h$^{2}$\_\{R,\textbackslash{}\textbackslash{}text\{face\}\}\ −\ h$^{2}$\_\{L,\textbackslash{}\textbackslash{}text\{face\}\})/\textbackslash{}\textbackslash{}Delta\ x}
+\(S = (g/2)(h^{2}_{R,\text{face}} - h^{2}_{L,\text{face}})/\Delta x\)
 that cancels the pressure-flux divergence exactly at rest (the
 C-property --- exact preservation of a flat free surface over an
 arbitrary bed; verified to machine precision in §3.1).
@@ -108,20 +108,18 @@ arbitrary bed; verified to machine precision in §3.1).
 integration}
 
 Second-order spatial accuracy uses MUSCL reconstruction with the minmod
-limiter applied to the \textbf{primitive} vector \texttt{(η,\ u,\ v)},
-where \texttt{η\ =\ h\ +\ z\_b} is the free-surface elevation --- not
-the conserved variables and not \texttt{(η,\ hu,\ hv)}. The choice
-follows the well-balancing argument of Liang and Marche
-\citep{LiangMarche2009}: reconstructing velocities rather than momenta
-is what makes the scheme well-balanced on flows with non-uniform depth
-over a sloped bed. When the analytical solution has uniform \texttt{u}
-but varying \texttt{h} (e.g.~Manning normal flow),
-\texttt{(η,\ u,\ v)}-MUSCL gives equal velocity on both sides of every
-face and the HLLC sees a consistent state, eliminating an
-\texttt{O(\textbackslash{}\textbackslash{}Delta\ x\textbackslash{}\textbackslash{},\ S\_0/h\_n)}
-steady-state drift that momentum-reconstruction incurs (§3.4 measures a
-45× reduction versus \texttt{(η,\ hu,\ hv)}-MUSCL on the steady Manning
-uniform-flow test).
+limiter applied to the \textbf{primitive} vector \((\eta , u, v)\),
+where \(\eta = h + z_b\) is the free-surface elevation --- not the
+conserved variables and not \((\eta , hu, hv)\). The choice follows the
+well-balancing argument of Liang and Marche \citep{LiangMarche2009}:
+reconstructing velocities rather than momenta is what makes the scheme
+well-balanced on flows with non-uniform depth over a sloped bed. When
+the analytical solution has uniform \texttt{u} but varying \texttt{h}
+(e.g.~Manning normal flow), \((\eta , u, v)\)-MUSCL gives equal velocity
+on both sides of every face and the HLLC sees a consistent state,
+eliminating an \(O(\Delta x\, S_0/h_n)\) steady-state drift that
+momentum-reconstruction incurs (§3.4 measures a 45× reduction versus
+\((\eta , hu, hv)\)-MUSCL on the steady Manning uniform-flow test).
 
 Time integration uses the strong-stability-preserving Runge--Kutta
 second-order method (SSP-RK2; Heun), written as the convex combination
@@ -129,47 +127,39 @@ of two forward-Euler updates so that every property the forward-Euler
 step preserves under the CFL bound --- non-negative depth, mass
 conservation, finite momentum --- is inherited \citep{Toro2009}. The
 time step is bounded by
-\texttt{dt\ ·\ (s\_x/\textbackslash{}\textbackslash{}Delta\ x\ +\ s\_y/\textbackslash{}\textbackslash{}Delta\ y)\ ≤\ \textbackslash{}\textbackslash{}text\{CFL\}}
-with
-\texttt{s\_x\ =\ \textbackslash{}\textbackslash{}max(\textbar{}u\textbar{}\ +\ c)},
-\texttt{s\_y\ =\ \textbackslash{}\textbackslash{}max(\textbar{}v\textbar{}\ +\ c)},
-\texttt{c\ =\ \textbackslash{}\textbackslash{}sqrt\{g\ h\}}.
+\(dt \cdot (s_x/\Delta x + s_y/\Delta y) \leq \text{CFL}\) with
+\(s_x = \max(|u| + c)\), \(s_y = \max(|v| + c)\), \(c = \sqrt{g h}\).
 
 \subsection{Friction, wetting/drying, and boundary
 conditions}
 
 Manning friction is applied as an operator-split point-implicit
 fractional step on the momentum,
-\texttt{(hu,\ hv)\ \textbackslash{}\textbackslash{}leftarrow\ (hu,\ hv)/(1\ +\ \textbackslash{}\textbackslash{}alpha)}
-with
-\texttt{\textbackslash{}\textbackslash{}alpha\ =\ \textbackslash{}\textbackslash{}Delta\ t\textbackslash{}\textbackslash{},\ g\textbackslash{}\textbackslash{},\ n\^{}2\ \textbar{}U\textbar{}\ /\ h\^{}\{4/3\}},
-which is unconditionally stable, preserves rest and dry cells exactly,
-and keeps the flow direction fixed (the shared factor divides both
-momentum components). The Manning coefficient \texttt{n} is stored as a
-per-cell field, allowing a spatially variable roughness derived from
-land cover (§4.2); a uniform scalar is the special case of a constant
-field.
+\((hu, hv) \leftarrow (hu, hv)/(1 + \alpha)\) with
+\(\alpha = \Delta t\, g\, n^2 |U| / h^{4/3}\), which is unconditionally
+stable, preserves rest and dry cells exactly, and keeps the flow
+direction fixed (the shared factor divides both momentum components).
+The Manning coefficient \texttt{n} is stored as a per-cell field,
+allowing a spatially variable roughness derived from land cover (§4.2);
+a uniform scalar is the special case of a constant field.
 
 Wetting and drying use the Liang \& Marche flux-rescaling scheme: a
-per-cell factor
-\texttt{\textbackslash{}\textbackslash{}alpha\ \textbackslash{}\textbackslash{}in\ {[}0,\ 1{]}}
-caps the total outgoing mass at the available depth, applied to all
-three flux components at each outgoing face, with the upstream cell's
-factor seen by both cells sharing the face. This guarantees no cell
-drains below the dry threshold and that mass is conserved exactly across
-each face; on wet--wet flows
-\texttt{\textbackslash{}\textbackslash{}alpha\ ≡\ 1} and the scheme
-reduces to the unrescaled finite-volume update. Boundary conditions
-(Wall, Transmissive, Discharge, Depth) are imposed via ghost cells on
-all four sides; the Discharge-on-dry case reconstructs a
-Manning-normal-depth ghost so a cold-start inflow over a dry domain
-picks a sane first time step.
+per-cell factor \(\alpha \in [0, 1]\) caps the total outgoing mass at
+the available depth, applied to all three flux components at each
+outgoing face, with the upstream cell's factor seen by both cells
+sharing the face. This guarantees no cell drains below the dry threshold
+and that mass is conserved exactly across each face; on wet--wet flows
+\(\alpha ≡ 1\) and the scheme reduces to the unrescaled finite-volume
+update. Boundary conditions (Wall, Transmissive, Discharge, Depth) are
+imposed via ghost cells on all four sides; the Discharge-on-dry case
+reconstructs a Manning-normal-depth ghost so a cold-start inflow over a
+dry domain picks a sane first time step.
 
 \subsection{Differentiability and
 performance}
 
 The 2D solver is generic over a \texttt{Real} trait abstracting the
-arithmetic surface (\texttt{+}, \texttt{−}, \texttt{×}, \texttt{/},
+arithmetic surface (\texttt{+}, \(-\), \texttt{×}, \texttt{/},
 \texttt{sqrt}, \texttt{powf}, \texttt{max}, \texttt{min}, \texttt{abs}).
 Two implementations are used: \texttt{f64} for production, and a
 forward-mode \texttt{Dual\ \{val,\ dval\}} propagating
@@ -192,11 +182,11 @@ independent gradients across every layer of the discretisation. On the
 HLLC Riemann flux (wet/wet star branch and the dry-bed two-rarefaction
 branch), the Manning friction step (seeded on both \texttt{n} and
 \texttt{h}), the full forward-Euler update, and the SSP-RK2 update, AD
-matches central FD to better than \texttt{10$^{-6}$} relative on derivatives
+matches central FD to better than \(10^{-6}\) relative on derivatives
 whose magnitudes span six orders of magnitude. The SSP-RK2 test
 additionally recovers an exact analytical invariance: the derivative of
 total mass with respect to a uniform bed-elevation shift is
-\texttt{−(n\_rows\ ·\ n\_cols\ ·\ dx\ ·\ dy)} to \texttt{10$^{-8}$} --- mass
+\(-(n_rows \cdot n_cols \cdot dx \cdot dy)\) to \(10^{-8}\) --- mass
 conservation under reference-level change holds in the gradient, not
 just the value.
 
@@ -207,10 +197,10 @@ friction-damped dam-break on a 3×60 channel with
 serves as the observation. Picking \texttt{n\_true\ =\ 0.040} produces a
 synthetic centroid at \texttt{x\ =\ 27.65} m. Starting from
 \texttt{n\_init\ =\ 0.080} (a 2× over-estimate) and updating
-\texttt{n\ ←\ n\ −\ (c\_pred(n)\ −\ c\_obs)\ ·\ (∂c\_pred/∂n)⁻¹} with
-the gradient from one forward pass of \texttt{T\ =\ Dual}, Newton
+\(n \leftarrow n - (c_pred(n) - c_obs) \cdot (\partial c_pred/\partial n)^{-1}\)
+with the gradient from one forward pass of \texttt{T\ =\ Dual}, Newton
 converges to \texttt{n\_final\ =\ 0.040\ 000} (relative error
-\texttt{\textless{}\ 10$^{-15}$}) in five iterations.
+\(< 10^{-15}\)) in five iterations.
 
 The arithmetic overhead of the wedge is measured on a 64×64 cell domain
 over 200 SSP-RK2 + Manning steps. The Dual-typed run takes 1.98× the
@@ -268,13 +258,13 @@ Result
 \bottomrule\noalign{}
 \endlastfoot
 Lake-at-rest, bumpy bed & analytical (C-property) & 20×20 &
-\texttt{‖η\ −\ η₀‖∞} & \texttt{\textless{}\ 10$^{-10}$} (machine) \\
+\(\|\eta - \eta _{0}\|_\infty\) & \(< 10^{-10}\) (machine) \\
 Lake-at-rest, Thacker paraboloid & analytical (C-property) & --- &
-\texttt{‖η\ −\ η₀‖∞} & \texttt{≈\ 3·10$^{-16}$} \\
+\(\|\eta - \eta _{0}\|_\infty\) & \(\approx 3\cdot 10^{-16}\) \\
 Thacker oscillating & analytical transient & 80×80 & rel. L$^{2}$ on
 \texttt{h} & 0.068 \% \\
 Thacker oscillating & analytical transient & 80×80 & mass error &
-\texttt{2.15·10$^{-5}$} \\
+\(2.15\cdot 10^{-5}\) \\
 Stoker/Ritter dam-break & analytical transient & 400×3 & L$^{1}$ on
 \texttt{h} & 1.0 \% \\
 Stoker/Ritter dam-break & analytical transient & 400×3 & L∞ on
@@ -291,15 +281,15 @@ pass \\
 
 A flat free surface over an arbitrary bed must remain at rest. On a
 submerged 2D Gaussian bump and on a smooth Thacker paraboloid, the
-scheme preserves \texttt{η\ =\ h\ +\ z\_b} and zero momentum to machine
-precision (\texttt{‖η\ −\ η₀‖∞\ ≈\ 3·10$^{-16}$}, \texttt{‖q‖∞\ ≈\ 2·10$^{-15}$}
-after 60 s). The cell-centred algebraic bed-slope source of §2.2 is
-bit-exact for \emph{any} bed shape --- including smooth curved beds ---
-provided every cell stays wet, correcting an earlier working assumption
-in our own development that smooth curved beds would require a
-Castro--Parés path-conservative treatment. The cancellation is
-self-consistent in the face beds \texttt{z\_face}, not in the underlying
-bed function.
+scheme preserves \(\eta = h + z_b\) and zero momentum to machine
+precision (\(\|\eta - \eta _{0}\|_\infty \approx 3\cdot 10^{-16}\),
+\(\|q\|_\infty \approx 2\cdot 10^{-15}\) after 60 s). The cell-centred
+algebraic bed-slope source of §2.2 is bit-exact for \emph{any} bed shape
+--- including smooth curved beds --- provided every cell stays wet,
+correcting an earlier working assumption in our own development that
+smooth curved beds would require a Castro--Parés path-conservative
+treatment. The cancellation is self-consistent in the face beds
+\texttt{z\_face}, not in the underlying bed function.
 
 \subsection{Thacker oscillating
 paraboloid}
@@ -308,8 +298,8 @@ The Thacker planar-oscillation solution on a paraboloidal basin is a
 classic 2D analytical transient with a moving wet/dry shoreline. Over a
 half-period (864 steps on an 80×80 mesh), the solver reproduces the
 analytical depth with relative L$^{2}$ error 0.068 \% and L∞ error
-\texttt{2·10$^{-4}$} m (0.16 \% of \texttt{h₀}), conserving mass to
-\texttt{2.15·10$^{-5}$} despite the continuously moving shoreline.
+\(2\cdot 10^{-4}\) m (0.16 \% of \texttt{h₀}), conserving mass to
+\(2.15\cdot 10^{-5}\) despite the continuously moving shoreline.
 
 \subsection{Dam-break on a dry bed
 (Stoker/Ritter)}
@@ -337,9 +327,9 @@ step, and the Discharge (upstream) and Depth (downstream) boundary
 conditions --- and it is the configuration on which momentum-vector
 reconstruction visibly fails. The solver holds the prescribed
 \texttt{h\_n} to $\sim$0.03 \% (against a 2 \% regression
-guard), a 45× improvement over a \texttt{(η,\ hu,\ hv)}-momentum
-reconstruction, which motivated the primitive \texttt{(η,\ u,\ v)}
-choice of §2.3.
+guard), a 45× improvement over a \((\eta , hu, hv)\)-momentum
+reconstruction, which motivated the primitive \((\eta , u, v)\) choice
+of §2.3.
 
 \subsection{Radial dam-break and
 isotropy}
@@ -380,7 +370,7 @@ measuring the relative L1 and L2 error in depth at \texttt{t\ =\ T/2}
 
 \begin{longtable}[]{@{}llllll@{}}
 \toprule\noalign{}
-\texttt{n} & \texttt{Δx} {[}m{]} & rel. L1 & rel. L2 & order L1 & order
+\texttt{n} & \(\Delta x\) {[}m{]} & rel. L1 & rel. L2 & order L1 & order
 L2 \\
 \midrule\noalign{}
 \endhead
@@ -410,9 +400,9 @@ ANUGA}
 
 To position the solver against a mature open-source 2D shallow-water
 reference, we ran the Stoker dam-break in ANUGA \citep{Roberts2015} at
-the same effective resolution (\texttt{Δx\ =\ 1} m, matched to a
-100-cell hydroflux re-run) and the same physical setup (flat bed, walls
-on the long sides, transmissive ends, \texttt{h\_L\ =\ 1} m,
+the same effective resolution (\(\Delta x = 1\) m, matched to a 100-cell
+hydroflux re-run) and the same physical setup (flat bed, walls on the
+long sides, transmissive ends, \texttt{h\_L\ =\ 1} m,
 \texttt{t\_end\ =\ 4} s). Both solvers reproduce the Ritter rarefaction
 solution closely (Fig.~\ref{fig:head_to_head}). On the analytical rarefaction fan
 \texttt{x\ ∈\ {[}37.5,\ 75.1{]}} m, the relative error norms are L1 4.1
@@ -420,7 +410,7 @@ solution closely (Fig.~\ref{fig:head_to_head}). On the analytical rarefaction fa
 2.7 \%, L∞ 4.4 \% \texttt{h\_L} for ANUGA --- ANUGA edges out hydroflux
 by a factor of $\sim$1.5 in L1 at this coarse resolution, with
 both staying below 6 \%. Refining hydroflux to its reference 400-cell
-mesh (\texttt{Δx\ =\ 0.25} m, the configuration of Table 1 and §3.3)
+mesh (\(\Delta x = 0.25\) m, the configuration of Table 1 and §3.3)
 drops the L1 error to 1.0 \%, consistent with the near-second-order
 convergence of §3.7. The two solvers are therefore in the same accuracy
 class on this canonical dry-front benchmark; the (modest) coarse-grid
@@ -442,16 +432,15 @@ are released with the code.
 (no dry interior --- the cell-mask early-skip optimisation cannot
 artificially flatter the timing), the solver sustains
 \texttt{1.1}--\texttt{1.2} Mcell-steps per second at \texttt{f64}
-precision across grids from \texttt{256$^{2}$} to \texttt{1024$^{2}$}:
-\texttt{918}, \texttt{801} and \texttt{853} ns per cell-step
-respectively at the three sizes. The throughput is consistent with the
-single-threaded CPU references cited by the Caviedes-Voullième-circle
-GPU papers \citep{Rak2024, SaleemNorman2024} and falls in the band
-typical of HLLC + MUSCL + SSP-RK2 implementations on cache-resident
-problems.
+precision across grids from \(256^{2}\) to \(1024^{2}\): \texttt{918},
+\texttt{801} and \texttt{853} ns per cell-step respectively at the three
+sizes. The throughput is consistent with the single-threaded CPU
+references cited by the Caviedes-Voullième-circle GPU papers
+\citep{Rak2024, SaleemNorman2024} and falls in the band typical of HLLC
++ MUSCL + SSP-RK2 implementations on cache-resident problems.
 
 \textbf{\texttt{f64} vs \texttt{Dual\textless{}f64\textgreater{}}
-overhead.} On a \texttt{64$^{2}$} grid over \texttt{200} SSP-RK2 + Manning
+overhead.} On a \(64^{2}\) grid over \texttt{200} SSP-RK2 + Manning
 steps, the forward-mode AD instance takes \texttt{1.98\ ×} the
 wall-clock of the \texttt{f64} instance (\texttt{676} vs \texttt{1338}
 ns per cell-step, §2.5). The ratio is inside the expected 2-3× band for
@@ -461,7 +450,7 @@ overhead headline.
 
 \textbf{Wall-clock vs ANUGA on a matched Stoker problem.} On the Stoker
 dam-break scaled to \texttt{200\ m\ ×\ 5\ m}, \texttt{t\_end\ =\ 8\ s}
-at matched effective \texttt{Δx\ =\ 0.5\ m}, hydroflux integrates the
+at matched effective \(\Delta x = 0.5 m\), hydroflux integrates the
 eight simulated seconds in \texttt{1.07\ s} of wall-clock (\texttt{0.13}
 s wall per simulated second); ANUGA integrates the same physical problem
 in \texttt{6.91\ s} of wall-clock (\texttt{0.86} s wall per simulated
@@ -474,7 +463,7 @@ because the user- visible cost of running a flood event scales with this
 quantity.
 
 \textbf{Bottleneck and next layer.} Profiling the forward Euler step
-(rough profile from \texttt{cargo\ flamegraph} on the \texttt{512$^{2}$}
+(rough profile from \texttt{cargo\ flamegraph} on the \(512^{2}\)
 Gaussian bump) shows that the \texttt{well\_balanced\_x\_face} +
 \texttt{well\_balanced\_y\_face} assembly takes $\sim$60 \% of
 the wall-clock, the cell update (with the explicit bed-slope source)
@@ -485,7 +474,7 @@ per-face/per-cell basis. We attempted a CPU-parallel face-flux pass via
 arithmetic (\texttt{$\sim${}200-500} ns at the FV face level)
 is small relative to the rayon task-dispatch and Vec-collect overhead
 --- even at 8 threads, the multi-threaded version was slower than the
-serial baseline by about 2× on \texttt{512$^{2}$}. The conclusion we draw is
+serial baseline by about 2× on \(512^{2}\). The conclusion we draw is
 the opposite of the naive one: this scheme's next throughput layer is
 not CPU parallelisation but GPU offload, where the face- and cell-loops
 map to a single-instruction multiple-thread kernel without the per-task
@@ -522,36 +511,34 @@ shrubland (8 \%, \texttt{n\ =\ 0.060}), among minor classes. The land
 cover is not random with respect to the channel: riparian tree and shrub
 vegetation (\texttt{n\ =\ 0.06}--\texttt{0.10}) tracks the thalweg,
 while the surrounding hillslopes are bare desert (\texttt{n\ =\ 0.025}).
-The resulting field has
-\texttt{n\_\{\textbackslash{}\textbackslash{}min\}\ =\ 0.015},
-\texttt{n\_\{\textbackslash{}\textbackslash{}text\{mean\}\}\ =\ 0.036},
-\texttt{n\_\{\textbackslash{}\textbackslash{}max\}\ =\ 0.100}. The
-mapping is illustrative rather than calibrated: the absolute values are
-within the standard Manning ranges \citep{Chow1959} but a regional
-friction survey or a literature compilation with narrower-than-Chow
-uncertainties (e.g.~Arcement and Schneider's USGS compilation) would
-tighten the lookup. Because Manning friction enters the momentum
-equation as \texttt{n$^{2}$}, the headline storage and discharge changes
-reported in §4.3 scale roughly linearly with shifts in the channel-class
-values; the qualitative direction (riparian vegetation retains water) is
-robust to plausible lookup choices, the quantitative magnitude is not.
+The resulting field has \(n_{\min} = 0.015\),
+\(n_{\text{mean}} = 0.036\), \(n_{\max} = 0.100\). The mapping is
+illustrative rather than calibrated: the absolute values are within the
+standard Manning ranges \citep{Chow1959} but a regional friction survey
+or a literature compilation with narrower-than-Chow uncertainties
+(e.g.~Arcement and Schneider's USGS compilation) would tighten the
+lookup. Because Manning friction enters the momentum equation as
+\(n^{2}\), the headline storage and discharge changes reported in §4.3
+scale roughly linearly with shifts in the channel-class values; the
+qualitative direction (riparian vegetation retains water) is robust to
+plausible lookup choices, the quantitative magnitude is not.
 
 \subsection{Results}
 
 Over a one-day peak simulation, the spatially variable Manning field
 changes the inundation relative to a single calibrated
 \texttt{n\ =\ 0.04}: the mean channel depth increases by 0.22 m, the
-final wet volume retained in the reach grows by 25 \% (\texttt{2.69·10$^{5}$}
-vs \texttt{2.14·10$^{5}$} m$^{3}$), the mean outflow drops 4 \% (15.0 vs 15.6
-m$^{3}$/s), and the wetted-cell count rises from 278 to 286. The mechanism is
-physical: the riparian vegetation that the land cover places exactly in
-the channel (\texttt{n\ ≈\ 0.10}, four times the uniform value) slows
-the flow, deepens it locally, and retains more water in the reach --- an
-effect a single domain-averaged roughness cannot represent. The peak
-depth is marginally lower (4.29 vs 4.33 m) because the slowed flow
-spreads laterally rather than building to the channel peak. Mass is
-conserved throughout (net storage change consistent with cumulative
-inflow minus outflow).
+final wet volume retained in the reach grows by 25 \%
+(\(2.69\cdot 10^{5}\) vs \(2.14\cdot 10^{5}\) m$^{3}$), the mean outflow
+drops 4 \% (15.0 vs 15.6 m$^{3}$/s), and the wetted-cell count rises from 278
+to 286. The mechanism is physical: the riparian vegetation that the land
+cover places exactly in the channel (\(n \approx 0.10\), four times the
+uniform value) slows the flow, deepens it locally, and retains more
+water in the reach --- an effect a single domain-averaged roughness
+cannot represent. The peak depth is marginally lower (4.29 vs 4.33 m)
+because the slowed flow spreads laterally rather than building to the
+channel peak. Mass is conserved throughout (net storage change
+consistent with cumulative inflow minus outflow).
 
 This application is a demonstration of capability, not a calibrated
 hindcast: the absolute depths depend on the warm-start and the
