@@ -147,11 +147,11 @@ $$\partial_t (hu) + \partial_x\!\left(hu^2 + \tfrac{1}{2}g h^2\right) + \partial
 
 $$\partial_t (hv) + \partial_x (huv) + \partial_y\!\left(hv^2 + \tfrac{1}{2}g h^2\right) = -g h\, \partial_y z_b - g h S_{fy}$$
 
-with depth `h`, velocities `(u, v)`, bed elevation `z_b(x, y)`,
-gravity `g`, and Manning friction slopes `S_{fx}, S_{fy}`. The state
-is stored as `Conserved2D = (h, hu, hv)` on a structured Cartesian
-mesh of cells indexed `(i, j)` with row `i` along `y` and column `j`
-along `x`, matching the GeoTIFF raster convention so that DEM and
+with depth $h$, velocities $(u, v)$, bed elevation $z_b(x, y)$,
+gravity $g$, and Manning friction slopes $S_{fx}, S_{fy}$. The state
+is stored as `Conserved2D` = (h, hu, hv) on a structured Cartesian
+mesh of cells indexed $(i, j)$ with row $i$ along $y$ and column $j$
+along $x$, matching the GeoTIFF raster convention so that DEM and
 output rasters share a geotransform.
 
 ## 2.2 Finite-volume discretisation
@@ -165,7 +165,7 @@ at each face the reconstructed depths
 
 $$h^*_L = \max(h_L + z_L - z_{\max}, 0), \quad h^*_R = \max(h_R + z_R - z_{\max}, 0)$$
 
-with `z_max = max(z_L, z_R)` feed the HLLC flux, and the
+with $z_max = max(z_L, z_R)$ feed the HLLC flux, and the
 hydrostatic-pressure correction $(g/2)(h^{2} - h*^{2})$ is added to the
 face-normal momentum component on each side. The bed is reconstructed
 linearly to the face midpoint following Liang & Marche [@LiangMarche2009],
@@ -184,7 +184,7 @@ variables and not $(\eta , hu, hv)$. The choice follows the well-balancing
 argument of Liang and Marche [@LiangMarche2009]: reconstructing
 velocities rather than momenta is what makes the scheme well-balanced
 on flows with non-uniform depth over a sloped bed. When the analytical
-solution has uniform `u` but varying `h` (e.g. Manning normal flow),
+solution has uniform $u$ but varying $h$ (e.g. Manning normal flow),
 $(\eta , u, v)$-MUSCL gives equal velocity on both sides of every face and
 the HLLC sees a consistent state, eliminating an
 $O(\Delta x\, S_0/h_n)$ steady-state drift that momentum-reconstruction
@@ -206,7 +206,7 @@ fractional step on the momentum, $(hu, hv) \leftarrow (hu, hv)/(1 + \alpha)$
 with $\alpha = \Delta t\, g\, n^2 |U| / h^{4/3}$, which is unconditionally
 stable, preserves rest and dry cells exactly, and keeps the flow
 direction fixed (the shared factor divides both momentum components).
-The Manning coefficient `n` is stored as a per-cell field, allowing a
+The Manning coefficient $n$ is stored as a per-cell field, allowing a
 spatially variable roughness derived from land cover (§4.2); a uniform
 scalar is the special case of a constant field.
 
@@ -225,18 +225,18 @@ picks a sane first time step.
 ## 2.5 Differentiability and performance
 
 The 2D solver is generic over a `Real` trait abstracting the
-arithmetic surface (`+`, $-$, `×`, `/`, `sqrt`, `powf`, `max`, `min`,
+arithmetic surface ($+$, $-$, $×$, $/$, `sqrt`, `powf`, `max`, `min`,
 `abs`). Two implementations are used: `f64` for production, and a
-forward-mode `Dual {val, dval}` propagating `(value, derivative)`
+forward-mode `Dual {val, dval}` propagating $(value, derivative)$
 through every operation. The state (`Conserved2DG<T>`), the mesh
 (`Mesh2DG<T>`), the HLLC Riemann flux, the Audusse hydrostatic
 reconstruction, the MUSCL slopes, the Liang–Marche flux rescaling, the
 point-implicit Manning step, and both time integrators
-(`forward_euler_step`, `ssprk2_step`) all dispatch over `T: Real`. The
+(`forward_euler_step`, `ssprk2_step`) all dispatch over $T: Real$. The
 derivative of any output with respect to a single seed input is
 recovered as `result.dval` after one forward pass; there is no
 separate adjoint code to maintain. Branching on dryness uses
-`T::value()` so control flow stays scalar; on each branch the
+$T::value()$ so control flow stays scalar; on each branch the
 arithmetic propagates the derivative through whichever side is taken.
 
 We verify this end-to-end with an AD-vs-FD locking suite that
@@ -244,7 +244,7 @@ compares forward-mode AD against second-order central finite
 differences on independent gradients across every layer of the
 discretisation. On the HLLC Riemann flux (wet/wet star branch and
 the dry-bed two-rarefaction branch), the Manning friction step
-(seeded on both `n` and `h`), the full forward-Euler update, and the
+(seeded on both $n$ and $h$), the full forward-Euler update, and the
 SSP-RK2 update, AD matches central FD to better than $10^{-6}$ relative
 on derivatives whose magnitudes span six orders of magnitude. The
 SSP-RK2 test additionally recovers an exact analytical invariance:
@@ -254,18 +254,18 @@ under reference-level change holds in the gradient, not just the value.
 
 Beyond locking, we exercise the wedge on a small inverse problem. A
 friction-damped dam-break on a 3×60 channel with
-`(h_L, h_R) = (1.0, 0.1)` m is simulated to `t = 20` s; the
+$(h_L, h_R) = (1.0, 0.1)$ m is simulated to $t = 20$ s; the
 depth-weighted centroid of the wet region serves as the
-observation. Picking `n_true = 0.040` produces a synthetic centroid
-at `x = 27.65` m. Starting from `n_init = 0.080` (a 2× over-estimate)
+observation. Picking $n_true = 0.040$ produces a synthetic centroid
+at $x = 27.65$ m. Starting from $n_init = 0.080$ (a 2× over-estimate)
 and updating
 $n \leftarrow  n - (c_pred(n) - c_obs) \cdot  (\partial c_pred/\partial n)^{-1}$ with the gradient from
-one forward pass of `T = Dual`, Newton converges to
-`n_final = 0.040 000` (relative error $< 10^{-15}$) in five iterations.
+one forward pass of $T = Dual$, Newton converges to
+$n_final = 0.040 000$ (relative error $< 10^{-15}$) in five iterations.
 
 The arithmetic overhead of the wedge is measured on a 64×64 cell
 domain over 200 SSP-RK2 + Manning steps. The Dual-typed run takes
-1.98× the wall-clock of the `f64` run (`1338` vs `676` ns per
+1.98× the wall-clock of the `f64` run ($1338$ vs $676$ ns per
 cell-step, post-warm-up, release build). This is within the expected
 2-3× band for forward-mode AD on compiled code and lower than
 tracer-based AD on the same problem class.
@@ -291,7 +291,7 @@ We verify against a hierarchy of references of increasing complexity,
 from exact steady states through analytical transients to the
 community benchmark suite. Table 1 summarises the quantitative results;
 all are computed by the solver's automated test suite and reproduced by
-the `report_*` informational tests.
+the $report_*$ informational tests.
 
 **Table 1. Verification results.**
 
@@ -299,12 +299,12 @@ the `report_*` informational tests.
 |-----------|------|------|--------|--------|
 | Lake-at-rest, bumpy bed | analytical (C-property) | 20×20 | $\|\eta  - \eta _{0}\|_\infty$ | $< 10^{-10}$ (machine) |
 | Lake-at-rest, Thacker paraboloid | analytical (C-property) | — | $\|\eta  - \eta _{0}\|_\infty$ | $\approx  3\cdot 10^{-16}$ |
-| Thacker oscillating | analytical transient | 80×80 | rel. L² on `h` | 0.068 % |
+| Thacker oscillating | analytical transient | 80×80 | rel. L² on $h$ | 0.068 % |
 | Thacker oscillating | analytical transient | 80×80 | mass error | $2.15\cdot 10^{-5}$ |
-| Stoker/Ritter dam-break | analytical transient | 400×3 | L¹ on `h` | 1.0 % |
-| Stoker/Ritter dam-break | analytical transient | 400×3 | L∞ on `h` | 2.2 % |
+| Stoker/Ritter dam-break | analytical transient | 400×3 | L¹ on $h$ | 1.0 % |
+| Stoker/Ritter dam-break | analytical transient | 400×3 | L∞ on $h$ | 2.2 % |
 | Radial dam-break | symmetry | 160×160 | axisymmetry | preserved |
-| MacDonald uniform flow | steady, well-balanced | — | steady-state `h` | ~0.03 % (guard 2 %) |
+| MacDonald uniform flow | steady, well-balanced | — | steady-state $h$ | ~0.03 % (guard 2 %) |
 | UK EA Tests 1–6 | community suite | various | qualitative + mass | pass |
 
 ## 3.1 Well-balancedness (lake-at-rest)
@@ -326,14 +326,14 @@ The Thacker planar-oscillation solution on a paraboloidal basin is a
 classic 2D analytical transient with a moving wet/dry shoreline. Over a
 half-period (864 steps on an 80×80 mesh), the solver reproduces the
 analytical depth with relative L² error 0.068 % and L∞ error
-$2\cdot 10^{-4}$ m (0.16 % of `h₀`), conserving mass to $2.15\cdot 10^{-5}$ despite
+$2\cdot 10^{-4}$ m (0.16 % of $h_{0}$), conserving mass to $2.15\cdot 10^{-5}$ despite
 the continuously moving shoreline.
 
 ## 3.3 Dam-break on a dry bed (Stoker/Ritter)
 
 The Ritter/Stoker dam-break has a closed-form rarefaction-plus-front
-solution. On a 400-cell channel with `h_L = 1` m, the SSP-RK2 scheme
-attains L¹ error 1.0 %, L² 1.0 %, and L∞ 2.2 % of `h_L` at `t = 4` s,
+solution. On a 400-cell channel with $h_L = 1$ m, the SSP-RK2 scheme
+attains L¹ error 1.0 %, L² 1.0 %, and L∞ 2.2 % of $h_L$ at $t = 4$ s,
 with the wet front lagging the analytical position by 2.9 m (the
 expected diffusive lag of a shock-capturing scheme at the dry front).
 The forward-Euler integrator gives a comparable L¹ (1.1 %) and a
@@ -359,8 +359,8 @@ $(\eta , u, v)$ choice of §2.3.
 
 A circular dam-break on a 160×160 mesh tests grid isotropy: the radial
 depth profile must be independent of azimuth. The solver preserves
-axisymmetry — depths along `+x` and `+y` are bit-identical, and the
-diagonal (`+45°`) profile agrees to ~1 % — confirming the x/y flux
+axisymmetry — depths along $+x$ and $+y$ are bit-identical, and the
+diagonal ($+45°$) profile agrees to ~1 % — confirming the x/y flux
 assembly carries no directional bias.
 
 ## 3.6 UK Environment Agency 2D benchmark suite
@@ -382,12 +382,12 @@ and the cell-mask skip on a realistically heterogeneous domain.
 We quantify the order of accuracy on the Thacker oscillation — the
 benchmark here that combines a smooth analytical transient with a
 moving wet/dry shoreline — by refining the grid from 32² to 256² and
-measuring the relative L1 and L2 error in depth at `t = T/2`
+measuring the relative L1 and L2 error in depth at $t = T/2$
 (Table 2, Figure 5).
 
-**Table 2. Thacker convergence (error in `h` at `t = T/2`).**
+**Table 2. Thacker convergence (error in $h$ at $t = T/2$).**
 
-| `n` | $\Delta x$ [m] | rel. L1 | rel. L2 | order L1 | order L2 |
+| $n$ | $\Delta x$ [m] | rel. L1 | rel. L2 | order L1 | order L2 |
 |-----|----------|---------|---------|----------|----------|
 | 32  | 0.0781   | 4.96·10⁻³ | 5.96·10⁻³ | —    | —    |
 | 64  | 0.0391   | 1.31·10⁻³ | 1.68·10⁻³ | 1.92 | 1.82 |
@@ -413,11 +413,11 @@ To position the solver against a mature open-source 2D shallow-water
 reference, we ran the Stoker dam-break in ANUGA [@Roberts2015] at the
 same effective resolution ($\Delta x = 1$ m, matched to a 100-cell hydroflux
 re-run) and the same physical setup (flat bed, walls on the long sides,
-transmissive ends, `h_L = 1` m, `t_end = 4` s). Both solvers reproduce
+transmissive ends, $h_L = 1$ m, $t_end = 4$ s). Both solvers reproduce
 the Ritter rarefaction solution closely (Figure 6). On the analytical
-rarefaction fan `x ∈ [37.5, 75.1]` m, the relative error norms are
-L1 4.1 %, L2 3.6 %, L∞ 5.3 % `h_L` for hydroflux and L1 2.6 %, L2 2.7 %,
-L∞ 4.4 % `h_L` for ANUGA — ANUGA edges out hydroflux by a factor of
+rarefaction fan $x ∈ [37.5, 75.1]$ m, the relative error norms are
+L1 4.1 %, L2 3.6 %, L∞ 5.3 % $h_L$ for hydroflux and L1 2.6 %, L2 2.7 %,
+L∞ 4.4 % $h_L$ for ANUGA — ANUGA edges out hydroflux by a factor of
 ~1.5 in L1 at this coarse resolution, with both staying below 6 %.
 Refining hydroflux to its reference 400-cell mesh ($\Delta x = 0.25$ m, the
 configuration of Table 1 and §3.3) drops the L1 error to 1.0 %,
@@ -439,30 +439,30 @@ measurements only; see below); the corresponding benchmark scripts
 **Serial throughput.** On smooth Gaussian-bump initial conditions
 (no dry interior — the cell-mask early-skip optimisation cannot
 artificially flatter the timing), the solver sustains
-`1.1`–`1.2` Mcell-steps per second at `f64` precision across grids
-from $256^{2}$ to $1024^{2}$: `918`, `801` and `853` ns per cell-step
+$1.1$–$1.2$ Mcell-steps per second at `f64` precision across grids
+from $256^{2}$ to $1024^{2}$: $918$, $801$ and $853$ ns per cell-step
 respectively at the three sizes. The throughput is consistent with the
 single-threaded CPU references cited by the Caviedes-Voullième-circle
 GPU papers [@Rak2024; @SaleemNorman2024] and falls in the band
 typical of HLLC + MUSCL + SSP-RK2 implementations on cache-resident
 problems.
 
-**`f64` vs `Dual<f64>` overhead.** On a $64^{2}$ grid over `200` SSP-RK2 +
-Manning steps, the forward-mode AD instance takes `1.98 ×` the
-wall-clock of the `f64` instance (`676` vs `1338` ns per cell-step,
+**`f64` vs `Dual<f64>` overhead.** On a $64^{2}$ grid over $200$ SSP-RK2 +
+Manning steps, the forward-mode AD instance takes $1.98 ×$ the
+wall-clock of the `f64` instance ($676$ vs $1338$ ns per cell-step,
 §2.5). The ratio is inside the expected 2-3× band for forward-mode AD
 on compiled code and below the 3-5× typical of tracer-based AD on
 similar problem classes. We treat this as the AD overhead headline.
 
 **Wall-clock vs ANUGA on a matched Stoker problem.** On the Stoker
-dam-break scaled to `200 m × 5 m`, `t_end = 8 s` at matched effective
+dam-break scaled to $200 m × 5 m$, $t_end = 8 s$ at matched effective
 $\Delta x = 0.5 m$, hydroflux integrates the eight simulated seconds in
-`1.07 s` of wall-clock (`0.13` s wall per simulated second); ANUGA
-integrates the same physical problem in `6.91 s` of wall-clock (`0.86`
-s wall per simulated second). The ratio is `6.5×` in hydroflux's
+$1.07 s$ of wall-clock ($0.13$ s wall per simulated second); ANUGA
+integrates the same physical problem in $6.91 s$ of wall-clock ($0.86$
+s wall per simulated second). The ratio is $6.5×$ in hydroflux's
 favour per simulated second. The two solvers run different mesh
 topologies (rectangular cells versus the
-`rectangular_cross`-triangulated `4 ×` denser mesh that ANUGA's
+`rectangular_cross`-triangulated $4 ×$ denser mesh that ANUGA's
 solver requires) so cell-count throughput is not directly comparable;
 the simulated-second metric is the meaningful one because the user-
 visible cost of running a flood event scales with this quantity.
@@ -474,8 +474,8 @@ takes ~60 % of the wall-clock, the cell update (with the explicit
 bed-slope source) ~25 %, and the cell-mask + MUSCL slope pass the
 remainder. Both dominant pieces are embarrassingly parallel on a
 per-face/per-cell basis. We attempted a CPU-parallel face-flux pass
-via `rayon` for this submission and found that the per-face
-arithmetic (`~200-500` ns at the FV face level) is small relative to
+via $rayon$ for this submission and found that the per-face
+arithmetic ($~200-500$ ns at the FV face level) is small relative to
 the rayon task-dispatch and Vec-collect overhead — even at 8 threads,
 the multi-threaded version was slower than the serial baseline by
 about 2× on $512^{2}$. The conclusion we draw is the opposite of the
@@ -483,7 +483,7 @@ naive one: this scheme's next throughput layer is not CPU
 parallelisation but GPU offload, where the face- and cell-loops map
 to a single-instruction multiple-thread kernel without the per-task
 overhead that defeats CPU rayon on a fine-grained per-face workload.
-Section §5 carries the GPU port (via `wgpu` compute shaders) as the
+Section §5 carries the GPU port (via $wgpu$ compute shaders) as the
 immediate next deliverable.
 
 # 4. Application: the 2017 Aluvión Atacama on the Río Huasco
@@ -507,11 +507,11 @@ The solver ingests an ESA WorldCover 2021 land-cover raster
 [@ESAWorldCover2021] resampled to the DEM grid and maps each class
 to a Manning coefficient through a published lookup (Chow [@Chow1959]
 and compilations therein): bare/sparse ground (66 % of the domain,
-`n = 0.025`), grassland (14 %, `n = 0.040`), tree cover (8 %,
-`n = 0.100`), and shrubland (8 %, `n = 0.060`), among minor classes.
+$n = 0.025$), grassland (14 %, $n = 0.040$), tree cover (8 %,
+$n = 0.100$), and shrubland (8 %, $n = 0.060$), among minor classes.
 The land cover is not random with respect to the channel: riparian
-tree and shrub vegetation (`n = 0.06`–`0.10`) tracks the thalweg, while
-the surrounding hillslopes are bare desert (`n = 0.025`). The resulting
+tree and shrub vegetation ($n = 0.06$–$0.10$) tracks the thalweg, while
+the surrounding hillslopes are bare desert ($n = 0.025$). The resulting
 field has $n_{\min} = 0.015$, $n_{\text{mean}} = 0.036$,
 $n_{\max} = 0.100$. The mapping is illustrative rather than
 calibrated: the absolute values are within the standard Manning ranges
@@ -527,7 +527,7 @@ quantitative magnitude is not.
 ## 4.3 Results
 
 Over a one-day peak simulation, the spatially variable Manning field
-changes the inundation relative to a single calibrated `n = 0.04`: the
+changes the inundation relative to a single calibrated $n = 0.04$: the
 mean channel depth increases by 0.22 m, the final wet volume retained
 in the reach grows by 25 % ($2.69\cdot 10^{5}$ vs $2.14\cdot 10^{5}$ m³), the mean
 outflow drops 4 % (15.0 vs 15.6 m³/s), and the wetted-cell count rises
@@ -552,9 +552,9 @@ that a continental-scale, multi-basin programme requires.
 # 5. Roadmap
 
 The verified 2D solver is the foundation of a staged programme. The
-immediate next layers are: (i) **GPU acceleration** via `wgpu` compute
+immediate next layers are: (i) **GPU acceleration** via $wgpu$ compute
 shaders, prioritised by the §3.9 finding that CPU-side parallelism
-(`rayon` over the per-face FV work) is defeated by the small
+($rayon$ over the per-face FV work) is defeated by the small
 per-face arithmetic relative to task-dispatch overhead — the next
 throughput layer is SIMT, not multi-threaded; both the well-balanced
 flux assembly and the cell-mask skip map naturally to per-face/per-cell
@@ -596,13 +596,13 @@ simulation — released for the community to build on.
 
 **Figure 1** (`fig01_scheme.pdf`). Well-balanced finite-volume scheme
 at an x-face between cells L and R over a stepped bed (to scale). The
-cells carry actual depths `h_L, h_R` (blue brackets at the cell
+cells carry actual depths $h_L, h_R$ (blue brackets at the cell
 centres) with free surfaces $\eta _L, \eta _R$. The Audusse (2004) hydrostatic
-reconstruction defines `z_max = max(z_L, z_R)` (purple dashed) and the
+reconstruction defines $z_max = max(z_L, z_R)$ (purple dashed) and the
 reconstructed face depths $h*_L = max(\eta _L - z_max, 0)$,
 $h*_R = max(\eta _R - z_max, 0)$ (purple brackets), on which the HLLC
-flux `F` (vermillion) is evaluated. The bed is reconstructed linearly
-to the shared face value `z_face = ½(z_L + z_R)`, which makes the
+flux $F$ (vermillion) is evaluated. The bed is reconstructed linearly
+to the shared face value $z_face = ½(z_L + z_R)$, which makes the
 Audusse pressure correction vanish and moves the bed-slope force into
 the cell-centred source term (orange) — the construction that gives
 the exact lake-at-rest balance verified in §3.1. Schematic (no
@@ -610,13 +610,13 @@ simulation data); generated by `fig01_scheme.R`.
 
 **Figure 2** (`fig02_verification.pdf`). Verification against analytical
 references: simulated profiles (points) overlaid on the analytical
-solution (line). (a) Stoker/Ritter dam-break on a dry bed at `t = 4` s —
+solution (line). (a) Stoker/Ritter dam-break on a dry bed at $t = 4$ s —
 the rarefaction fan and the leading dry front are captured (400-cell
 channel, mid-row slice). (b) MacDonald uniform flow at steady state, y-
 axis zoomed to ±1.5 % of the normal depth `h_n` to expose the
 well-balanced preservation (the profile stays flat at `h_n` on a sloped
 bed under Manning friction). (c) Thacker oscillating paraboloid at
-`t = T/2`, centre-row slice — the parabolic cap and its moving wet/dry
+$t = T/2$, centre-row slice — the parabolic cap and its moving wet/dry
 shoreline track the analytical solution on a curved bed. Quantitative
 error metrics for all benchmarks are in Table 1 (computed over the
 benchmark-specific regions: the Stoker rarefaction fan, the 2D Thacker
@@ -625,14 +625,14 @@ view of this figure with the table's domain-wide norms. Generated by
 `fig02_verification.R` from the `gen_verification_data` example output.
 
 **Figure 3** (`fig03_uk_ea_t6.pdf`). UK Environment Agency 2D benchmark
-Test 6: urban dam-break depth field at `t = 30` s on the 500 × 100 m
-domain (250 × 50 cells, $\Delta x = \Delta y = 2$ m). The reservoir (`x < 100` m,
+Test 6: urban dam-break depth field at $t = 30$ s on the 500 × 100 m
+domain (250 × 50 cells, $\Delta x = \Delta y = 2$ m). The reservoir ($x < 100$ m,
 dashed dam line) collapses into the dry downstream and reaches the
-first building cluster ($x \approx  150$–170 m) by `t = 30` s, wrapping around
+first building cluster ($x \approx  150$–170 m) by $t = 30$ s, wrapping around
 the obstacles with the expected wakes and inter-building jets. The six
 raised-bed buildings (grey) remain dry throughout — water navigates the
 array without overtopping them — while the wet/dry front is captured
-without spurious oscillation. Depth `scico` devon scale; downstream
+without spurious oscillation. Depth $scico$ devon scale; downstream
 buildings ($x \geq  250$ m) are still dry at this time as the front has not
 yet arrived. Generated by `fig03_uk_ea_t6.R` from the
 `gen_verification_data` example output.
@@ -641,10 +641,10 @@ yet arrived. Generated by `fig03_uk_ea_t6.R` from the
 application, 200 × 67-cell 30 m subset (UTM 19S), one-day peak. Five
 panels sharing the reach extent: (a) ESA WorldCover 2021 land cover —
 riparian tree and shrub vegetation tracks the thalweg within bare
-Atacama hillslopes; (b) the derived Manning field `n(x, y)` mapping
-land cover to roughness (`n = 0.025` bare to `0.10` tree); (c)
-inundation depth with a single uniform `n = 0.04`; (d) inundation
-depth with the variable `n(x, y)`; (e) the difference $\Delta h = (d) - (c)$,
+Atacama hillslopes; (b) the derived Manning field $n(x, y)$ mapping
+land cover to roughness ($n = 0.025$ bare to $0.10$ tree); (c)
+inundation depth with a single uniform $n = 0.04$; (d) inundation
+depth with the variable $n(x, y)$; (e) the difference $\Delta h = (d) - (c)$,
 hill-shaded base, divergent scale. Panels (c)–(e) share a hillshade
 underlay. The positive Δh (warm) concentrated in the channel shows the
 riparian roughness deepening and retaining the flow — the +0.22 m mean
@@ -655,7 +655,7 @@ rasters (`huasco_subset_{dem,landcover}.tif`,
 
 **Figure 5** (`fig05_convergence.pdf`). Mesh-refinement convergence on
 the Thacker oscillation (§3.7): relative L1 (circles) and L2
-(triangles) error in depth at `t = T/2` versus cell size $\Delta x$, log-log,
+(triangles) error in depth at $t = T/2$ versus cell size $\Delta x$, log-log,
 with order-1 and order-2 reference slopes (dashed). The data track the
 order-2 slope at coarse-to-medium grids and bend toward order 1 as the
 moving wet/dry shoreline (locally first order) dominates the shrinking
@@ -665,10 +665,10 @@ Generated by `fig05_convergence.R` from the `gen_convergence` example.
 **Figure 6** (`fig06_head_to_head.pdf`). Head-to-head against ANUGA
 [@Roberts2015] on the Stoker/Ritter dam-break at matched resolution
 ($\Delta x = 1$ m, §3.8). Both solvers (circles: hydroflux; triangles: ANUGA)
-overlaid on the analytical Ritter profile (line) at `t = 4` s; the
-rarefaction fan `[37.5, 75.1]` m is shaded. The dashed vertical marks
-the initial dam at `x = 50` m. Relative error norms over the fan,
-annotated: L1 4.1 % / L2 3.6 % / L∞ 5.3 % `h_L` for hydroflux versus
+overlaid on the analytical Ritter profile (line) at $t = 4$ s; the
+rarefaction fan $[37.5, 75.1]$ m is shaded. The dashed vertical marks
+the initial dam at $x = 50$ m. Relative error norms over the fan,
+annotated: L1 4.1 % / L2 3.6 % / L∞ 5.3 % $h_L$ for hydroflux versus
 2.6 % / 2.7 % / 4.4 % for ANUGA. Both stay below 6 % at this coarse
 resolution; hydroflux's reference 400-cell run (Table 1) reaches
 L1 1.0 %. Generated by `fig06_head_to_head.R` from the
@@ -677,10 +677,10 @@ L1 1.0 %. Generated by `fig06_head_to_head.R` from the
 # Open Research
 
 All code is released open-source at <https://github.com/franciscoparrao/hydroflux>
-(commit hash TODO at submission). The `solver-2d` crate contains the
-finite-volume solver (`state`, `flux`, `riemann`, `geometry`,
-`boundary`, `update`, `source`, `io` modules) and its verification
-suite (143 tests; the `report_*` ignored tests print the §3 metrics).
+(commit hash TODO at submission). The $solver-2d$ crate contains the
+finite-volume solver ($state$, $flux$, $riemann$, $geometry$,
+`boundary`, $update$, $source$, $io$ modules) and its verification
+suite (143 tests; the $report_*$ ignored tests print the §3 metrics).
 The Huasco application is reproduced by the `huasco_2d_event` and
 `huasco_2d_event_landcover` examples. Build and verify:
 
@@ -724,7 +724,7 @@ Feng2022, Tsai2021] plus the verified JAX-Fluids and SynxFlow.)*
    (§1 here); the verification (§3) and application (§4) are new and
    data-backed by the solver-2d test suite + this session's Huasco runs.
 2. Verification numbers in Table 1 / §3 are REAL (from the solver-2d
-   `report_*` tests, run 2026-05-28): lake-at-rest 3e-16, Thacker L²
+   $report_*$ tests, run 2026-05-28): lake-at-rest 3e-16, Thacker L²
    0.068 % / mass 2.15e-5, Stoker L¹ 1.0 %, MacDonald ~0.03 % (guard 2 %), radial
    axisymmetric, UK EA ×6 pass.
 3. Application numbers (§4.3) are REAL (huasco_2d_event vs
@@ -746,8 +746,8 @@ Feng2022, Tsai2021] plus the verified JAX-Fluids and SynxFlow.)*
    to C&G/GMD methods.
 7. Abstract + Plain Language Summary are first drafts; tighten before
    submission.
-8. `/verify-refs` ✅ done (2026-05-29; 3 hallucinated refs removed).
-   `/tex-review` ✅ done (2026-05-29): applied textual fixes — MacDonald
+8. $/verify-refs$ ✅ done (2026-05-29; 3 hallucinated refs removed).
+   $/tex-review$ ✅ done (2026-05-29): applied textual fixes — MacDonald
    reframed as the degenerate uniform-flow limit (was overclaimed as
    "non-trivial inverse-designed"); mass-2e-5 claim scoped to the
    closed-domain Thacker; "25 % more water" given a one-day/sensitivity
