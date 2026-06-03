@@ -118,6 +118,6 @@ forward to your decision.
 
 Sincerely,
 
-Francisco Parra Orellana
+Francisco Parra
 Postdoctoral researcher, Universidad de Santiago de Chile
 gran.huja@gmail.com  ·  ORCID: TBD

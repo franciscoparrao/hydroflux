@@ -1,10 +1,10 @@
 # Differentiable hydraulic geometry: bridging the cross-event generalisation gap in 1D shallow-water flood routing
 
-**Authors**: Francisco Parra Olea<sup>1</sup>, [IR del postdoc]<sup>1</sup>
+**Authors**: Francisco Parra<sup>1</sup>, [IR del postdoc]<sup>1</sup>
 
 <sup>1</sup>Universidad de Santiago de Chile, Departamento [TBD], Santiago, Chile.
 
-**Corresponding author**: Francisco Parra Olea (francisco.parra.o@usach.cl)
+**Corresponding author**: Francisco Parra (francisco.parra.o@usach.cl)
 
 ## Key Points
 

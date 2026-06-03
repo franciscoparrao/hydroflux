@@ -1,7 +1,7 @@
 ---
 title: "hydroflux: a well-balanced, differentiable-by-design 2D shallow-water solver in Rust, verified against analytical and community benchmarks and applied to a semiarid Andean reach"
 author:
-  - name: Francisco Parra Olea
+  - name: Francisco Parra
     affiliation: Universidad de Santiago de Chile
     orcid: 0000-0000-0000-0000  # TODO confirm ORCID
 date: 2026-05-28
