@@ -373,7 +373,7 @@ We quantify the order of accuracy on the Thacker oscillation --- the
 benchmark here that combines a smooth analytical transient with a moving
 wet/dry shoreline --- by refining the grid from 32$^{2}$ to 256$^{2}$ and
 measuring the relative L1 and L2 error in depth at \texttt{t\ =\ T/2}
-(Table 2, Figure 5).
+(Table 2, Fig.~\ref{fig:convergence}).
 
 \textbf{Table 2. Thacker convergence (error in \texttt{h} at
 \texttt{t\ =\ T/2}).}
@@ -414,7 +414,7 @@ the same effective resolution (\texttt{Δx\ =\ 1} m, matched to a
 100-cell hydroflux re-run) and the same physical setup (flat bed, walls
 on the long sides, transmissive ends, \texttt{h\_L\ =\ 1} m,
 \texttt{t\_end\ =\ 4} s). Both solvers reproduce the Ritter rarefaction
-solution closely (Figure 6). On the analytical rarefaction fan
+solution closely (Fig.~\ref{fig:head_to_head}). On the analytical rarefaction fan
 \texttt{x\ ∈\ {[}37.5,\ 75.1{]}} m, the relative error norms are L1 4.1
 \%, L2 3.6 \%, L∞ 5.3 \% \texttt{h\_L} for hydroflux and L1 2.6 \%, L2
 2.7 \%, L∞ 4.4 \% \texttt{h\_L} for ANUGA --- ANUGA edges out hydroflux

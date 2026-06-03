@@ -22,7 +22,7 @@ BODY_CLEAN  := body_clean.tex
 
 all: $(PAPER).pdf
 
-$(PAPER).pdf: $(PAPER).tex $(BODY_CLEAN) references.bib elsarticle.cls elsarticle-harv.bst
+$(PAPER).pdf: $(PAPER).tex $(BODY_CLEAN) figures.tex references.bib elsarticle.cls elsarticle-harv.bst
 	$(LATEX) $(PAPER).tex
 	$(BIBTEX) $(PAPER)
 	$(LATEX) $(PAPER).tex
@@ -35,6 +35,15 @@ $(BODY_CLEAN): $(MD_SOURCE)
 	awk '/^\\hypertarget{introduction}/,/^\\end{document}/' $(PANDOC_INTERMEDIATE) > $(BODY_FROM_INTRO)
 	sed -E '/^\\hypertarget\{/d; s/^\\section\{[0-9]+\. /\\section{/g; s/^\\subsection\{[0-9]+\.[0-9]+ ?/\\subsection{/g; s/\}\\label\{[^}]+\}\}$$/}/; s/\\textasciitilde\\?[ ]?/$$\\sim$$/g' $(BODY_FROM_INTRO) > $(BODY_CLEAN).tmp
 	awk '/^\\section\{Figures/{exit} {print}' $(BODY_CLEAN).tmp > $(BODY_CLEAN)
+	# Cross-references: in-text "Figure N" becomes Fig.~\ref{fig:tag}
+	sed -E -i \
+	    -e 's/Figure 1/Fig.~\\ref{fig:scheme}/g' \
+	    -e 's/Figure 2/Fig.~\\ref{fig:verification}/g' \
+	    -e 's/Figure 3/Fig.~\\ref{fig:ukea_t6}/g' \
+	    -e 's/Figure 4/Fig.~\\ref{fig:huasco}/g' \
+	    -e 's/Figure 5/Fig.~\\ref{fig:convergence}/g' \
+	    -e 's/Figure 6/Fig.~\\ref{fig:head_to_head}/g' \
+	    $(BODY_CLEAN)
 	python3 fix_superscripts.py $(BODY_CLEAN)
 	rm -f $(BODY_CLEAN).tmp
 
