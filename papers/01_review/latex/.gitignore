@@ -26,3 +26,6 @@ body_clean.tex.tmp
 # Final PDF — built locally, not stored in git
 paper.pdf
 paper.spl
+
+# Cover letter PDF — built from cover_letter_ems.tex
+cover_letter_ems.pdf

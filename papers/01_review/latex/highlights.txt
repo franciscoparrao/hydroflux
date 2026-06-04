@@ -1,0 +1,5 @@
+A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
+HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
+Verified on Thacker, Stoker, MacDonald, UK EA x6; head-to-head against ANUGA.
+Forward-mode AD costs 1.98x f64; 6.5x faster wall-clock than ANUGA on Stoker.
+Applied to 2017 Aluvion Atacama (Rio Huasco) with ESA WorldCover Manning.

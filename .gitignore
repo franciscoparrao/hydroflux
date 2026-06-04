@@ -62,3 +62,13 @@ tmp/
 
 # Notebooks profundos (preservar el .ipynb pero no checkpoints)
 .ipynb_checkpoints/
+
+# Stray journal-comparison artefacts at repo root (residue from /paper-match
+# runs; regenerable from ~/vault/journals/<slug>/ if needed).
+/AWR*
+/JH*
+/NH_guidelines*
+/RSASE*
+
+# ANUGA binary outputs (regenerable from m2_anuga_wallclock.py + anuga_stoker_compare.py)
+*.sww
