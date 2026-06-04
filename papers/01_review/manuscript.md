@@ -3,7 +3,18 @@ title: "hydroflux: a well-balanced, differentiable-by-design 2D shallow-water so
 author:
   - name: Francisco Parra
     affiliation: Universidad de Santiago de Chile
-    orcid: 0000-0000-0000-0000  # TODO confirm ORCID
+    orcid: 0009-0008-4961-304X
+    corresponding: true
+    email: francisco.parra.o@usach.cl
+  - name: Verónica Gil-Costa
+    affiliation: Universidad Nacional de San Luis (UNSL) and CONICET, San Luis, Argentina
+    orcid: 0000-0003-4637-9725
+  - name: Carolina Bonacic
+    affiliation: Universidad de Santiago de Chile
+    orcid: 0000-0002-8076-6537
+  - name: Mauricio Marín
+    affiliation: Universidad de Santiago de Chile
+    orcid: 0000-0003-0662-7149
 date: 2026-05-28
 keywords: [shallow water equations, finite volume, well-balanced,
            HLLC, wetting and drying, differentiable physics, Rust,

@@ -120,4 +120,7 @@ Sincerely,
 
 Francisco Parra
 Postdoctoral researcher, Universidad de Santiago de Chile
-gran.huja@gmail.com  ·  ORCID: TBD
+francisco.parra.o@usach.cl  ·  ORCID: 0009-0008-4961-304X
+
+on behalf of co-authors V. Gil-Costa (UNSL–CONICET, Argentina),
+C. Bonacic (USACH) and M. Marín (USACH)
