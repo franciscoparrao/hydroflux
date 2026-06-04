@@ -1,0 +1,157 @@
+Para: Verónica Gil-Costa <ggvcosta@gmail.com>
+CC: Carolina Bonacic <carolina.bonacic@usach.cl>, Mauricio Marín <mauricio.marin@usach.cl>
+Asunto: Paper hydroflux — listo para envío a Environmental Modelling & Software, requiere su revisión
+
+Hola Verónica, hola Carolina, hola profesor Marín,
+
+Les escribo para que revisen, antes del envío, el segundo manuscrito
+del postdoc DICYT 2026-2027 que tengo listo: el paper de hydroflux, el
+solver 2D de aguas someras en Rust con autodiferenciación nativa.
+Replica la misma autoría del Paper 1 (BEGE):
+
+  1. Francisco Parra (corresponding, USACH)
+  2. Verónica Gil-Costa (UNSL–CONICET)
+  3. Carolina Bonacic (USACH)
+  4. Mauricio Marín (USACH)
+
+ORCIDs ya integrados al title page (los mismos que confirmamos para
+Paper 1):
+
+  - Francisco J. Parra Ortiz:  0009-0008-4961-304X
+  - Verónica Gil-Costa:        0000-0003-4637-9725
+  - Carolina Bonacic:          0000-0002-8076-6537
+  - Mauricio Marín:            0000-0003-0662-7149
+
+----------------------------------------------------------------------
+Venue: Environmental Modelling & Software (Elsevier, IF 4.0)
+----------------------------------------------------------------------
+
+Para esta línea (numerics + software ambiental, no susceptibilidad),
+EMS es el venue natural: 6 Associate Editors con áreas directamente
+solapadas (Costabile flood + HPC, Samadi hydroinformatics + ML floods,
+Demir cyberinfra, Razavi uncertainty, Galelli river basin, Gualtieri
+CFD environmental), tres papers casi gemelos publicados ahí mismo en
+2024-2025 (Rak GPU, Saleem & Norman MPI-GPU, Chen adaptive mesh
+coupled flood-landslide), y el paper SurtGIS que está actualmente
+bajo Major Revision en EMS forma una línea editorial coherente.
+
+----------------------------------------------------------------------
+Resumen de qué entrega el paper
+----------------------------------------------------------------------
+
+- Un solver 2D shallow-water finite-volume en Rust con HLLC + Audusse
+  + MUSCL + SSP-RK2 + Liang–Marche flux rescaling, well-balanced a
+  precisión de máquina y mass-conservative en wet/dry. Open-source
+  bajo MIT OR Apache-2.0.
+
+- Genérico sobre el tipo numérico (Real trait): el mismo código
+  evalúa en f64 para producción y en Dual<f64> para autodiferenciación
+  forward-mode. Sin código adjunto separado para el adjoint. Overhead
+  medido: 1.98× sobre f64.
+
+- Verificado contra una jerarquía deliberada: lake-at-rest a 3·10⁻¹⁶,
+  Thacker (rel L² 0.068%, masa 2·10⁻⁵), Stoker/Ritter (L¹ 1.0%),
+  MacDonald, dam-break radial, y los 6 tests UK Environment Agency 2D.
+
+- Cabeza-a-cabeza contra ANUGA en Stoker (matched mesh, Δx=0.5 m):
+  hydroflux 6.5× más rápido por segundo simulado, misma clase de
+  precisión.
+
+- Aplicado al Aluvión Atacama 2017 en Río Huasco (Santa Juana, DGA),
+  30 m DEM + ESA WorldCover, demostrando un campo de Manning espacial
+  derivado de cobertura terrestre. Reportado honestamente como
+  sensitivity demonstration, no calibrated hindcast.
+
+- Convergence study sobre Thacker (32²→256²): órdenes L¹ 1.81 / L²
+  1.68, consistentes con el régimen front-limited de MUSCL en
+  wet/dry.
+
+- §3.9 Performance: serial 1.1-1.2 Mcell-steps/s; intento honesto de
+  paralelismo CPU vía rayon reportado como negative result (la
+  aritmética per-face es demasiado fina vs el overhead de dispatch
+  de rayon — la dirección correcta es GPU/SIMT, no CPU multi-thread).
+
+36 páginas con 6 figuras embedded + bibliografía completa (38
+entries, verify-refs OpenAlex/CrossRef ya corrido — caza 3 referencias
+alucinadas en una iteración temprana).
+
+----------------------------------------------------------------------
+Author Contributions (CRediT) propuesta
+----------------------------------------------------------------------
+
+La hice así basándome en lo que cada uno aportó realmente en este
+paper específico (que es predominantemente método numérico + software,
+no aplicación territorial como Paper 1):
+
+  - Francisco Parra: Conceptualization; Methodology; Software
+    (solver-2d, autograd, suite de verificación, pipeline de
+    aplicación); Validation; Formal analysis; Investigation; Data
+    curation; Writing original + review & editing; Visualization;
+    Project administration; Funding acquisition.
+
+  - Verónica Gil-Costa: Methodology (numerical schemes + benchmarking);
+    Validation; Writing — review & editing; Supervision (computational
+    methodology).
+
+  - Carolina Bonacic: Software (HPC + parallelism review); Validation;
+    Writing — review & editing.
+
+  - Mauricio Marín: Conceptualization (research line + venue
+    positioning); Methodology (software-engineering rigor +
+    reproducibility); Writing — review & editing; Supervision (Rust
+    systems programming + software engineering); Resources (computing
+    infrastructure).
+
+Si alguno prefiere otro reparto de roles —especialmente Verónica y
+profesor Marín en lo que toca a metodología y supervisión, dado que
+este paper es más metodológico que el Paper 1—, me avisan y lo
+ajusto antes del envío.
+
+----------------------------------------------------------------------
+Adjuntos
+----------------------------------------------------------------------
+
+  - paper.pdf            (36 pp, manuscrito completo + 6 figs + bib)
+  - cover_letter_ems.pdf (2 pp, cover letter dirigida a Profs. Chen y
+                          El Sawah)
+  - highlights.txt       (5 bullets para Editorial Manager)
+
+Si quieren ver el código del solver y los benchmarks reproduciendo
+las 9 verificaciones del §3, está en:
+
+  https://github.com/franciscoparrao/hydroflux
+
+El Zenodo DOI lo mintamos cuando el paper esté aceptado (lo
+prometemos en §Open Research).
+
+----------------------------------------------------------------------
+Próximos pasos
+----------------------------------------------------------------------
+
+Mi plan es subir el paquete al Editorial Manager de EMS en los
+próximos 5-7 días, una vez que tenga:
+
+  1. Visto bueno general de los tres sobre el contenido del paper
+     (no necesito review línea-por-línea; basta con que la dirección
+     les haga sentido).
+
+  2. Confirmación o ajuste de los roles CRediT que propuse arriba.
+
+  3. Aprovecho también de preguntar: ¿alguno tiene un reviewer
+     sugerido o uno a evitar que ya conozca personalmente y prefiera
+     que mencione en el formulario de submission? (Los que ya sugerí
+     en la cover letter están en el ámbito europeo y norteamericano
+     de SW solvers; si tienen redes con cualquiera de ellos, mejor
+     evitarlos por conflicto de interés.)
+
+Cualquier comentario sobre el manuscrito o ajuste menor que quieran
+incorporar antes del envío, lo recibo y lo aplico.
+
+Muchas gracias a los tres por el respaldo de la línea.
+
+Un abrazo,
+
+Francisco Parra Ortiz
+francisco.parra.o@usach.cl
+Postdoctorado DICYT 2026-2027 (código 062619MC_POSTDOC)
+Depto. de Ingeniería Informática, USACH
