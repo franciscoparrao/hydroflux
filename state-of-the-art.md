@@ -1,7 +1,10 @@
 # State of the Art — Solvers de inundación open source y proprietarios
 
 Documento vivo. Cada solver tiene una ficha estándar.
-Última actualización: 2026-05-19. Estado: 12 fichas históricas + 3 entradas 2024-2025 que disparan el pivot estratégico.
+
+Última actualización: 2026-06-04. Estado: 12 fichas históricas + 1 entrante reciente verificado (SynxFlow) + sub-campo de differentiable hydrology + JAX-Fluids.
+
+> **Nota editorial 2026-06-04.** Una versión anterior de este documento (2026-05-19) incluía tres entrantes "2024-2025" que motivaron el pivot estratégico de Q4 2026: SynxFlow, Hydrograd.jl y AegirJAX. Una pasada de verify-refs vía CrossRef y OpenAlex el 2026-06-04 confirmó que sólo **SynxFlow** (Xia et al. 2025, JOSS, DOI 10.21105/joss.06952) es una publicación real. Hydrograd.jl y AegirJAX no aparecen en ninguna base bibliográfica y son atribuibles a alucinaciones de un literature scout asistido por LLM en mayo 2026. Las fichas y las síntesis fueron reescritas en consecuencia. El pivot estratégico sigue siendo sólido — la diferenciabilidad como framework unificador en hidrología está consolidada por la trilogía Shen (2023, *Nat. Rev. Earth Environ.*), Feng (2022, WRR) y Tsai (2021, *Nat. Commun.*), y JAX-Fluids (Bezgin et al. 2023, *Comput. Phys. Commun.*) entrega un solver CFD high-order diferenciable; un paper de review novedad-thin sobre flood SWE diferenciable habría sido difícil de defender de todos modos. El artefacto entregado es lo que vuelve defendible el wedge.
 
 ---
 
@@ -21,11 +24,10 @@ Documento vivo. Cada solver tiene una ficha estándar.
 | Delft3D | FORTRAN + C++ | FV | 2D, 3D | Parcial | No | No | LGPL | Sí (Deltares) | Sí (NL, global) |
 | GeoClaw | FORTRAN + Python | FV Godunov + AMR | 2D | No | No | No | BSD | Sí (UW) | Parcial (tsunami) |
 | Kratos Multiphysics SW app | C++/Python | FE | 2D, 3D | Parcial | No | No | BSD | Sí (CIMNE) | Académico |
-| **Hydrograd.jl** (Liu 2025) | **Julia** | FV | **2D** | **CUDA.jl** | **Sí (Zygote/Enzyme)** | No | **MIT** | **Sí (NEW)** | Académico (preliminar) |
-| **AegirJAX** (2025) | **Python+JAX** | FV | **2D** | **JAX-GPU/TPU** | **Sí (JAX native)** | No | **Apache-2.0** | **Sí (NEW)** | Académico (preliminar) |
-| **SynxFlow** (Xia 2024/2025) | **C++/CUDA** | FV well-balanced | **2D** | **CUDA maduro** | No | **Sí (flood+landslide+debris)** | **GPL** | **Sí (NEW)** | UK + China casos |
+| **SynxFlow** (Xia et al. 2025) | **C++/CUDA** | FV well-balanced | **2D** | **CUDA maduro** | No | **Sí (flood+landslide+debris)** | **GPL** | **Sí** | UK + China casos |
+| **JAX-Fluids** (Bezgin et al. 2023) | **Python+JAX** | High-order WENO/TENO | **3D CFD** | **JAX-GPU/TPU** | **Sí (JAX native)** | N/A (CFD core) | **GPL-3.0** | **Sí** | Académico (benchmarks compresibles) |
 
-**Lectura de la tabla a 2026-05**: las 12 filas históricas confirman el patrón heredado (FORTRAN/C++ legacy, GPU como excepción, sin diferenciabilidad, sin acoplamiento físico). Las 3 filas nuevas resaltadas en **negrita** son los entrantes 2024-2025 que cambian el landscape y disparan el pivot del 2026-05-18: cada uno cubre un subconjunto del wedge original (Hydrograd/AegirJAX cubren diferenciabilidad; SynxFlow cubre acoplamiento landslide+flood+debris; los tres incorporan GPU), pero ninguno los cubre simultáneamente, y los tres usan stacks runtime-managed (Julia JIT, Python interpreter, CUDA NVIDIA-only) que limitan portabilidad y deployment operacional. Ver fichas detalladas en `§ Entradas 2024-2025`.
+**Lectura de la tabla a 2026-06**: las 12 filas históricas confirman el patrón heredado (FORTRAN/C++ legacy, GPU como excepción, sin diferenciabilidad, sin acoplamiento físico). La fila **SynxFlow** es el entrante 2025 verificado y publicado en JOSS que cubre el acoplamiento físico flood + landslide + debris en un mismo runtime GPU, pero CUDA-only y sin diferenciabilidad. **JAX-Fluids** (incluido por completitud) demuestra que un solver CFD diferenciable end-to-end en un lenguaje high-level es viable, pero opera sobre las Navier-Stokes compresibles 3D y no sobre la SW 2D; su existencia define el corredor donde la diferenciabilidad ya es paradigma. La diferenciabilidad sobre SW 2D específicamente está en una zona pre-paper en el momento de redacción (junio 2026); ver § "Trabajos relacionados en diferenciabilidad hidrológica" para la trilogía Shen/Feng/Tsai que articula el marco.
 
 ---
 
@@ -214,63 +216,51 @@ Documento vivo. Cada solver tiene una ficha estándar.
 
 ---
 
-## Entradas 2024-2025 (cambio del landscape)
+## Entradas recientes verificadas (2023-2025)
 
-Tres entrantes publicados entre 2024 y 2025 reconfiguran el espacio competitivo y son lo que dispara el pivot estratégico del 2026-05-18. La detección tardía de los tres (después de redactar el draft del review paper Q4 2026) es la lección operacional: **WebSearch sistemático sobre claims de novedad ANTES de finalizar cualquier paper de posicionamiento**. La heurística se incorpora a la práctica del laboratorio.
+Dos publicaciones recientes y verificables reconfiguran el espacio competitivo y enmarcan el wedge revisado de hydroflux. La lección operacional del proceso de descubrirlas — y de la posterior retracción del 2026-06-04 — es que **verify-refs (CrossRef + OpenAlex) debe ejecutarse sobre TODA referencia de posicionamiento antes de incorporarla a un documento canónico, sin excepciones**. La heurística se incorporó como skill estable (`/verify-refs`) al laboratorio.
 
-### A. Hydrograd.jl (Liu et al., WRR 2025)
+### A. SynxFlow (Xia et al., JOSS 2025)
 
-- **Stack técnico**: Julia 1.10+, kernels SWE puro Julia con `ndarray`-equivalente, autograd vía Zygote.jl y Enzyme.jl (forward + reverse mode). GPU via CUDA.jl (NVIDIA only).
-- **Esquema numérico**: FV well-balanced 2D, HLLC Riemann o variantes; tiempo Euler/RK2 según versión. *Verificar detalles exactos del esquema en el paper publicado.*
-- **Discretización espacial**: structured Cartesian 2D primario; soporte unstructured *verificar*.
-- **Capacidades especiales**: gradiente nativo end-to-end sobre el solver (Manning n, BCs, condiciones iniciales). Demos de calibración por gradient descent en casos sintéticos + 1-2 casos reales de US Midwest (Mississippi tributarios). NO acopla landslide.
-- **Validación**: dam break analítico, MacDonald steady, partial UK EA. *Verificar cuántos casos UK EA exactamente.*
-- **Mantenimiento**: GitHub público (Liu lab), releases regulares desde 2024. Comunidad pequeña, scaling todavía no probado en producción.
-- **Licencia y código**: MIT. Repositorio abierto.
-- **Workflow del usuario**: Julia REPL o scripts; setup en YAML/Julia macros; outputs HDF5/NetCDF.
-- **Fortalezas únicas**: primer SWE differentiable maduro en lenguaje moderno con autograd ergonómico; Julia permite expresión matemática cercana al paper.
-- **Limitaciones**: Julia JIT (cold start 5-30s para casos no-triviales, mata operacionalización); CUDA.jl restringe a NVIDIA; NO acopla landslide ni debris; cluster scaling experimental; documentación todavía irregular.
-- **Gap vs hydroflux**: Hydrograd cubre diferenciabilidad solo. NO acopla peligros, NO multiplataforma GPU, NO shippable como binary (Julia runtime obligatorio). Lenguaje (Julia vs Rust) es decisión de arquitectura irreversible para ellos.
-
-### B. AegirJAX (2025)
-
-- **Stack técnico**: Python 3.11+ con JAX como backend numérico; tracing JIT a XLA para GPU/TPU/CPU. *Verificar si tiene componentes C/Cython residuales o es 100% JAX.*
-- **Esquema numérico**: FV well-balanced SWE 2D, scheme tipo central-upwind o HLL/HLLC. *Verificar exacto.* Tiempo explícito.
-- **Discretización espacial**: structured 2D primario. Sin AMR (los tracers JAX no soportan ramificación dinámica eficiente).
-- **Capacidades especiales**: autograd JAX nativo (`jax.grad`, `jax.vjp`) sobre TODO el solver, incluyendo loops temporales via `lax.scan`. Demos de uncertainty quantification (UQ) sobre Manning + BCs vía Hamiltonian Monte Carlo (HMC) con `numpyro` o `BlackJAX`. NO acopla landslide.
-- **Validación**: dam break, oblique waves, casos sintéticos. Validación regulatoria ausente.
-- **Mantenimiento**: GitHub público, autores en EU/UK *verificar institución exacta*, releases 2024-2025.
-- **Licencia y código**: Apache-2.0. Abierto.
-- **Workflow del usuario**: Python notebooks o scripts; pip-installable; outputs NumPy/Xarray.
-- **Fortalezas únicas**: ecosistema científico Python completo (NumPyro, Optax, etc.) habilita workflows downstream UQ y ML; portabilidad GPU/TPU/CPU vía XLA.
-- **Limitaciones**: Python runtime (startup overhead, GIL para multiproceso CPU); JAX consume memoria GPU agresivamente (corre OOM en mallas grandes); JIT trace cost para sims largas; NO shippable como binary (Python+JAX wheels obligatorias); NO acopla landslide; no operacionalizable en agencias estatales sin DevOps Python.
-- **Gap vs hydroflux**: AegirJAX cubre diferenciabilidad + portabilidad GPU/TPU, pero está atado al runtime Python+JAX y NO acopla peligros. No es shippable como tool standalone.
-
-### C. SynxFlow (Xia et al., JOSS 2024/2025)
-
+- **Cita verificada**: Xia, X., Liang, Q. y Hou, J. (2025). SynxFlow: A coupled GPU-accelerated framework for simulating cascading flood, landslide and debris flow processes. *Journal of Open Source Software*, 9(95), 6952. DOI: 10.21105/joss.06952. Verificado vía CrossRef + OpenAlex 2026-06-04.
 - **Stack técnico**: C++ orchestrator + CUDA kernels nativos (NVIDIA only). Bindings Python para setup.
-- **Esquema numérico**: FV well-balanced 2D SWE para inundación; modelo Iverson-type con stress de poro para landslide trigger; Voellmy o tipo mu(I) para propagación granular. Operator splitting entre dominios (flood ↔ landslide ↔ debris). Tiempo explícito CFL-bounded por dominio.
+- **Esquema numérico**: FV well-balanced 2D SWE para inundación; modelo Iverson-type con stress de poro para landslide trigger; Voellmy o tipo μ(I) para propagación granular. Operator splitting entre dominios (flood ↔ landslide ↔ debris). Tiempo explícito CFL-bounded por dominio.
 - **Discretización espacial**: structured Cartesian raster (compatible DEM); cada dominio físico (flood / landslide / debris) corre en su propio kernel CUDA sobre la misma mesh.
-- **Capacidades especiales**: PRIMERA implementación opensource de acoplamiento físico explícito flood + landslide + debris flow en un mismo engine GPU. Demos en cuencas UK y casos chinos (Wenchuan, *verificar*); aplicaciones a riesgo post-incendio y debris flow inducido por lluvia.
+- **Capacidades especiales**: una de las primeras implementaciones open-source de acoplamiento físico explícito flood + landslide + debris flow en un mismo engine GPU. Demos en cuencas UK y casos chinos (Wenchuan); aplicaciones a riesgo post-incendio y debris flow inducido por lluvia.
 - **Validación**: casos UK EA parcial (los 2D relevantes); casos de campo Wenchuan/China; sin certificación regulatoria explícita.
-- **Mantenimiento**: GitHub público (Hemwet Lab, UK), releases regulares 2023-2025; JOSS paper publicado 2024.
-- **Licencia y código**: GPL. Open source (clave para legitimidad académica).
+- **Mantenimiento**: GitHub público, releases regulares 2023-2025; JOSS paper publicado 2025.
+- **Licencia y código**: GPL.
 - **Workflow del usuario**: Python setup (configuración + IO), CLI para correr; outputs raster GeoTIFF.
-- **Fortalezas únicas**: única solver open opensource que **acopla los tres peligros físicamente** en un mismo runtime; GPU CUDA maduro; comunidad creciente.
-- **Limitaciones**: NO differentiable (CUDA hand-coded no expone gradientes); CUDA-only (no AMD, no Apple, no WASM); C++/CUDA legacy (build system fragil, no memory safety por construcción); cualquier extensión requiere modificar CUDA kernels manualmente; sin path natural a autograd sin reescritura completa.
-- **Gap vs hydroflux**: SynxFlow cubre acoplamiento + GPU, pero está bloqueado en CUDA-NVIDIA y no es differentiable. Adoptar autograd requeriría reescribir todo el kernel CUDA en un framework como JAX/Enzyme, lo que es equivalente a reescribir el proyecto entero.
+- **Fortalezas únicas**: solver open-source que **acopla los tres peligros físicamente** en un mismo runtime; GPU CUDA maduro; comunidad creciente.
+- **Limitaciones**: NO differentiable (CUDA hand-coded no expone gradientes); CUDA-only (no AMD, no Apple, no WASM); C++/CUDA legacy; cualquier extensión requiere modificar CUDA kernels manualmente; sin path natural a autograd sin reescritura completa.
+- **Gap vs hydroflux**: SynxFlow cubre acoplamiento + GPU pero está bloqueado en CUDA-NVIDIA y no es diferenciable. La intersección "coupling + diferenciable + multiplataforma" queda abierta.
 
-### Síntesis de los 3 entrantes
+### B. JAX-Fluids (Bezgin et al., *Comput. Phys. Commun.* 2023)
 
-| Eje | Hydrograd | AegirJAX | SynxFlow | hydroflux (target) |
-|---|---|---|---|---|
-| Diferenciable | ✅ | ✅ | ❌ | ✅ |
-| Coupling físico de peligros | ❌ | ❌ | ✅ | ✅ |
-| GPU multiplataforma | ❌ (CUDA only) | ✅ (XLA) | ❌ (CUDA only) | ✅ (wgpu) |
-| Compiled binary deployment | ❌ (Julia JIT) | ❌ (Python+JAX) | ❌ (C++ runtime libs) | ✅ (Rust static) |
-| Aplicación a Chile / cuencas BNA | ❌ | ❌ | ❌ | ✅ (postdoc DICYT) |
+- **Cita verificada**: Bezgin, D. A., Buhendwa, A. B. y Adams, N. A. (2023). JAX-Fluids: A fully-differentiable high-order computational fluid dynamics solver for compressible two-phase flows. *Computer Physics Communications*, 282, 108527. DOI: 10.1016/j.cpc.2022.108527. Verificado vía CrossRef 2026-05-29 (incluido en `references.bib` del paper EMS).
+- **Stack técnico**: Python 3.10+ con JAX como backend numérico; tracing JIT a XLA para GPU/TPU/CPU.
+- **Esquema numérico**: FV high-order para Navier-Stokes compresibles 3D; reconstrucciones WENO5/WENO7/TENO5/TENO7; Riemann HLLC/Rusanov; time-stepping SSP-RK3.
+- **Discretización espacial**: structured Cartesian 3D primario.
+- **Capacidades especiales**: autograd JAX nativo (`jax.grad`, `jax.vjp`) sobre todo el solver, incluyendo loops temporales via `lax.scan`. Demos de inverse design, shock-capture differentiable y ML closures para LES.
+- **Mantenimiento**: GitHub público (TUM, Múnich), releases regulares 2023-2025.
+- **Licencia y código**: GPL-3.0.
+- **Fortalezas únicas**: prueba de existencia de un solver CFD diferenciable end-to-end de alto orden en un lenguaje high-level — el paradigma de "diferenciable por construcción" sobre CFD ya es realidad.
+- **Limitaciones para flood SWE**: NO es shallow-water (resuelve Navier-Stokes compresibles); estructurado 3D denso (no GIS-native); Python+JAX runtime; sin acoplamiento de peligros. No compite directamente con hydroflux; es referencia paradigmática del corredor diferenciable.
+- **Relación con hydroflux**: hydroflux toma el principio (diferenciabilidad por construcción) y lo entrega en el dominio shallow-water 2D + Rust + GIS-native + Chilean basins. JAX-Fluids no resuelve el mismo problema, pero **demuestra que el corredor diferenciable es viable**, lo que descarta cualquier argumento de novelty puro sobre "primer solver diferenciable" en CFD/SWE.
 
-Cada uno de los tres entrantes hace 1 o 2 dimensiones del wedge original; ninguno cubre la intersección completa, y por la naturaleza de sus stacks (Julia, JAX/Python, CUDA hand-coded) ninguno puede pivotar a cubrirla sin reescritura sustancial. **Esa intersección — diferenciable + acoplado + multiplataforma + binary + aplicado a hidrología chilena — es el wedge revisado de hydroflux.**
+### Síntesis del landscape verificado
+
+| Eje | SynxFlow | JAX-Fluids | hydroflux |
+|---|---|---|---|
+| Dominio | Shallow water + landslide + debris | Navier-Stokes compresibles 3D | Shallow water 2D |
+| Diferenciable | ❌ | ✅ | ✅ |
+| Coupling físico de peligros | ✅ | N/A | Roadmap (§5 paper EMS) |
+| GPU portable / multiplataforma | ❌ CUDA only | ✅ XLA (GPU/TPU/CPU) | Roadmap `wgpu` |
+| Compiled binary deployment | ❌ | ❌ Python+JAX | ✅ Rust static |
+| GIS-native I/O (GeoTIFF) | Parcial | ❌ | ✅ |
+| Anclaje en cuencas chilenas | ❌ | ❌ | ✅ (postdoc DICYT) |
+
+SynxFlow y JAX-Fluids representan los frentes vigentes del paradigma "coupled hazard" y del paradigma "diferenciable por construcción" respectivamente. **hydroflux ocupa la composición**: diferenciable como JAX-Fluids pero sobre SWE 2D; coupled como SynxFlow pero por construcción en el roadmap explícito; entregado como binario nativo y con I/O GIS-native que ninguno de los dos provee. Las decisiones arquitectónicas son aditivas, no idénticas a las de los entrantes — no necesitamos reclamar novelty pura sobre ninguno de los ejes, sino sobre su composición.
 
 ---
 
@@ -310,13 +300,13 @@ El pipeline canónico actual es: susceptibilidad (eslabón 1) → propagación g
 
 ---
 
-## Síntesis: gap final (revisado post-pivot 2026-05-18)
+## Síntesis: gap final (versión 2026-06-04)
 
 El landscape se evalúa en dos capas. La capa **incumbente** (HEC-RAS, LISFLOOD-FP, BASEMENT, TELEMAC, ANUGA, Iber, SRH-2D, MIKE, TUFLOW, Delft3D, GeoClaw, Kratos) hereda cuatro patrones estructurales que delimitan colectivamente el espacio histórico: el software regulatorio (HEC-RAS, MIKE, TUFLOW, SRH-2D, Iber, BASEMENT) es propietario o de código cerrado, atado a GUI Windows con archivos binarios no versionables, lo que bloquea auditabilidad y reproducibilidad; las alternativas opensource (TELEMAC, Delft3D, ANUGA, GeoClaw, Kratos) entregan el código pero cargan con build systems frágiles y curvas de aprendizaje que en la práctica las confinan a sus nichos académicos; los kernels numéricos están sin excepción en FORTRAN o C++ legacy, lenguajes que no ofrecen memory safety por construcción ni ergonomía nativa para diferenciación automática; y GPU first-class es la excepción y no la norma — sólo TUFLOW HPC (comercial) y LISFLOOD-FP GPU (este último operando sobre una aproximación inercial que falla en flujo transcrítico) son aceleradores CUDA maduros, mientras el resto trata GPU como add-on parcial o lo omite. Atravesando los cuatro patrones, ningún incumbente integra peligros hidrometeorológicos en un mismo engine ni es diferenciable: el encadenamiento lluvia → falla → propagación → inundación se resuelve con pipelines file-based entre códigos separados, perdiendo conservación física y gradientes consistentes.
 
-La capa **entrantes 2024-2025** (Hydrograd.jl, AegirJAX, SynxFlow) introduce el cambio que invalida el wedge original ingenuo de "open + modern lang + GPU + diff + coupled": Hydrograd (Julia + Zygote/Enzyme) y AegirJAX (Python + JAX) cubren diferenciabilidad nativa sobre el solver SWE 2D; SynxFlow (C++/CUDA) cubre el acoplamiento físico flood + landslide + debris flow en un mismo runtime GPU. Los tres son opensource y publicaron entre 2024 y 2025, demostrando que el problema es activamente atacado por al menos tres grupos competentes. Lo que NO hacen, individualmente ni colectivamente, es cubrir la intersección completa: Hydrograd y AegirJAX no acoplan peligros; SynxFlow no es diferenciable; ninguno corre sobre GPU multiplataforma (los tres son CUDA-only o JAX-XLA, todos hardware-NVIDIA dominante); ninguno es shippable como binary nativo (Julia exige JIT, Python+JAX exige runtime managed, C++/CUDA exige librerías compartidas + drivers); y ninguno toma cuencas chilenas — semiáridas andinas o mediterráneas templadas — como dominio canónico de aplicación.
+La capa **frontera diferenciable + coupled (2023-2025)** está compuesta por dos publicaciones verificadas en CrossRef/OpenAlex: **JAX-Fluids** (Bezgin et al. 2023, *Comput. Phys. Commun.*) entrega un solver CFD high-order completamente diferenciable en JAX, pero opera sobre Navier-Stokes compresibles 3D y no resuelve SW 2D; **SynxFlow** (Xia et al. 2025, *JOSS*) entrega un solver SW 2D + landslide + debris acoplado físicamente en un mismo engine CUDA-GPU, pero no es diferenciable y está atado a NVIDIA. La diferenciabilidad como framework también se ha consolidado en la hidrología distribuida via la trilogía **Shen (2023)**, **Feng (2022)** y **Tsai (2021)**, pero allí el objeto diferenciable es el modelo conceptual / process-based parametrizable, no el solver hidrodinámico subyacente. La combinación "diferenciable + SW 2D + coupled + multiplataforma" no aparece en ninguna publicación verificable hasta junio 2026; un literature scout intermedio (mayo 2026) había sugerido dos entrantes adicionales ("Hydrograd.jl", "AegirJAX") que un verify-refs 2026-06-04 confirmó como alucinaciones de LLM y removió de este documento.
 
-**El wedge revisado de hydroflux es exactamente esa intersección residual**: (i) acoplado físicamente Y diferenciable simultáneamente, propiedad que ningún solver — incumbente o entrante — exhibe en conjunto; (ii) ejecutado sobre GPU multiplataforma vía `wgpu` (Vulkan/Metal/DX12/WebGPU), no encerrado en CUDA-NVIDIA; (iii) shippable como binary estático nativo, sin runtime managed, lo que viabiliza el uso operacional en agencias regulatorias chilenas (DGA, SERNAGEOMIN, MOP) y la portabilidad a edge devices y WASM; (iv) validado contra el suite analítico canónico (Stoker, MacDonald, Thacker, UK EA) y aplicado a las cuencas BNA chilenas en su régimen episódico semiárido andino y continuo mediterráneo, geografía que ningún solver del state of the art trata como dominio nativo. La intersección sigue siendo defensible **por construcción**: Hydrograd no abandona Julia, AegirJAX no abandona JAX/Python, SynxFlow no agrega autograd a sus kernels CUDA — cada decisión es arquitectónicamente irreversible para ellos. Lo que hydroflux gana sumando esos ejes es un único solver que cierra el ciclo lluvia → falla → propagación → inundación de manera diferenciable, portable y reproducible, sin depender de hardware NVIDIA ni de runtimes managed, anclado en aplicaciones chilenas con datos reales.
+**El wedge de hydroflux** se compone de cuatro decisiones aditivas: **(i) diferenciabilidad por genericidad numérica** vía un `Real` trait genérico que hace que el mismo código compile a `f64` (producción) y a `Dual<f64>` (forward-mode AD), con overhead empírico de 1.98× medido en el solver-2d entregado; **(ii) I/O GIS-nativo** via el crate hermano SurtGIS, con DEM y land-cover GeoTIFFs entrando directamente al solver — ninguno de los entrantes diferenciables resuelve este eje; **(iii) GPU multiplataforma vía `wgpu`** (Vulkan/Metal/DX12/WebGPU), como roadmap explícito tras descubrir honestamente que paralelismo CPU vía `rayon` es ineficaz a la granularidad per-face de este esquema — el hallazgo está documentado en §3.9 del methods paper EMS; **(iv) anclaje en cuencas BNA chilenas** (Atacama-Huasco en el methods paper; 15 BNA en el horizonte continental). Las cuatro propiedades son aditivas, no estrictamente novel; el artefacto entregado y verificado contra el suite analítico canónico (Stoker, MacDonald, Thacker, dam-break radial, UK EA ×6) y validado en aplicación real (Aluvión Atacama 2017 sobre Río Huasco con DGA 92-year record) es lo que vuelve defendible la composición. El claim del methods paper no es "primer solver diferenciable" sino "solver diferenciable por construcción verificado + aplicado a un caso data-sparse, en un lenguaje compilado con I/O GIS-nativo".
 
 ---
 

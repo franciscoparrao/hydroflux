@@ -1,138 +1,118 @@
 # hydroflux
 
-> Differentiable, GPU-accelerated coupled hazard solver in Rust.
+> Differentiable, GPU-targeted coupled hazard solver in Rust.
 > A research line within the Postdoctorado DICYT, Universidad de Santiago de Chile (2026–2027).
 
-## Una frase
+## One sentence
 
-Acoplamos peligros hidrometeorológicos (lluvia → remoción en masa → flujo de detritos → inundación) en un solver shallow-water diferenciable nativo GPU, que permite calibración a escala continental sobre las cuencas BNA chilenas.
+We couple hydrometeorological hazards (rainfall → mass movement → debris flow → inundation) into a single shallow-water solver that is differentiable by construction and designed for continental-scale calibration over Chile's main hydrographic basins (BNA).
 
-## Por qué
+## Why
 
-HEC-RAS es estándar regulatorio mundial pero arcaico operacionalmente: archivos binarios no versionables, Windows-only, sin paralelismo nativo, calibración manual, integración pobre con stacks modernos (Linux, cloud, ML, GIS). Los alternativos open source (LISFLOOD-FP, BASEMENT, TELEMAC, ANUGA) resolvieron parte del problema pero no acoplan peligros, no son diferenciables, ni están diseñados para escala continental.
+HEC-RAS is the regulatory standard worldwide but operationally dated: binary project files (not version-controllable), Windows-only, no native parallelism, manual calibration, awkward integration with modern Linux/cloud/ML/GIS stacks. The mature open-source alternatives — LISFLOOD-FP, BASEMENT, TELEMAC-MASCARET, ANUGA, Iber, SRH-2D, Delft3D, GeoClaw — span the regulatory and research tracks but are, almost without exception, written in FORTRAN or C++. That language choice is not incidental: it places automatic differentiation (AD), now a first-class capability in scientific computing, behind a substantial re-engineering cost.
 
-## El wedge (revisado 2026-05-19, post-pivot)
+## The wedge
 
-**hydroflux ocupa la intersección residual que queda después del cambio de landscape 2024-2025.** El wedge ingenuo "open + modern lang + GPU + diff + coupled" fue parcialmente cubierto por Hydrograd.jl (Julia + Zygote/Enzyme, differentiable SWE), AegirJAX (Python+JAX, differentiable SWE) y SynxFlow (C++/CUDA, coupled flood+landslide+debris). La intersección defendible que queda — donde hydroflux se construye, y que ningún solver vigente ni entrante cubre simultáneamente — combina cuatro propiedades: **(i) acoplamiento físico de peligros y diferenciabilidad en el MISMO engine**, propiedad que Hydrograd/AegirJAX no cubren (no acoplan landslide) y que SynxFlow no cubre (kernels CUDA hand-coded sin autograd); **(ii) GPU multiplataforma vía `wgpu`** (Vulkan, Metal, DX12, WebGPU), liberándose de la dependencia CUDA-NVIDIA que ata a los tres entrantes; **(iii) deployment como binary estático nativo** sin runtime Python/Julia, viabilizando el uso operacional en agencias chilenas (DGA, SERNAGEOMIN, MOP); **(iv) anclaje en cuencas BNA chilenas** en sus regímenes episódico semiárido andino y continuo mediterráneo, geografía que ningún solver del state of the art trata como dominio nativo. La intersección es defendible **por construcción**: cada eje exige una decisión arquitectónica que los entrantes no pueden revertir sin reescribir su núcleo — Hydrograd no abandona Julia, AegirJAX no abandona JAX, SynxFlow no agrega autograd a CUDA. Lo que hydroflux gana al sumar esos ejes es un único solver que cierra el ciclo lluvia → falla → propagación → inundación de manera diferenciable, portable, reproducible y aplicada a hidrología chilena.
+Differentiable modelling has emerged across the geosciences ([Shen 2023](https://doi.org/10.1038/s43017-023-00450-9)) and hydrology has been an early adopter ([Feng et al. 2022](https://doi.org/10.1029/2022wr032404); [Tsai et al. 2021](https://doi.org/10.1038/s41467-021-26107-z)). In the fluid-dynamics core, [JAX-Fluids](https://doi.org/10.1016/j.cpc.2022.108527) (Bezgin et al. 2023) delivers a fully-differentiable high-order CFD solver in JAX. On the multi-hazard side, [SynxFlow](https://joss.theoj.org/papers/10.21105/joss.06952) (Xia et al. 2025) couples flood, landslide and debris flow in a single GPU-accelerated engine. The paradigm these works share: the *forward solver* becomes differentiable (or GPU-native, or both), and inverse problems — parameter estimation, bathymetry inversion, learned closures — inherit efficient gradients. The differentiable layer typically sits in a host language with mature AD: JAX, PyTorch, Julia.
 
-*Versión canónica en `outline.md` § "Wedge en un párrafo". Comparación con los 3 entrantes 2024-2025 en `state-of-the-art.md` § "Entradas 2024-2025". Desglose por eje:*
+**hydroflux occupies a complementary niche: a 2D shallow-water flood solver that is differentiable by construction *in a compiled systems language*, verified on the standard community benchmark suite, and exercised on a real data-sparse application.** Concretely, four design commitments mark the wedge:
 
-| Eje | Cubierto por entrantes 2024-2025 | Diferenciador de hydroflux |
-|---|---|---|
-| Diferenciabilidad | ✅ Hydrograd, AegirJAX | NO es wedge en sí; necesario pero no suficiente |
-| Acoplamiento físico de peligros | ✅ SynxFlow | NO es wedge en sí; necesario pero no suficiente |
-| **Coupling + diff simultáneo** | ❌ ninguno | ✅ **Wedge real**: ningún solver lo cubre |
-| **GPU multiplataforma (wgpu)** | ❌ todos son CUDA / JAX-XLA | ✅ Vulkan, Metal, DX12, WebGPU; libre de NVIDIA |
-| **Binary deployment nativo** | ❌ todos requieren runtime managed | ✅ Rust static binary; operacionalizable en agencias |
-| **Aplicación cuencas BNA chilenas** | ❌ ninguno targetea | ✅ régimen semiárido andino + mediterráneo |
-| Reproducibilidad (texto, CI/CD, DOI) | parcial | ✅ project files YAML/TOML, releases Zenodo |
+| Axis | Why it matters |
+|---|---|
+| **Differentiability by numeric genericity** | The solver is generic over a `Real` trait; the identical source compiles to `f64` for production and to a forward-mode `Dual` type for gradient extraction. No tracer overhead, no separate adjoint code, no host-language runtime. Forward-mode AD overhead measured: 1.98× over `f64` on a 64² grid. |
+| **GIS-native I/O and verification on data-sparse basins** | The solver ingests DEM and land-cover GeoTIFFs directly (via the [SurtGIS](https://github.com/franciscoparrao/surtgis) sibling crate) and is exercised against the full UK Environment Agency 2D benchmark suite plus analytical references (Stoker, MacDonald, Thacker, radial dam-break, lake-at-rest). |
+| **GPU-targeted via `wgpu`** | The cell-mask early-skip and the explicit time stepping are structured for SIMT; the §5 roadmap of the methods paper targets the Vulkan/Metal/DX12/WebGPU layer through `wgpu` compute shaders. CPU multi-threading was explicitly explored and found ineffective at this scheme's per-face granularity (reported as an honest negative result in §3.9). |
+| **Anchored in Chilean Andean basins** | The Río Huasco at Santa Juana (DGA gauge 03820003, 92-year record, semiarid Atacama) is the data-sparse application driving the design; the staged programme is targeted at the 15 BNA basins spanning 36° of latitude. |
 
-## Estado
+The four properties are *additive*, not standalone. None of them is novel on its own — what is distinctive is their composition in a single artefact released open-source from the start.
 
-Año 1 (2026), tras pivot estratégico 2026-05-18. **Hitos cerrados ADELANTADOS**:
+## Status
 
-- **Solver-1d**: HLL Riemann + Audusse well-balanced + Manning + inflow/outflow BCs. 4 benchmarks analíticos validados, 2 demos chilenas (Maule + Huasco). [2026-Q3 cerrado]
-- **Solver-2d orden 2**: HLLC + MUSCL + SSP-RK2 + Liang & Marche 2009 bed-recon + flux-rescaling + Manning + point source + rain-on-grid. 4 benchmarks analíticos (Thacker, dam-break-on-dry, MacDonald 0.028% drift, radial axisimétrico) + UK EA-style benchmark suite 6/6 (T1–T6). [2026-Q4 + 2027-Q2 ADELANTADO a 2026-05-22]
-- **`autograd` crate** (Track A scaffolding + application iter 1): forward-mode `Dual` con derivadas exactas para sqrt/exp/ln/sin/cos/abs/powi/powf, `Real` trait genérico sobre `f64` y `Dual`, primitivas SWE genéricas (celerity, Manning, flux 1D/2D, normal depth, critical depth), solver SWE 1D Lax-Friedrichs sobre `T: Real`. Demos: (a) `calibrate_manning_1d` — gradient descent recupera Manning a precisión de máquina en 4 iter (sintético); (b) `calibrate_manning_huasco_2017` — calibración sobre evento Aluvión Atacama 2017 con forzamiento DGA real (serie Q diaria Santa Juana), recuperando n=0.04 a 0.04% rel error en 25 iter, dentro del envelope literatura Chow 1959. AD-vs-FD locking test. [2027-Q4 scaffolding + application iter 1 ADELANTADO a 2026-05-23]
+End of Year 1 (2026), post-pivot of 2026-05-18 (a literature check refined the claim from "novelty in differentiable flooding" to "delivered + verified artefact within the differentiable frontier"). Milestones closed *ahead* of the multi-year schedule:
 
-Estado de tests: ~213 verde. Paper de review Q4 2026 archivado; primer paper metodológico se mueve a 2028 Q1 con artifact-backing. Ver `outline.md` para el arco multi-año y milestones revisados.
+- **solver-1d**: HLL Riemann + Audusse well-balanced + Manning + inflow/outflow BCs. Four analytical benchmarks validated; two Chilean demos (Maule, Huasco). [2026-Q3 closed]
+- **solver-2d, second-order**: HLLC + Audusse + MUSCL + SSP-RK2 + Liang & Marche (2009) bed reconstruction + flux rescaling + Manning + point source + rain-on-grid. Verification hierarchy: lake-at-rest (machine precision), Thacker oscillating paraboloid, Stoker/Ritter dam-break on a dry bed, MacDonald-family steady Manning uniform flow, radial dam-break, and the six UK Environment Agency 2D benchmark tests. Mesh-refinement convergence study (Thacker, 32²→256²: orders L¹ 1.81 / L² 1.68, front-limited). Head-to-head versus ANUGA on Stoker: 6.5× faster wall-clock per simulated second at matched effective resolution. [Originally 2027-Q2, advanced to 2026-Q4]
+- **`autograd` crate**: forward-mode `Dual` with exact derivatives for sqrt/exp/ln/sin/cos/abs/powi/powf/powd; `Real` trait generic over `f64` and `Dual`; SWE primitives generic over `T: Real` (celerity, Manning, flux 1D/2D, normal depth, critical depth). The 2D solver is fully generic over `Real` end-to-end as of 2026-06; the AD-vs-FD locking suite passes on HLLC (wet/wet and dry-bed branches), Manning friction (seeded on n and on h), the full forward-Euler update, and SSP-RK2 (including a mass-conservation invariance check). [Originally 2027-Q4, advanced to 2026-Q2]
 
-## Estructura del repo
+Test suite: ~250 verde (lib + integration + AD locking). Methods paper for the verified 2D solver under preparation for *Environmental Modelling & Software* (2026-Q2 submission).
+
+## Repository structure
 
 ```
 hydroflux/
-├── README.md                    # Este archivo
-├── CLAUDE.md                    # Convenciones para futuras sesiones de Claude Code
-├── outline.md                   # Arco multi-año (2026 → Fondecyt Regular)
-├── state-of-the-art.md          # Review vivo de solvers existentes
-├── references.bib               # Bibliografía acumulada
-├── .gitignore
-├── solver-1d/                   # Saint-Venant 1D (año 1, prototipo)
-├── solver-2d/                   # Shallow water 2D (año 2)
-├── autograd/                    # Forward-mode AD + primitivas SWE genéricas
-├── coupling/                    # Acoplamiento landslide-flood (años 4-6)
-├── benchmarks/                  # Toro, UK EA, casos analíticos
-├── examples/                    # Aplicaciones a cuencas chilenas
-├── docs/                        # Documentación técnica y manuscritos en draft
-└── papers/                      # Drafts/preprints de papers de la línea
+├── README.md                    # This file
+├── outline.md                   # Multi-year arc and milestones
+├── state-of-the-art.md          # Living review of existing 2D SW solvers
+├── references.bib               # Cumulative bibliography (verify-refs-clean)
+├── LICENSE-MIT, LICENSE-APACHE  # Dual licence
+├── Cargo.toml                   # Rust workspace
+├── solver-1d/                   # Saint-Venant 1D (prototype layer)
+├── solver-2d/                   # Shallow-water 2D solver (the primary artefact)
+├── autograd/                    # Forward-mode AD + Real trait + 1D demo SWE
+├── benchmarks/                  # Toro, UK EA, analytical cases
+├── examples/                    # Applications to Chilean basins
+├── docs/                        # Technical docs
+└── papers/                      # Methods paper + companion paper drafts
 ```
 
-## Relación con el postdoc DICYT
+## Relation to the postdoc DICYT
 
-Esta línea está **vinculada al postdoc** (a diferencia de `no_supervisado_superficie/` que es independiente). Comparte:
+This research line is *linked* to the postdoctoral programme. It shares:
 
-- Sustrato de datos: 15 cuencas BNA, DEM 30m alineados, factores procesados con SurtGIS, inventarios SERNAGEOMIN
-- Stack tecnológico: Rust como lenguaje principal, SurtGIS como engine raster
-- Calendario: alineado a la postulación Fondecyt Iniciación 2028
-- Sinergia explícita: el acoplamiento landslide-flood usa modelos de susceptibilidad desarrollados en `papers/paper1_susceptibilidad/`
+- **Data substrate**: 15 BNA basins, 30 m DEMs aligned and prepared with SurtGIS, SERNAGEOMIN inventories.
+- **Tech stack**: Rust as the implementation language; SurtGIS as the raster I/O engine.
+- **Calendar**: aligned with the Fondecyt Iniciación 2028 application window.
+- **Synergy with the susceptibility line**: the eventual landslide-flood coupling layer (§5 roadmap) consumes the susceptibility maps produced in `papers/paper1_susceptibilidad/`.
 
-Puede citarse y vincularse a la postdoctoral en CLAUDE.md, READMEs y futuros papers.
+DICYT funding is acknowledged in all derived publications.
 
-## Relación con SurtGIS
+## Relation to SurtGIS
 
-`hydroflux` usa SurtGIS para I/O raster (DEM, friction, rainfall, depth maps). Cualquier mejora a SurtGIS que requiera el solver se hace upstream (SurtGIS es proyecto separado, manteniéndolo limpio). Si SurtGIS necesita extensiones específicas para solvers (e.g., stencil operators, halo exchange), se documentan en `docs/surtgis-integration.md`.
+`hydroflux` uses [SurtGIS](https://github.com/franciscoparrao/surtgis) for raster I/O (DEM, friction, rainfall, depth maps). Any improvement to SurtGIS that the solver requires goes upstream — SurtGIS stays as a self-contained project. Solver-specific extensions to SurtGIS (e.g., stencil operators, halo exchange) are documented in `docs/surtgis-integration.md` when they appear.
 
-## Output esperado (alto nivel)
+## Output schedule (high level)
 
-| Año | Output principal | Venue tentativo |
+| Year | Output | Venue |
 |---|---|---|
-| 2026 | Solver-1d + solver-2d primera iteración (artifact backing, sin paper) | Releases Zenodo |
-| 2027 | Solver-2d con autograd forward-mode + UK EA pasado + GPU wgpu | Releases Zenodo |
-| 2028 Q1 | **Primer paper metodológico** (artifact-backed) | Water Resources Research, Geoscientific Model Development |
-| 2028 Q2 | Postulación **Fondecyt Iniciación** | — |
-| 2028 Q4 | Reverse-mode autograd + coupling primitives | — |
-| 2029-2031 | 2-3 papers de aplicación + Fondecyt Iniciación adjudicado | NHESS, JGR, HESS |
-| 2032+ | Acoplamiento landslide-flood maduro (Fondecyt Regular) | Nature, Science Advances |
-| Continuo | Releases v0.x, v1.0 en GitHub | Zenodo DOI por versión |
+| 2026 | solver-2d verified + autograd end-to-end | Releases + Zenodo DOI per version |
+| 2026-Q2 | **Methods paper** (verified 2D solver, differentiable, ANUGA head-to-head, Huasco application) | *Environmental Modelling & Software* |
+| 2027 | GPU port via `wgpu`; calibration companion paper (1D autograd, Huasco) | *EMS* / WRR |
+| 2028-Q1 | Fondecyt Iniciación proposal anchored on the artefact | — |
+| 2028-Q4 | Reverse-mode AD + coupling primitives | — |
+| 2029-2031 | 2-3 application papers + Fondecyt Iniciación awarded | NHESS, JGR, HESS |
+| 2032+ | Coupled landslide-flood mature (Fondecyt Regular) | Nature, Science Advances |
 
 ## Quickstart
 
 ```bash
-# Run the full workspace test suite (~213 tests).
+# Run the full workspace test suite.
 cargo test --workspace --release
 
-# Run the synthetic Manning calibration demo (4 iterations to machine precision).
+# Run the 2D verification hierarchy as informational tests (prints metrics for §3 of the paper).
+cargo test --release -p hydroflux-solver-2d --tests -- --ignored report
+
+# Manning calibration demo (synthetic, recovers n to machine precision via AD in a few iterations).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_1d
 
-# Run the Aluvión Atacama 2017 calibration demo (real DGA forcing, synthetic bed, 25 iter).
+# Aluvión Atacama 2017 calibration with real DGA discharge forcing (Huasco at Santa Juana).
 cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017
 
-# Same Atacama 2017 calibration but with DEM-derived channel bed (real Huasco profile, 40 iter).
-cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_dem
+# Forward-mode AD on the full 2D solver: AD-vs-FD locking on a friction-damped dam-break,
+# recovers n_true from n_init=0.080 by Newton steps using one forward Dual pass per iteration.
+cargo run --release -p hydroflux-solver-2d --example m1_inverse_manning_demo
 
-# DEM bed + REAL 24-hour daily blocks (21 real days, ~1 min wall time, 9 iter to 1e-8).
-cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_realtime
+# f64 vs Dual<f64> wall-clock benchmark on a 64x64 problem (forward-mode AD overhead = 1.98x).
+cargo run --release -p hydroflux-solver-2d --example m1_timing_f64_vs_dual
 
-# Target externo (rating curve literature-derived) — diagnostica mismatch modelo vs rating.
-cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_rating
-
-# Same con channel width DEM-derived (HAND-connected walk, median 42 m).
-cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_width
-
-# COMPOUND cross-section (main 30m + floodplain 85m at h_bank=1m) — n inside envelope, RMSE 0.19 m.
-cargo run --release -p hydroflux-autograd --example calibrate_manning_huasco_2017_compound
-
-# Validation temporal: same parameters frozen, re-run on 1998 La Niña event — documents
-# cross-event generalization failure (RMSE 6.8× higher; 2-stage compound saturates at high Q).
-cargo run --release -p hydroflux-autograd --example validate_manning_huasco_1998
-
-# Differentiable POWER-LAW cross-section (Leopold h^p) + joint multi-param AD calibration —
-# closes the cross-event gap: RMSE 2017 = 0.006 m, RMSE 1998 = 0.103 m (12.6× mejor que compound).
-cargo run --release -p hydroflux-autograd --example calibrate_powerlaw_huasco
+# Head-to-head wall-clock vs ANUGA on a matched Stoker dam-break (requires ANUGA in a venv).
+cargo run --release -p hydroflux-solver-2d --example m2_hydroflux_wallclock
+# anuga_venv/bin/python solver-2d/examples/m2_anuga_wallclock.py
 ```
 
-## Licencia
+## Licence
 
-Licenciado bajo **MIT OR Apache-2.0** dual — el usuario downstream elige.
-Compatible con uso académico, comercial, GPL-compatible downstream (vía
-Apache) y maximally-permissive downstream (vía MIT). Es la convención
-estándar del ecosistema Rust y matchea la licencia del paquete hermano
-[SurtGIS](https://github.com/franciscoparrao/surtgis).
+Dual-licensed under **MIT OR Apache-2.0** — downstream users choose. Compatible with academic and commercial use, GPL-compatible downstream (via Apache), and maximally-permissive downstream (via MIT). This is the standard convention of the Rust ecosystem and matches the licence of the sibling [SurtGIS](https://github.com/franciscoparrao/surtgis) package.
 
-Ver `LICENSE-MIT` y `LICENSE-APACHE` en la raíz del repositorio para los
-textos completos.
+See `LICENSE-MIT` and `LICENSE-APACHE` at the repository root for the full texts.
 
-A menos que el contribuyente declare lo contrario explícitamente,
-cualquier contribución intencionalmente enviada para inclusión en este
-trabajo, según lo definido en la licencia Apache-2.0, será dual-licenciada
-como arriba sin términos o condiciones adicionales.
+Unless a contributor explicitly declares otherwise, any contribution intentionally submitted for inclusion in this work, as defined in the Apache-2.0 licence, shall be dual-licensed as above, without any additional terms or conditions.
