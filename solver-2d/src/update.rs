@@ -905,32 +905,46 @@ pub fn forward_euler_step<T: Real>(
         }
     };
 
+    // Snapshot of the PRE-STEP wet/dry pattern for the fast path below.
+    // The update loop mutates `states` in place in row-major order, so
+    // at cell (i, j) the north (i−1) and west (j−1) neighbours are
+    // already post-step. The dry-dry face short-circuit and the α pass
+    // above were both evaluated on the pre-step state; the fast path
+    // must be too. Consulting mutated `states` instead would misfire
+    // when a wet upstream neighbour exported mass through the shared
+    // face and drained to dry in its own update: this cell would look
+    // isolated-dry, skip its update, and silently discard the inflow —
+    // destroying the mass the neighbour just exported.
+    let was_dry =
+        Array2::from_shape_fn((n_rows, n_cols), |(i, j)| states[(i, j)].h.value() <= H_DRY);
+
     // FV update with scaled face fluxes + explicit bed-slope source.
     //
     // Isolated-dry-cell fast path: if the cell and all four immediate
-    // neighbours have `h ≤ H_DRY`, the four face fluxes around the
-    // cell are all zero by the dry-dry short-circuit above. The
-    // standard path would compute `dh = dhu = dhv = 0` and only the
-    // bed-slope source `s_hu, s_hv` could be non-zero — but those
-    // would feed momentum into a cell with `h = 0`, which the
-    // `if new_h <= H_DRY` floor below resets to `Conserved2DG::dry()`
-    // anyway. Going straight to `dry()` is mathematically identical
-    // to running the full body and lets us skip ~12 FLOPs per dry
-    // interior cell. We restrict the shortcut to STRICT interior
-    // cells (`1 ≤ i ≤ n_rows − 2`, `1 ≤ j ≤ n_cols − 2`) so that
-    // boundary cells — which could receive injected mass from a
-    // `Discharge` / `Depth` ghost — keep the full path.
+    // neighbours were dry (`h ≤ H_DRY`) at the START of the step, the
+    // four face fluxes around the cell are all zero by the dry-dry
+    // short-circuit above. The standard path would compute
+    // `dh = dhu = dhv = 0` and only the bed-slope source `s_hu, s_hv`
+    // could be non-zero — but those would feed momentum into a cell
+    // with `h = 0`, which the `if new_h <= H_DRY` floor below resets
+    // to `Conserved2DG::dry()` anyway. Going straight to `dry()` is
+    // mathematically identical to running the full body and lets us
+    // skip ~12 FLOPs per dry interior cell. We restrict the shortcut
+    // to STRICT interior cells (`1 ≤ i ≤ n_rows − 2`,
+    // `1 ≤ j ≤ n_cols − 2`) so that boundary cells — which could
+    // receive injected mass from a `Discharge` / `Depth` ghost — keep
+    // the full path.
     for i in 0..n_rows {
         for j in 0..n_cols {
-            if states[(i, j)].h.value() <= H_DRY
+            if was_dry[(i, j)]
                 && i > 0
                 && i + 1 < n_rows
                 && j > 0
                 && j + 1 < n_cols
-                && states[(i - 1, j)].h.value() <= H_DRY
-                && states[(i + 1, j)].h.value() <= H_DRY
-                && states[(i, j - 1)].h.value() <= H_DRY
-                && states[(i, j + 1)].h.value() <= H_DRY
+                && was_dry[(i - 1, j)]
+                && was_dry[(i + 1, j)]
+                && was_dry[(i, j - 1)]
+                && was_dry[(i, j + 1)]
             {
                 states[(i, j)] = Conserved2DG::dry();
                 continue;
@@ -1279,6 +1293,48 @@ mod tests {
         }
         let m1 = total_mass(&states, dx, dy);
         assert_relative_eq!(m0, m1, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn draining_cell_inflow_to_dry_neighbour_is_not_discarded() {
+        // Regression test for the isolated-dry-cell fast path: it must
+        // consult the PRE-step wet/dry pattern, not the in-place
+        // mutated `states`. Cell (0, 1) starts wet with strong +y
+        // momentum; the α-rescaling caps its outflow at `h − H_DRY`,
+        // so it drains to the floor and is reset to dry IN THE SAME
+        // STEP in which it exports its mass into the dry interior
+        // cell (1, 1). A fast path reading post-update states sees
+        // (0, 1) already dry, classifies (1, 1) as isolated-dry, and
+        // discards the inflow — destroying most of the domain's mass.
+        let mesh = flat_mesh(3, 3, 1.0, 1.0);
+        let mut states = Array2::from_elem((3, 3), Conserved2D::DRY);
+        let h0 = 0.05;
+        states[(0, 1)] = Conserved2D::new(h0, 0.0, h0 * 5.0);
+        let m0 = total_mass(&states, 1.0, 1.0);
+
+        // dt chosen so the raw outflow through the (0,1)/(1,1) face
+        // exceeds the available mass and the rescaling engages. CFL
+        // is irrelevant here: a single step, and the α cap bounds the
+        // update regardless of dt.
+        forward_euler_step(&mut states, &mesh, Boundaries2D::WALLS, 0.25);
+
+        assert!(
+            states[(0, 1)].h <= H_DRY,
+            "source cell should have drained, h = {}",
+            states[(0, 1)].h
+        );
+        assert!(
+            states[(1, 1)].h > 0.5 * h0,
+            "inflow into the dry interior cell was discarded: h(1,1) = {}",
+            states[(1, 1)].h
+        );
+        // Only the floor reset of the drained source cell may destroy
+        // mass, and it is bounded by H_DRY per drained cell.
+        let m1 = total_mass(&states, 1.0, 1.0);
+        assert!(
+            (m0 - m1).abs() <= 2.0 * H_DRY,
+            "mass not conserved across the draining step: before {m0}, after {m1}"
+        );
     }
 
     #[test]
