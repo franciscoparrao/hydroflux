@@ -25,7 +25,7 @@
 //!   -te 333620.42 6826925.80 335630.42 6832925.80 \
 //!   -tr 30 30 -r mode -ot Byte -overwrite \
 //!   /vsicurl/https://esa-worldcover.s3.amazonaws.com/v200/2021/map/ESA_WorldCover_10m_2021_v200_S30W072_Map.tif \
-//!   examples/huasco_2d_phase2/output/huasco_subset_landcover.tif
+//!   examples/huasco_2d_phase2/data/huasco_subset_landcover.tif
 //! ```
 //!
 //! # Reproducir
@@ -49,9 +49,9 @@ use hydroflux_solver_2d::{
     ssprk2_step, write_depth_geotiff,
 };
 
-const SUBSET_DEM: &str = "examples/huasco_2d_phase2/output/huasco_subset_dem.tif";
-const SUBSET_ACC: &str = "examples/huasco_2d_phase2/output/huasco_subset_acc.tif";
-const SUBSET_LC: &str = "examples/huasco_2d_phase2/output/huasco_subset_landcover.tif";
+const SUBSET_DEM: &str = "examples/huasco_2d_phase2/data/huasco_subset_dem.tif";
+const SUBSET_ACC: &str = "examples/huasco_2d_phase2/data/huasco_subset_acc.tif";
+const SUBSET_LC: &str = "examples/huasco_2d_phase2/data/huasco_subset_landcover.tif";
 const OUTPUT_DIR: &str = "examples/huasco_2d_phase2/output";
 
 const N_REF: f64 = 0.04; // reference Manning for warm-start depth only

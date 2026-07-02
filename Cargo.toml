@@ -30,7 +30,11 @@ criterion = "0.5"
 proptest = "1"
 # Internal workspace members exposed as deps to siblings.
 hydroflux-autograd = { path = "autograd" }
-# SurtGIS path dependency. Mientras seamos el único dev, path dep está bien.
-# Antes del primer release público (Q4 2026) migrar a git dep con tag fijo
-# para que terceros puedan compilar sin clonar surtgis manualmente.
-surtgis-core = { path = "../../surtgis/crates/core" }
+# SurtGIS pinned by commit so a fresh clone builds with cargo alone —
+# the path-dependency era broke the exact commands printed in the
+# paper's Open Research section (audit 2026-07, §2.4/WP2). Keep this
+# rev in sync with SURTGIS_REF in .github/workflows/ci.yml. To iterate
+# against a local surtgis checkout temporarily, swap in
+#   surtgis-core = { path = "../../surtgis/crates/core" }
+# but never commit that state.
+surtgis-core = { git = "https://github.com/franciscoparrao/surtgis", rev = "7348ac2b7642d43f800d6d3d7a7eed5b1577edec" }

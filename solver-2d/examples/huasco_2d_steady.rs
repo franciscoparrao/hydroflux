@@ -38,8 +38,8 @@ use hydroflux_solver_2d::{
     manning_friction_step, mesh_from_geotiff, ssprk2_step, write_depth_geotiff,
 };
 
-const SUBSET_DEM: &str = "examples/huasco_2d_phase2/output/huasco_subset_dem.tif";
-const SUBSET_ACC: &str = "examples/huasco_2d_phase2/output/huasco_subset_acc.tif";
+const SUBSET_DEM: &str = "examples/huasco_2d_phase2/data/huasco_subset_dem.tif";
+const SUBSET_ACC: &str = "examples/huasco_2d_phase2/data/huasco_subset_acc.tif";
 const OUTPUT_DEPTH: &str = "examples/huasco_2d_phase2/output/huasco_2d_depth.tif";
 
 const MANNING_N: f64 = 0.04;

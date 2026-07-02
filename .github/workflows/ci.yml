@@ -1,13 +1,14 @@
 # CI del workspace hydroflux.
 #
-# Peculiaridad del layout: el workspace depende de surtgis-core por PATH
-# (`../../surtgis/crates/core`, ver Cargo.toml raíz). Para reproducir esa
-# ruta relativa en CI, hydroflux se clona en `postdoc/hydroflux/` y
-# surtgis en `surtgis/`, pinneado a un commit exacto. El pin se sube a
-# mano, deliberadamente: el drift silencioso de surtgis ya rompió los
-# tests de io (band index 1-based → 0-based, 2026-07-02); el pin convierte
-# ese modo de falla en un bump explícito y revisable. Migrar a git-dep
-# con tag antes del release público v0.1 (plan: outline.md Fase 3).
+# surtgis-core llega como git-dependency pinneada por rev en el
+# Cargo.toml raíz (misma razón que el pin que antes vivía aquí: el
+# drift silencioso de surtgis ya rompió los tests de io — band index
+# 1-based → 0-based, 2026-07-02 — y el pin convierte ese modo de falla
+# en un bump explícito y revisable). El CI corre exactamente lo que un
+# reviewer obtiene con `git clone` + cargo: si esto pasa, el claim de
+# reproducibilidad del paper (§Open Research) se sostiene.
+#
+# Al bumpear surtgis: actualizar el `rev` en Cargo.toml (único lugar).
 
 name: CI
 
@@ -19,28 +20,13 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  # Commit de surtgis contra el que este workspace compila y pasa.
-  # Incluye el Sprint 1 de correctness (band 0-based, nodata→NaN).
-  SURTGIS_REF: 7348ac2b7642d43f800d6d3d7a7eed5b1577edec
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: postdoc/hydroflux
     steps:
-      - name: Checkout hydroflux
+      - name: Checkout
         uses: actions/checkout@v4
-        with:
-          path: postdoc/hydroflux
-
-      - name: Checkout surtgis (path dependency, pinned)
-        uses: actions/checkout@v4
-        with:
-          repository: franciscoparrao/surtgis
-          ref: ${{ env.SURTGIS_REF }}
-          path: surtgis
 
       - name: Install Rust (stable)
         uses: dtolnay/rust-toolchain@stable
@@ -49,8 +35,6 @@ jobs:
 
       - name: Cache cargo
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: postdoc/hydroflux
 
       # Los tests numéricos corren en release: los benchmarks de
       # integración (UK EA, Thacker, MacDonald 2D) son prohibitivos
