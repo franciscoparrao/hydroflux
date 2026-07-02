@@ -1,34 +1,74 @@
 //! HLL Riemann solver for the 1D Saint-Venant system.
 //!
-//! Wave-speed estimate follows Toro (2009, §10.5.1), Davis (1988) bound:
+//! Wave-speed estimate follows Toro (2009, §10.5.1), Davis (1988) bound
+//! for two wet states:
 //!
 //! ```text
 //!   S_L = min(u_L - c_L, u_R - c_R)
 //!   S_R = max(u_L + c_L, u_R + c_R)
 //! ```
 //!
-//! Dry-bed handling: cells with `h = 0` carry `c = 0` here, giving an
-//! approximate but consistent flux. The exact two-rarefaction estimate
-//! (Toro 2009 §10.5.4) is deferred to the iteration that introduces a
-//! dam-break-on-dry-bed benchmark.
+//! At a wet/dry interface the Davis bound underestimates the front: the
+//! leading edge of the rarefaction into the dry region propagates at
+//! `u_W ± 2·c_W` (two-rarefaction estimate, Toro 2009 §10.5.4). The
+//! solver branches on the wet/dry pattern to use the right estimate,
+//! mirroring `hydroflux-solver-2d`.
 
 use crate::GRAVITY;
 use crate::flux::Flux;
 use crate::state::Conserved;
 
+/// Wet/dry threshold used internally by the Riemann solver to detect
+/// dry cells when picking wave-speed estimates. Tighter than the
+/// user-visible `H_DRY` constant: this is the numerical-noise floor
+/// for the wave-speed branch, not a physical wet/dry definition.
+const DRY_TOL: f64 = 1.0e-12;
+
 /// HLL Riemann flux at the interface between left state `ul` and right
 /// state `ur`. Returns the numerical flux `F*` used by the FV update.
 pub fn hll_flux(ul: Conserved, ur: Conserved) -> Flux {
-    let cl = (GRAVITY * ul.h.max(0.0)).sqrt();
-    let cr = (GRAVITY * ur.h.max(0.0)).sqrt();
-    let u_left = if ul.h > 0.0 { ul.hu / ul.h } else { 0.0 };
-    let u_right = if ur.h > 0.0 { ur.hu / ur.h } else { 0.0 };
+    let l_wet = ul.h > DRY_TOL;
+    let r_wet = ur.h > DRY_TOL;
 
-    let sl = (u_left - cl).min(u_right - cr);
-    let sr = (u_left + cl).max(u_right + cr);
+    // Both sides dry: no flux, no Riemann problem to solve.
+    if !l_wet && !r_wet {
+        return Flux::ZERO;
+    }
 
-    let fl = Flux::from_state(ul);
-    let fr = Flux::from_state(ur);
+    let cl = if l_wet { (GRAVITY * ul.h).sqrt() } else { 0.0 };
+    let cr = if r_wet { (GRAVITY * ur.h).sqrt() } else { 0.0 };
+    let u_left = if l_wet { ul.hu / ul.h } else { 0.0 };
+    let u_right = if r_wet { ur.hu / ur.h } else { 0.0 };
+
+    let (sl, sr) = match (l_wet, r_wet) {
+        (true, true) => (
+            (u_left - cl).min(u_right - cr),
+            (u_left + cl).max(u_right + cr),
+        ),
+        (false, true) => (u_right - 2.0 * cr, u_right + cr),
+        (true, false) => (u_left - cl, u_left + 2.0 * cl),
+        (false, false) => unreachable!("handled by the both-dry early return above"),
+    };
+
+    // Physical fluxes, written from the reconstructed velocities so a
+    // near-dry state (h ≤ DRY_TOL with residual hu) cannot blow up in
+    // `hu²/h`; the dry side carries exactly zero flux.
+    let fl = if l_wet {
+        Flux {
+            mass: ul.hu,
+            momentum: ul.hu * u_left + 0.5 * GRAVITY * ul.h * ul.h,
+        }
+    } else {
+        Flux::ZERO
+    };
+    let fr = if r_wet {
+        Flux {
+            mass: ur.hu,
+            momentum: ur.hu * u_right + 0.5 * GRAVITY * ur.h * ur.h,
+        }
+    } else {
+        Flux::ZERO
+    };
 
     if sl >= 0.0 {
         fl
@@ -95,6 +135,33 @@ mod tests {
             "expected positive mass flux from deep to shallow, got {}",
             f.mass
         );
+    }
+
+    #[test]
+    fn wet_dry_interface_pushes_mass_into_dry_side() {
+        // Dam break onto dry bed at the initial instant: left wet at
+        // rest, right dry. With the two-rarefaction estimate S_L = -c,
+        // S_R = +2c the HLL star flux is F_mass = 2·c·h/3 > 0 (mass
+        // moves into the dry region) and must be finite.
+        let h = 1.0;
+        let ul = Conserved::new(h, 0.0);
+        let f = hll_flux(ul, Conserved::DRY);
+        let c = (GRAVITY * h).sqrt();
+        assert_relative_eq!(f.mass, 2.0 * c * h / 3.0, epsilon = 1e-12);
+        assert!(f.momentum.is_finite());
+    }
+
+    #[test]
+    fn near_dry_state_with_residual_momentum_does_not_blow_up() {
+        // h below DRY_TOL with leftover hu is a numerical pathology the
+        // update clamp normally removes; the Riemann solver must not
+        // amplify it through hu²/h if it ever sees one.
+        let pathological = Conserved::new(1.0e-13, 1.0e-13);
+        let wet = Conserved::new(1.0, 0.0);
+        for f in [hll_flux(wet, pathological), hll_flux(pathological, wet)] {
+            assert!(f.mass.is_finite());
+            assert!(f.momentum.is_finite());
+        }
     }
 
     #[test]

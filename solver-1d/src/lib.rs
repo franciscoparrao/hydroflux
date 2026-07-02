@@ -22,6 +22,13 @@ pub mod update;
 /// Standard gravity used throughout the solver, in m/s².
 pub const GRAVITY: f64 = 9.81;
 
+/// Wet/dry threshold in metres. Cells with `h ≤ H_DRY` are treated as
+/// dry for momentum purposes: their velocity is undefined (`hu/h` would
+/// blow up on a vanishing film), so [`update::forward_euler_step`] zeroes
+/// `hu` while keeping the residual mass, which preserves conservation.
+/// Matches the convention of `hydroflux-solver-2d`.
+pub const H_DRY: f64 = 1.0e-6;
+
 pub use boundary::{Boundaries, Boundary, Side, ghost_cell};
 pub use flux::Flux;
 pub use geometry::Channel1D;

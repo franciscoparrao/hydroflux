@@ -6,25 +6,47 @@
 //! friction is applied separately as an operator-split fractional step
 //! (see [`crate::source`]).
 
-use crate::GRAVITY;
 use crate::boundary::{Boundaries, Side, ghost_cell};
 use crate::flux::Flux;
 use crate::geometry::Channel1D;
 use crate::riemann::hll_flux;
 use crate::state::Conserved;
+use crate::{GRAVITY, H_DRY};
 
-/// Maximum signal speed `|u| + c` across the state vector. Used to bound
-/// the time step under the CFL condition. Returns 0 for an empty or all-dry
-/// state.
+/// Maximum signal speed across the state vector. Used to bound the time
+/// step under the CFL condition. Returns 0 for an empty or all-dry state.
+///
+/// Wet cells contribute `|u| + c`. A wet cell adjacent to a dry one
+/// contributes `|u| + 2c` instead: the rarefaction front into the dry
+/// region propagates at `u ± 2c` (Toro 2009 §10.5.4), and bounding dt
+/// with `|u| + c` there would let the front outrun the CFL window,
+/// draining cells below zero depth.
 pub fn max_wave_speed(states: &[Conserved]) -> f64 {
-    states
+    let cell_speed = |s: &Conserved, front_factor: f64| -> f64 {
+        if s.h > H_DRY {
+            let c = (GRAVITY * s.h).sqrt();
+            let u = s.hu / s.h;
+            u.abs() + front_factor * c
+        } else {
+            0.0
+        }
+    };
+
+    let interior = states
         .iter()
-        .map(|s| {
-            let c = (GRAVITY * s.h.max(0.0)).sqrt();
-            let u = if s.h > 0.0 { s.hu / s.h } else { 0.0 };
-            u.abs() + c
+        .map(|s| cell_speed(s, 1.0))
+        .fold(0.0, f64::max);
+
+    let fronts = states
+        .windows(2)
+        .map(|w| match (w[0].h > H_DRY, w[1].h > H_DRY) {
+            (true, false) => cell_speed(&w[0], 2.0),
+            (false, true) => cell_speed(&w[1], 2.0),
+            _ => 0.0,
         })
-        .fold(0.0, f64::max)
+        .fold(0.0, f64::max);
+
+    interior.max(fronts)
 }
 
 /// CFL-bounded time step: `dt = cfl · dx / max_wave_speed`. Returns
@@ -154,6 +176,18 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
         let f_left = faces[i].plus;
         states[i].h -= dt_dx * (f_right.mass - f_left.mass);
         states[i].hu -= dt_dx * (f_right.momentum - f_left.momentum);
+
+        // Positivity safety net + dry-film momentum zeroing. Under the
+        // CFL bound of `max_wave_speed` the update should not drive h
+        // negative; if roundoff does, clamping to zero is the smallest
+        // consistent correction. A film of h ≤ H_DRY keeps its mass
+        // (destroying it would leak volume at every wetting front) but
+        // has no meaningful velocity, so its momentum is dropped before
+        // `hu/h` can amplify it into a spurious wave speed.
+        if states[i].h <= H_DRY {
+            states[i].h = states[i].h.max(0.0);
+            states[i].hu = 0.0;
+        }
     }
 }
 
@@ -358,6 +392,56 @@ mod tests {
             "central depth went non-positive: {}",
             states[center].h
         );
+    }
+
+    #[test]
+    fn dam_break_on_dry_bed_stays_positive_and_conserves_mass() {
+        // Ritter configuration: left half wet at rest, right half dry.
+        // This is the case that used to drive h negative (Davis speeds
+        // underestimate the dry front ~2×, so the CFL window let the
+        // front outrun the update). With the two-rarefaction speeds in
+        // both the Riemann solver and `max_wave_speed`, depth must stay
+        // non-negative and mass must be conserved: the positivity clamp
+        // only zeroes momentum, never destroys mass.
+        let n = 100;
+        let dx = 1.0;
+        let channel = flat_channel(n, dx);
+        let mut states: Vec<Conserved> = (0..n)
+            .map(|i| {
+                if i < n / 2 {
+                    Conserved::new(1.0, 0.0)
+                } else {
+                    Conserved::DRY
+                }
+            })
+            .collect();
+        let m0 = total_mass(&states, dx);
+
+        for _ in 0..300 {
+            let dt = cfl_time_step(&states, dx, 0.4);
+            forward_euler_step(&mut states, &channel, Boundaries::WALLS, dt);
+        }
+        for (i, s) in states.iter().enumerate() {
+            assert!(s.h.is_finite(), "h[{i}] became non-finite: {}", s.h);
+            assert!(s.h >= 0.0, "h[{i}] went negative: {}", s.h);
+            assert!(s.hu.is_finite(), "hu[{i}] became non-finite: {}", s.hu);
+        }
+        let m1 = total_mass(&states, dx);
+        assert_relative_eq!(m0, m1, epsilon = 1e-10);
+    }
+
+    #[test]
+    fn max_wave_speed_uses_dry_front_estimate_at_wet_dry_interface() {
+        // A wet cell at rest next to a dry one: the signal bound must be
+        // the dry-front speed 2c, not the interior estimate c.
+        let h = 1.0;
+        let states = [Conserved::new(h, 0.0), Conserved::DRY];
+        let c = (GRAVITY * h).sqrt();
+        assert_relative_eq!(max_wave_speed(&states), 2.0 * c, epsilon = 1e-12);
+
+        // All-wet configuration keeps the interior estimate.
+        let states_wet = [Conserved::new(h, 0.0), Conserved::new(h, 0.0)];
+        assert_relative_eq!(max_wave_speed(&states_wet), c, epsilon = 1e-12);
     }
 
     #[test]
