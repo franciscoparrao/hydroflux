@@ -4,29 +4,37 @@
 //! Manning, trapezoidal sections, and sub-grid topography are follow-up work
 //! (Q4 2026 onwards).
 
+use hydroflux_autograd::Real;
 use ndarray::Array1;
 
 /// A uniformly-spaced 1D rectangular channel.
+///
+/// Generic over `T: Real` in the Manning roughness — the calibration
+/// parameter of the differentiable workflow. Instantiate with
+/// `T = Dual` and `manning = Dual::variable(n)` to thread `∂/∂n`
+/// through the solver; the bed stays `f64` (bed calibration is not in
+/// scope for the 1D prototype).
 #[derive(Debug, Clone)]
-pub struct Channel1D {
+pub struct Channel1D<T = f64> {
     /// Bed elevation `z(x)` at each cell center [m].
     pub bed: Array1<f64>,
     /// Uniform cell spacing `Δx` [m].
     pub dx: f64,
     /// Manning roughness coefficient (uniform for now).
-    pub manning: f64,
+    pub manning: T,
 }
 
-impl Channel1D {
+impl<T: Real> Channel1D<T> {
     /// Build a channel from bed elevations, spacing, and Manning n.
     ///
     /// Panics if `dx <= 0`, `manning < 0`, or `bed` is empty. These are
     /// programming errors; the solver does not silently swallow them.
-    pub fn new(bed: Array1<f64>, dx: f64, manning: f64) -> Self {
+    pub fn new(bed: Array1<f64>, dx: f64, manning: T) -> Self {
         assert!(dx > 0.0, "dx must be strictly positive (got {dx})");
         assert!(
-            manning >= 0.0,
-            "Manning n must be non-negative (got {manning})"
+            manning.value() >= 0.0,
+            "Manning n must be non-negative (got {})",
+            manning.value()
         );
         assert!(!bed.is_empty(), "channel must have at least one cell");
         Self { bed, dx, manning }

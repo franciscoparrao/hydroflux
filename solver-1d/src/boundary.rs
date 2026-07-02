@@ -23,6 +23,7 @@
 
 use crate::geometry::Channel1D;
 use crate::state::Conserved;
+use hydroflux_autograd::Real;
 
 /// Boundary kind at one end of the 1D domain.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -93,20 +94,31 @@ impl Boundaries {
 ///
 /// The `inner` parameter is the adjacent inner cell state (`states[0]` for
 /// `Side::Left`, `states[n-1]` for `Side::Right`).
-pub fn ghost_cell(
-    channel: &Channel1D,
-    inner: Conserved,
+///
+/// The prescribed BC values (`q`, `h`) are `f64` and enter the generic
+/// state as constants (`T::from_f64`): under AD they carry zero
+/// derivative, which is the "gradient with the BC held fixed" semantics
+/// the calibration workflow (and its FD verification) relies on.
+pub fn ghost_cell<T: Real>(
+    channel: &Channel1D<T>,
+    inner: Conserved<T>,
     kind: Boundary,
     side: Side,
-) -> (Conserved, f64) {
+) -> (Conserved<T>, f64) {
     let state = match kind {
         Boundary::Transmissive => inner,
         Boundary::Wall => Conserved {
             h: inner.h,
             hu: -inner.hu,
         },
-        Boundary::Discharge { q } => Conserved { h: inner.h, hu: q },
-        Boundary::Depth { h } => Conserved { h, hu: inner.hu },
+        Boundary::Discharge { q } => Conserved {
+            h: inner.h,
+            hu: T::from_f64(q),
+        },
+        Boundary::Depth { h } => Conserved {
+            h: T::from_f64(h),
+            hu: inner.hu,
+        },
     };
     let bed = ghost_bed(channel, kind, side);
     (state, bed)
@@ -115,7 +127,7 @@ pub fn ghost_cell(
 /// Bed elevation of the ghost cell. Computational BCs use zero-gradient
 /// extrapolation; physical BCs extend the bed linearly so the boundary
 /// face carries the same bed jump as interior faces.
-fn ghost_bed(channel: &Channel1D, kind: Boundary, side: Side) -> f64 {
+fn ghost_bed<T: Real>(channel: &Channel1D<T>, kind: Boundary, side: Side) -> f64 {
     let n = channel.n_cells();
     match kind {
         Boundary::Transmissive | Boundary::Wall => match side {

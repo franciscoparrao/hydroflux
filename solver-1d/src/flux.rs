@@ -4,34 +4,46 @@
 
 use crate::GRAVITY;
 use crate::state::Conserved;
+use hydroflux_autograd::Real;
 
 /// 1D Saint-Venant flux vector.
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Flux {
+pub struct Flux<T = f64> {
     /// Mass flux component `hu`.
-    pub mass: f64,
+    pub mass: T,
     /// Momentum flux component `hu² + g h²/2`.
-    pub momentum: f64,
+    pub momentum: T,
 }
 
-impl Flux {
+impl<T: Real> Flux<T> {
     /// Compute `F(U)` for a conservative state. Returns the zero flux when
     /// the cell is dry; the momentum term is otherwise written to avoid
     /// `0/0` if the caller passes `h = 0` with non-zero `hu` (a numerical
     /// pathology, not a physical state).
-    pub fn from_state(u: Conserved) -> Self {
-        let h = u.h.max(0.0);
-        if h == 0.0 {
-            return Self::ZERO;
+    pub fn from_state(u: Conserved<T>) -> Self {
+        let h = u.h.max(T::zero());
+        if h.value() == 0.0 {
+            return Self::zero();
         }
         let hu = u.hu;
         Self {
             mass: hu,
-            momentum: hu * hu / h + 0.5 * GRAVITY * h * h,
+            momentum: hu * hu / h + h * h * (0.5 * GRAVITY),
         }
     }
 
     /// Zero flux. Used as the trivial value for dry-dry interfaces.
+    pub fn zero() -> Self {
+        Self {
+            mass: T::zero(),
+            momentum: T::zero(),
+        }
+    }
+}
+
+impl Flux {
+    /// Zero flux constant for the `f64` configuration (generic code uses
+    /// [`Flux::zero`]).
     pub const ZERO: Self = Self {
         mass: 0.0,
         momentum: 0.0,

@@ -17,6 +17,7 @@
 use crate::GRAVITY;
 use crate::flux::Flux;
 use crate::state::Conserved;
+use hydroflux_autograd::Real;
 
 /// Wet/dry threshold used internally by the Riemann solver to detect
 /// dry cells when picking wave-speed estimates. Tighter than the
@@ -26,27 +27,32 @@ const DRY_TOL: f64 = 1.0e-12;
 
 /// HLL Riemann flux at the interface between left state `ul` and right
 /// state `ur`. Returns the numerical flux `F*` used by the FV update.
-pub fn hll_flux(ul: Conserved, ur: Conserved) -> Flux {
-    let l_wet = ul.h > DRY_TOL;
-    let r_wet = ur.h > DRY_TOL;
+///
+/// Generic over `T: Real`: wet/dry branching decides on `.value()`
+/// (the primal), and the flux arithmetic on the selected branch
+/// propagates derivatives — the discipline established in
+/// `hydroflux-solver-2d`.
+pub fn hll_flux<T: Real>(ul: Conserved<T>, ur: Conserved<T>) -> Flux<T> {
+    let l_wet = ul.h.value() > DRY_TOL;
+    let r_wet = ur.h.value() > DRY_TOL;
 
     // Both sides dry: no flux, no Riemann problem to solve.
     if !l_wet && !r_wet {
-        return Flux::ZERO;
+        return Flux::zero();
     }
 
-    let cl = if l_wet { (GRAVITY * ul.h).sqrt() } else { 0.0 };
-    let cr = if r_wet { (GRAVITY * ur.h).sqrt() } else { 0.0 };
-    let u_left = if l_wet { ul.hu / ul.h } else { 0.0 };
-    let u_right = if r_wet { ur.hu / ur.h } else { 0.0 };
+    let cl = if l_wet { (ul.h * GRAVITY).sqrt() } else { T::zero() };
+    let cr = if r_wet { (ur.h * GRAVITY).sqrt() } else { T::zero() };
+    let u_left = if l_wet { ul.hu / ul.h } else { T::zero() };
+    let u_right = if r_wet { ur.hu / ur.h } else { T::zero() };
 
     let (sl, sr) = match (l_wet, r_wet) {
         (true, true) => (
             (u_left - cl).min(u_right - cr),
             (u_left + cl).max(u_right + cr),
         ),
-        (false, true) => (u_right - 2.0 * cr, u_right + cr),
-        (true, false) => (u_left - cl, u_left + 2.0 * cl),
+        (false, true) => (u_right - cr * 2.0, u_right + cr),
+        (true, false) => (u_left - cl, u_left + cl * 2.0),
         (false, false) => unreachable!("handled by the both-dry early return above"),
     };
 
@@ -56,23 +62,23 @@ pub fn hll_flux(ul: Conserved, ur: Conserved) -> Flux {
     let fl = if l_wet {
         Flux {
             mass: ul.hu,
-            momentum: ul.hu * u_left + 0.5 * GRAVITY * ul.h * ul.h,
+            momentum: ul.hu * u_left + ul.h * ul.h * (0.5 * GRAVITY),
         }
     } else {
-        Flux::ZERO
+        Flux::zero()
     };
     let fr = if r_wet {
         Flux {
             mass: ur.hu,
-            momentum: ur.hu * u_right + 0.5 * GRAVITY * ur.h * ur.h,
+            momentum: ur.hu * u_right + ur.h * ur.h * (0.5 * GRAVITY),
         }
     } else {
-        Flux::ZERO
+        Flux::zero()
     };
 
-    if sl >= 0.0 {
+    if sl.value() >= 0.0 {
         fl
-    } else if sr <= 0.0 {
+    } else if sr.value() <= 0.0 {
         fr
     } else {
         let denom = sr - sl;

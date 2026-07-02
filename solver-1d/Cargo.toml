@@ -14,6 +14,7 @@ categories.workspace   = true
 ndarray.workspace = true
 thiserror.workspace = true
 surtgis-core.workspace = true
+hydroflux-autograd.workspace = true
 
 [dev-dependencies]
 approx.workspace = true

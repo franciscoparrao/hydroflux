@@ -2,7 +2,15 @@
 //!
 //! Implements the conservative shallow water equations in 1D using a
 //! finite-volume discretization with an HLL Riemann solver (Toro 2009,
-//! §10.5.1; wave-speed estimate after Davis 1988).
+//! §10.5.1; wave-speed estimate after Davis 1988; two-rarefaction
+//! dry-front speeds after Toro §10.5.4).
+//!
+//! The numerical core is generic over [`hydroflux_autograd::Real`]
+//! (defaulting to `f64`): instantiated with `Dual` and a seeded Manning
+//! roughness, the same production code path yields `∂h/∂n` by
+//! forward-mode AD — see `tests/ad_gradient.rs`. Wet/dry and CFL
+//! branching decide on `Real::value()` (the primal), the discipline
+//! established in `hydroflux-solver-2d`.
 //!
 //! See `outline.md` § "Plan Año 1 detallado — Fase 2 (2026 Q3)" for the
 //! design rationale and the open decisions this prototype closes.

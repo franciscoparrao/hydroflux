@@ -6,6 +6,7 @@
 
 use crate::GRAVITY;
 use crate::state::Conserved;
+use hydroflux_autograd::Real;
 
 /// Semi-implicit Manning friction step. In-place point-implicit update:
 ///
@@ -20,19 +21,25 @@ use crate::state::Conserved;
 /// - `manning == 0` short-circuits to a no-op.
 ///
 /// `manning` is the Manning roughness coefficient `n` (units s/m^(1/3));
-/// `dry_tol` is the wet/dry threshold in metres.
-pub fn manning_friction_step(states: &mut [Conserved], manning: f64, dt: f64, dry_tol: f64) {
-    if manning == 0.0 {
+/// `dry_tol` is the wet/dry threshold in metres. Generic over `T: Real`:
+/// with `T = Dual` and a seeded `manning`, `∂(hu)/∂n` propagates through
+/// the point-implicit factor.
+pub fn manning_friction_step<T: Real>(states: &mut [Conserved<T>], manning: T, dt: f64, dry_tol: f64) {
+    // Short-circuit keyed on the primal only. Exact also for the
+    // derivative: the factor depends on n through n², whose derivative
+    // 2·n·n' vanishes at n = 0, so a seeded Dual with val = 0 carries
+    // zero sensitivity through this step anyway.
+    if manning.value() == 0.0 {
         return;
     }
     let n_sq = manning * manning;
     for s in states.iter_mut() {
-        if s.h <= dry_tol {
+        if s.h.value() <= dry_tol {
             continue;
         }
         let u = s.hu / s.h;
-        let factor = 1.0 + dt * GRAVITY * n_sq * u.abs() / s.h.powf(4.0 / 3.0);
-        s.hu /= factor;
+        let factor = u.abs() * n_sq * (dt * GRAVITY) / s.h.powf(4.0 / 3.0) + 1.0;
+        s.hu = s.hu / factor;
     }
 }
 

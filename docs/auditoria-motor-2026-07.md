@@ -405,14 +405,32 @@ En orden de retorno/esfuerzo para el wedge:
    commit exacto (el pin convierte el drift silencioso en bump explícito). Promover
    clippy/fmt a bloqueantes cuando se limpien los examples (§2.6).
 
-### Q3 2026 (consolidación; el refactor de máximo apalancamiento)
+### Q3 2026 (consolidación) — ✅ 7, 8a, 9, 10 APLICADOS 2026-07-02; 8b-8d DIFERIDOS
 
-7. Corrección de shoreline Liang-Marche Δz + test lake-at-rest con isla (§1.2) + fix pérdida
-   de masa en frentes (§1.3) + umbral dual H_VEL (§1.4-B2).
-8. Genericar solver-1d sobre `Real`; trait `CrossSection`; autograd vuelve a leaf; crate
-   `hydroflux-core` con las primitivas compartidas (§2.1-2.3). En PRs ≤500 líneas: API → impl → tests.
-9. `Workspace2D` + precómputo z_face/primitivas + rescaling 1× por cara (§3.1).
-10. criterion benches + proptest en las propiedades algebraicas (§5.1).
+7. ✅ Corrección de shoreline (§1.2): regla `z_face = max(z_L, z_R)` en caras interiores con
+   exactamente un lado seco (midpoint solo wet-wet, donde vive el bias MUSCL) — cubre el caso
+   muro Y limpia el wetting de la columna espuria de medio salto. Tests lake-at-rest con isla
+   emergida y contra banco emergido, exactos a 1e-10 (antes drift ~1e-5). ✅ Moisture floor
+   (§1.3): los films ≤ umbral conservan su masa (solo pierden momentum); dam-break a caja seca
+   cerrada conserva volumen a roundoff. ✅ H_VEL = 10·H_DRY (§1.4-B2): corte de velocidad en
+   CFL, primitivas, caras y herencia de momentum — mata el colapso de dt y el leak de momentum
+   stale de ICs patológicos. Todo espejado en solver-1d.
+8. ✅ **8a**: solver-1d genérico sobre `Real` (manning como `T`, default type params
+   `Conserved<T = f64>` — sin sufijo G). El HLL+Audusse de producción es ahora diferenciable:
+   test AD-vs-FD de ∂h/∂n end-to-end (rel_err < 5e-3, mismo mecanismo dt-congelado
+   documentado) + igualdad bit-exacta f64 vs `Dual::constant`.
+   ⏸ **8b-8d diferidos** (trait `CrossSection`, autograd→leaf, crate `hydroflux-core`):
+   mover los módulos LF de autograd rompe los imports de los 15 examples del paper 02,
+   actualmente en HOLD con archivos sin commit pendientes de la submission. Ejecutar cuando
+   el paquete AWR esté enviado; el diseño está especificado en §2.1-2.3.
+9. ✅ `StepWorkspace2D` + API `_with` (allocation-free), primitivas precomputadas (1 pasada vs
+   ~10 divisiones/celda), rescaling in-place 1× por cara, snapshot SSP-RK2 sin clone.
+   Bit-idéntico al camino con allocations (test de 50 pasos × 2 integradores). Bench relativo
+   en máquina cargada: −26% all-wet / −54% mostly-dry vs wrapper; medir absolutos en máquina
+   quieta antes de citar (caveat en benches/step.rs).
+10. ✅ criterion (`solver-2d/benches/step.rs`, baseline quieto pre-workspace: 16/31/6.3 ms) +
+    proptest (`autograd/tests/properties.rs`: roundtrips de sección, f64 ≡ Dual::constant
+    bit-exacto sobre run completo, positividad bajo parámetros aleatorios).
 
 ### Q4 2026 (performance CPU + API pública para release v0.1)
 

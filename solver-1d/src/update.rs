@@ -12,6 +12,7 @@ use crate::geometry::Channel1D;
 use crate::riemann::hll_flux;
 use crate::state::Conserved;
 use crate::{GRAVITY, H_DRY, H_VEL};
+use hydroflux_autograd::Real;
 
 /// Maximum signal speed across the state vector. Used to bound the time
 /// step under the CFL condition. Returns 0 for an empty or all-dry state.
@@ -23,11 +24,15 @@ use crate::{GRAVITY, H_DRY, H_VEL};
 /// draining cells below zero depth. Films `h ≤ H_VEL` contribute only
 /// their celerity: the floor keeps their momentum at zero, and a stale
 /// residual (user-supplied IC) must not collapse dt through `hu/h`.
-pub fn max_wave_speed(states: &[Conserved]) -> f64 {
-    let cell_speed = |s: &Conserved, front_factor: f64| -> f64 {
-        if s.h > H_DRY {
-            let c = (GRAVITY * s.h).sqrt();
-            let u = if s.h > H_VEL { s.hu / s.h } else { 0.0 };
+pub fn max_wave_speed<T: Real>(states: &[Conserved<T>]) -> f64 {
+    // Wave speeds are reduced to f64 (via `Real::value()`): they feed
+    // CFL bookkeeping, a scalar timing decision that is deliberately
+    // not differentiated (same convention as `hydroflux-solver-2d`).
+    let cell_speed = |s: &Conserved<T>, front_factor: f64| -> f64 {
+        let h = s.h.value();
+        if h > H_DRY {
+            let c = (GRAVITY * h).sqrt();
+            let u = if h > H_VEL { s.hu.value() / h } else { 0.0 };
             u.abs() + front_factor * c
         } else {
             0.0
@@ -41,7 +46,7 @@ pub fn max_wave_speed(states: &[Conserved]) -> f64 {
 
     let fronts = states
         .windows(2)
-        .map(|w| match (w[0].h > H_DRY, w[1].h > H_DRY) {
+        .map(|w| match (w[0].h.value() > H_DRY, w[1].h.value() > H_DRY) {
             (true, false) => cell_speed(&w[0], 2.0),
             (false, true) => cell_speed(&w[1], 2.0),
             _ => 0.0,
@@ -56,7 +61,7 @@ pub fn max_wave_speed(states: &[Conserved]) -> f64 {
 /// propagate; callers should clamp this against a problem-specific maximum.
 ///
 /// `cfl` is typically 0.5 for an explicit FV solver with HLL.
-pub fn cfl_time_step(states: &[Conserved], dx: f64, cfl: f64) -> f64 {
+pub fn cfl_time_step<T: Real>(states: &[Conserved<T>], dx: f64, cfl: f64) -> f64 {
     let smax = max_wave_speed(states);
     if smax > 0.0 {
         cfl * dx / smax
@@ -70,9 +75,9 @@ pub fn cfl_time_step(states: &[Conserved], dx: f64, cfl: f64) -> f64 {
 /// `plus` is consumed by the cell on the RIGHT. They share `mass` but
 /// differ in `momentum` by a hydrostatic-pressure correction term.
 #[derive(Debug, Clone, Copy)]
-struct FaceFluxes {
-    minus: Flux,
-    plus: Flux,
+struct FaceFluxes<T> {
+    minus: Flux<T>,
+    plus: Flux<T>,
 }
 
 /// Audusse (2004) well-balanced face flux. Reconstructs the depths at the
@@ -83,17 +88,27 @@ struct FaceFluxes {
 /// On a flat bed (`z_left == z_right`) `h*_L = h_left` and `h*_R = h_right`,
 /// the correction vanishes, and the flux degenerates to the plain HLL flux
 /// of the original states — i.e. this generalises the flat-bed update.
-fn well_balanced_face(left: Conserved, z_left: f64, right: Conserved, z_right: f64) -> FaceFluxes {
+fn well_balanced_face<T: Real>(
+    left: Conserved<T>,
+    z_left: f64,
+    right: Conserved<T>,
+    z_right: f64,
+) -> FaceFluxes<T> {
     let z_max = z_left.max(z_right);
-    let h_star_left = (left.h + z_left - z_max).max(0.0);
-    let h_star_right = (right.h + z_right - z_max).max(0.0);
+    let h_star_left = (left.h + (z_left - z_max)).max(T::zero());
+    let h_star_right = (right.h + (z_right - z_max)).max(T::zero());
 
     // Reconstructed states carry the original velocities of each side.
-    let u_left = if left.h > 0.0 { left.hu / left.h } else { 0.0 };
-    let u_right = if right.h > 0.0 {
+    // Velocity extraction under the H_VEL cutoff (see `crate::H_VEL`).
+    let u_left = if left.h.value() > H_VEL {
+        left.hu / left.h
+    } else {
+        T::zero()
+    };
+    let u_right = if right.h.value() > H_VEL {
         right.hu / right.h
     } else {
-        0.0
+        T::zero()
     };
 
     let f_hll = hll_flux(
@@ -105,11 +120,11 @@ fn well_balanced_face(left: Conserved, z_left: f64, right: Conserved, z_right: f
     FaceFluxes {
         minus: Flux {
             mass: f_hll.mass,
-            momentum: f_hll.momentum + half_g * (left.h * left.h - h_star_left * h_star_left),
+            momentum: f_hll.momentum + (left.h * left.h - h_star_left * h_star_left) * half_g,
         },
         plus: Flux {
             mass: f_hll.mass,
-            momentum: f_hll.momentum + half_g * (right.h * right.h - h_star_right * h_star_right),
+            momentum: f_hll.momentum + (right.h * right.h - h_star_right * h_star_right) * half_g,
         },
     }
 }
@@ -122,7 +137,12 @@ fn well_balanced_face(left: Conserved, z_left: f64, right: Conserved, z_right: f
 ///
 /// Panics if `states.len() != channel.n_cells()`. The caller is responsible
 /// for keeping `dt` below the CFL bound (see [`cfl_time_step`]).
-pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Boundaries, dt: f64) {
+pub fn forward_euler_step<T: Real>(
+    states: &mut [Conserved<T>],
+    channel: &Channel1D<T>,
+    bcs: Boundaries,
+    dt: f64,
+) {
     assert_eq!(
         states.len(),
         channel.n_cells(),
@@ -141,7 +161,7 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
     // computational BCs (Transmissive, Wall) leave the bed flat across the
     // boundary; physical BCs (Discharge, Depth) extend it linearly so the
     // boundary face carries the same bed jump as interior faces.
-    let mut faces: Vec<FaceFluxes> = Vec::with_capacity(n + 1);
+    let mut faces: Vec<FaceFluxes<T>> = Vec::with_capacity(n + 1);
 
     let (ghost_left, z_ghost_left) = ghost_cell(channel, states[0], bcs.left, Side::Left);
     faces.push(well_balanced_face(
@@ -176,8 +196,8 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
     for i in 0..n {
         let f_right = faces[i + 1].minus;
         let f_left = faces[i].plus;
-        states[i].h -= dt_dx * (f_right.mass - f_left.mass);
-        states[i].hu -= dt_dx * (f_right.momentum - f_left.momentum);
+        states[i].h = states[i].h - (f_right.mass - f_left.mass) * dt_dx;
+        states[i].hu = states[i].hu - (f_right.momentum - f_left.momentum) * dt_dx;
 
         // Positivity safety net + film momentum zeroing. Under the
         // CFL bound of `max_wave_speed` the update should not drive h
@@ -186,9 +206,9 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
         // (destroying it would leak volume at every wetting front) but
         // has no meaningful velocity, so its momentum is dropped before
         // `hu/h` can amplify it into a spurious wave speed.
-        if states[i].h <= H_VEL {
-            states[i].h = states[i].h.max(0.0);
-            states[i].hu = 0.0;
+        if states[i].h.value() <= H_VEL {
+            states[i].h = states[i].h.max(T::zero());
+            states[i].hu = T::zero();
         }
     }
 }
