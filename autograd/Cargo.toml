@@ -13,4 +13,5 @@ categories.workspace   = true
 [dependencies]
 
 [dev-dependencies]
-approx.workspace = true
+approx.workspace   = true
+proptest.workspace = true

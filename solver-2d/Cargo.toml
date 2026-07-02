@@ -17,5 +17,10 @@ surtgis-core.workspace       = true
 hydroflux-autograd.workspace = true
 
 [dev-dependencies]
-approx.workspace   = true
-tempfile.workspace = true
+approx.workspace    = true
+tempfile.workspace  = true
+criterion.workspace = true
+
+[[bench]]
+name    = "step"
+harness = false
