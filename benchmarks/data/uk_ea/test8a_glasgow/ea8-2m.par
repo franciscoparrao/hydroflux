@@ -1,0 +1,34 @@
+DEMfile			ea8-2m.dem
+bcifile         ea8-2m.bci
+bdyfile         ea8-2m.bdy
+stagefile		ea8-2m.stage
+dirroot         ea8-2m
+resroot			ea8-2m
+manningfile     ea8-2m.n
+rainfall        ea8-2m.rain
+acc_nugrid
+cuda
+epsilon  0.001
+L         9
+#acceleration
+#fv1
+#dg2
+#drain_nodata
+
+#drycheckoff
+#theta 0.85
+
+#cfl 0.1
+nodata_elevation 40.0
+
+sim_time		18000.0
+initial_tstep	0.35
+saveint			3600.0
+massint			30.0
+#fpfric			0.015
+
+mint_hk
+
+elevoff
+voutput
+#gzip

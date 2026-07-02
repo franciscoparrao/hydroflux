@@ -338,12 +338,43 @@ líneas ~14-34).
 
 **Tareas**:
 
-- [ ] Preguntar al usuario qué camino (A es compatible con someter
-      pronto; B puede ser el plan para el R1 si los reviewers lo piden).
-- [ ] Ejecutar el camino elegido.
-- [ ] Si A: revisar TODAS las menciones ("passes all six", Highlights
-      bullet 3, Abstract, §6, Key Point 2) — la degradación debe ser
-      consistente en todo el texto.
+- [x] Decisión del usuario (2026-07-02): **Camino B — datasets oficiales**.
+- [x] **Etapa 1 — Adquisición (2026-07-02)**: los datasets originales EA
+      se piden por email (fcerm.evidence@environment-agency.gov.uk, no
+      son descarga pública), PERO los paquetes de reproducibilidad de
+      LISFLOOD-FP los redistribuyen bajo CC-BY-4.0 con las geometrías
+      oficiales. Adquirido y stageado en `benchmarks/data/uk_ea/`
+      (628 KB, ver su README con procedencia completa):
+      - **Test 4**: inputs oficiales completos (par/bci/bdy/stage +
+        DEMs 2/5/10 m) + series de referencia LISFLOOD ACC-1m y DG2-5m
+        en los puntos de control (Zenodo 10.5281/zenodo.4066824).
+      - **Test 5**: series de referencia ACC/DG2 a 10 m; los INPUTS no
+        venían — el valle es sintético paramétrico, se construye desde
+        la spec del informe SC120002.
+      - **Test 8A Glasgow** (urbano, lluvia+surcharge): inputs
+        oficiales completos a 2 m (Zenodo 10.5281/zenodo.6907286);
+        la versión 0.5 m (17 MB) se baja on-demand del Zenodo.
+      - **OJO nomenclatura**: el caso urbano oficial es el Test **8A**,
+        no el "Test 6" del manuscrito — al reescribir §3.6 revisar el
+        mapeo de los 6 stand-ins sintéticos actuales contra la
+        numeración oficial de Néelz & Pender (el reporte SC120002 tiene
+        las specs; URL en el README de los datos).
+- [ ] **Etapa 2 — Implementación** (próxima sesión):
+      1. Lector ASCII-grid (o conversión GeoTIFF) para los `.dem`.
+      2. Runner por test con series en los puntos de control oficiales
+         (usar `Simulation` + `set_boundaries()` para el hidrograma).
+      3. Construir el DEM del Test 5 desde la spec paramétrica.
+      4. Comparar vs LISFLOOD ACC/DG2 (numérico) + envelopes del
+         informe (cualitativo). Métricas: RMSE/bias de nivel y timing
+         de llegada por punto de control.
+- [ ] **Etapa 3 — Manuscrito**: reescribir §3.6 con resultados
+      cuantitativos, actualizar Tabla 1, Highlights, Abstract y Key
+      Point 2; decidir si los stand-ins sintéticos quedan como smoke
+      tests del CI.
+- [ ] (Opcional, en paralelo) Email a la EA pidiendo el paquete
+      oficial de specs/datasets — refuerza la procedencia y puede
+      traer los resultados numéricos de los modelos de industria.
+      Acción del usuario.
 
 **Tip**: la recomendación del review es A ahora + B como respuesta
 preparada para R1. Someter con el claim degradado es defendible; someter

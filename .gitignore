@@ -17,6 +17,11 @@ venv/
 
 # Datos pesados (referenciar paths externos, no copiar)
 data/
+# EXCEPCIÓN (convención CLAUDE.md): los datos de benchmarks numéricos
+# van EN el repo — son chicos (KB-MB) y el claim de reproducibilidad
+# del paper depende de que viajen con el clone. Igual que los fixtures
+# de examples/huasco_2d_phase2/data/ (force-added).
+!benchmarks/data/
 *.tif
 *.tiff
 *.nc
