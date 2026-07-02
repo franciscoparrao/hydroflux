@@ -44,11 +44,14 @@ The manuscript fits the journal's Aims & Scope on three explicit axes:
    application.** The solver is *generic over the numeric type* through
    a Rust trait abstraction, so that the identical code path evaluates
    in `f64` for production and in forward-mode dual numbers for
-   gradient extraction. This zero-runtime-cost approach to
-   differentiability is, to our knowledge, the first such pattern
-   reported in a compiled environmental-modelling kernel; the lesson
-   transfers directly to any structured-grid hyperbolic solver in a
-   modern systems language. The well-balancedness, mass conservation
+   gradient extraction. The idiom itself has a long lineage in
+   compiled languages (ADOL-C, Sacado, CoDiPack; the manuscript
+   positions against it explicitly); what we believe is new for an
+   environmental-modelling kernel is applying it as a design-time
+   commitment across the entire solver — no retrofit, no taping — and
+   *verifying the gradients themselves* with an AD-versus-finite-
+   differences locking suite. The lesson transfers directly to any
+   structured-grid hyperbolic solver in a modern systems language. The well-balancedness, mass conservation
    under wet/dry, and cell-mask early-skip optimisation are documented
    with the discipline EMS readers expect, including a mass-conservation
    discussion of why bounding-box skip-dry strategies break it

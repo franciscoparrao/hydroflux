@@ -32,9 +32,10 @@ keywords: [shallow water equations, finite volume, well-balanced,
 # Abstract
 
 Two-dimensional shallow-water solvers underpin flood hazard mapping,
-but open-source production kernels in FORTRAN or C++ offer no ergonomic
-path to automatic differentiation, even as differentiable modelling
-unifies geoscientific inverse problems.
+but none of the established open-source kernels ships with automatic
+differentiation (AD): retrofitting AD onto a legacy FORTRAN or C++
+solver is a substantial re-engineering effort, even as differentiable
+modelling unifies geoscientific inverse problems.
 We present *hydroflux*, a 2D shallow-water finite-volume solver written
 in Rust and generic over the numeric type: the identical code path
 evaluates in `f64` for production and in forward-mode dual numbers for
@@ -67,10 +68,10 @@ coupled hydrometeorological hazard simulation.
 # Plain Language Summary
 
 Computer models that predict where rivers flood solve the same
-physical equations, but the software that does so is usually written
-in older programming languages with limited compatibility with modern
-machine-learning tools, and is rarely tested transparently on freely
-available data. We built a new flood model, *hydroflux*, in Rust,
+physical equations, but the software that does so was usually written
+decades ago, in ways that make it hard to connect with modern
+calibration and machine-learning tools, and is rarely tested
+transparently on freely available data. We built a new flood model, *hydroflux*, in Rust,
 designed so that the same code can both run a simulation and
 automatically compute how its outputs depend on its inputs — the key
 ingredient for calibrating models against observations. We checked it
@@ -97,10 +98,19 @@ LISFLOOD-FP [@Bates2010; @BatesDeRoo2000], BASEMENT [@Vetsch2020],
 TELEMAC-MASCARET [@Hervouet2007], ANUGA [@Roberts2015], Iber
 [@Blade2014], SRH-2D [@Lai2010], Delft3D [@Lesser2004], and GeoClaw
 [@LeVeque2011] — span the regulatory and research tracks but are,
-almost without exception, written in FORTRAN or C++. That language
-choice is not incidental: it places automatic differentiation (AD),
-now a first-class capability in scientific computing, behind a
-substantial re-engineering cost.
+almost without exception, written in FORTRAN or C++, and none of them
+ships with automatic differentiation (AD). Mature AD toolchains for
+compiled languages do exist: operator-overloading libraries such as
+ADOL-C [@Griewank1996ADOLC], Sacado [@PhippsPawlowski2012Sacado], and
+CoDiPack [@Sagebaum2019CoDiPack] for C++; source transformation via
+Tapenade [@HascoetPascual2013Tapenade] and TAF, which powers the
+production adjoint of the MITgcm ocean model
+[@Heimbach2005MITgcmAdjoint]; and LLVM-level differentiation via
+Enzyme [@MosesChuravy2020Enzyme]. But retrofitting any of them onto a
+hand-optimised legacy flood kernel means invasive type or
+build-system surgery through code never designed for it — which is
+why, three decades into that lineage, no community shallow-water
+solver offers gradients today.
 
 Differentiable modelling has emerged over the last few years as a
 unifying inverse-problem framework across the geosciences
@@ -116,20 +126,29 @@ paradigm these works share is clear: the *forward solver* becomes
 differentiable (or GPU-native, or both), and inverse problems —
 parameter estimation, bathymetry inversion, learned closures — inherit
 efficient gradients. The differentiable layer typically sits in a
-host language with mature AD (JAX, PyTorch, Julia). What remains
-comparatively under-served is a 2D shallow-water flood solver that is
-differentiable *by construction in a compiled systems language*,
-verified on the standard community benchmark suite, and exercised on
-a real data-sparse application — the niche this paper occupies.
+host language with tracing-based AD (JAX, PyTorch, Julia). What
+remains comparatively under-served is a 2D shallow-water flood solver
+that is differentiable *by construction* — designed from the first
+commit around a generic numeric type rather than retrofitted onto a
+legacy kernel — in a memory-safe compiled language, with the gradients
+themselves verified as part of the test suite, exercised on the
+standard community benchmarks, and applied to a real data-sparse
+basin. That combination — not differentiation of compiled code per
+se, which the ADOL-C-to-Enzyme lineage established — is the niche
+this paper occupies.
 
 This paper does not claim to open that frontier; it claims to
 **deliver and verify** a solver positioned within it, with two
 specific design commitments. First, *differentiability by numeric
-genericity*: rather than relying on a host language's tracing-based
-AD (as in JAX or PyTorch/Julia toolchains), hydroflux is generic over
-a `Real` trait, so the identical source compiles to `f64` for
-production and to a forward-mode `Dual` type for gradient extraction,
-with no tracer overhead and no separate adjoint code to maintain. Second, *GIS-native
+genericity*: hydroflux is generic over a `Real` trait, so the
+identical source compiles to `f64` for production and to a
+forward-mode `Dual` type for gradient extraction. This is the
+operator-overloading idiom of the ADOL-C/Sacado/CoDiPack family,
+applied as a design-time commitment rather than a retrofit: every
+module of the solver dispatches over the generic type, there is no
+tracer overhead, no taping, and no separate adjoint code to maintain
+— and, distinctively, the gradients themselves are locked by an
+AD-versus-finite-differences test suite (§2.5). Second, *GIS-native
 verification on data-sparse basins*: the solver ingests DEM and
 land-cover GeoTIFFs directly and is exercised against the full UK
 Environment Agency 2D benchmark suite [@NeelzPender2013] plus analytical
@@ -277,9 +296,9 @@ $n_final = 0.040 000$ (relative error $< 10^{-15}$) in five iterations.
 The arithmetic overhead of the wedge is measured on a 64×64 cell
 domain over 200 SSP-RK2 + Manning steps. The Dual-typed run takes
 1.98× the wall-clock of the `f64` run ($1338$ vs $676$ ns per
-cell-step, post-warm-up, release build). This is within the expected
-2-3× band for forward-mode AD on compiled code and lower than
-tracer-based AD on the same problem class.
+cell-step, post-warm-up, release build). This is within the 2-3× band
+expected for operator-overloading forward AD on compiled code
+[@Griewank2008; @Sagebaum2019CoDiPack].
 
 The 1D companion line [@ParraPaper02] uses the same `Real` trait and
 the same `Dual` type, exposed through the autograd crate. Reverse-mode
@@ -461,9 +480,9 @@ problems.
 **`f64` vs `Dual<f64>` overhead.** On a $64^{2}$ grid over $200$ SSP-RK2 +
 Manning steps, the forward-mode AD instance takes $1.98 ×$ the
 wall-clock of the `f64` instance ($676$ vs $1338$ ns per cell-step,
-§2.5). The ratio is inside the expected 2-3× band for forward-mode AD
-on compiled code and below the 3-5× typical of tracer-based AD on
-similar problem classes. We treat this as the AD overhead headline.
+§2.5). The ratio is inside the 2-3× band expected for
+operator-overloading forward AD on compiled code [@Griewank2008;
+@Sagebaum2019CoDiPack]. We treat this as the AD overhead headline.
 
 **Wall-clock vs ANUGA on a matched Stoker problem.** On the Stoker
 dam-break scaled to $200 m × 5 m$, $t_end = 8 s$ at matched effective

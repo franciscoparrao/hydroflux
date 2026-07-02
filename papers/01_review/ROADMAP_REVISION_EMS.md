@@ -162,7 +162,16 @@ en un párrafo.
 
 **Tareas**:
 
-- [ ] Conseguir y verificar (vía `/verify-refs`) ~6 referencias:
+- [x] Conseguir y verificar (vía `/verify-refs`) ~6 referencias.
+      **Resuelto (2026-07-02)**: 6/6 verificadas contra CrossRef/OpenAlex
+      y agregadas a `references.bib` (bloque "AD in compiled languages"):
+      Griewank1996ADOLC (10.1145/229473.229474), PhippsPawlowski2012Sacado
+      (10.1007/978-3-642-30023-3_28), Sagebaum2019CoDiPack (10.1145/3356900),
+      HascoetPascual2013Tapenade (10.1145/2450153.2450158),
+      Heimbach2005MITgcmAdjoint (10.1016/j.future.2004.11.010, año 2005
+      confirmado en CrossRef), MosesChuravy2020Enzyme (NeurIPS 2020,
+      arXiv:2010.01709 — NeurIPS no lleva DOI CrossRef propio).
+      Candidatas originales:
       - Sacado: Phipps & Pawlowski (Trilinos AD package) — buscar la
         cita canónica (posible: Phipps et al., "Automatic
         Differentiation of C++ Codes for Large-Scale Scientific
@@ -178,8 +187,19 @@ en un párrafo.
       **NO usar estas citas de memoria: verificar cada una en
       CrossRef/OpenAlex antes de agregarla al .bib** (regla de las
       alucinaciones).
-- [ ] Reescribir el párrafo 1 de §1: la claim pasa de "no ergonomic
-      path" a algo tipo "AD in compiled languages has a long lineage
+- [x] Reescribir el párrafo 1 de §1.
+      **Resuelto (2026-07-02)**: la claim ahora reconoce el linaje
+      completo (operator-overloading ADOL-C/Sacado/CoDiPack, source
+      transformation Tapenade/TAF con el adjoint de producción de
+      MITgcm, Enzyme a nivel LLVM) y el hueco real queda como
+      "retrofitting onto a hand-optimised legacy flood kernel" +
+      "no community shallow-water solver offers gradients today".
+      El design commitment #1 se reposiciona como "el idiom de la
+      familia ADOL-C/Sacado/CoDiPack aplicado como design-time
+      commitment, con los gradientes verificados por la suite AD-vs-FD".
+      El párrafo del niche cierra con "not differentiation of compiled
+      code per se, which the ADOL-C-to-Enzyme lineage established".
+      Plan original: "AD in compiled languages has a long lineage
       (operator-overloading: ADOL-C, Sacado, CoDiPack; source
       transformation: Tapenade, TAF powering the MITgcm adjoint; and
       LLVM-level AD via Enzyme); what these toolchains do not provide
@@ -188,13 +208,23 @@ en un párrafo.
       exótico), memory-safety garantizada, suite de tests que verifica
       el GRADIENTE además del primal, e I/O GIS nativo. El artefacto
       sigue siendo defendible; la claim de vacío no.
-- [ ] Ajustar la frase equivalente del Abstract ("offer no ergonomic
-      path...") y del Plain Language Summary ("older programming
-      languages with limited compatibility...") — la misma corrección,
-      tono divulgativo.
-- [ ] Revisar §2.5 y §5(iii) por ecos de la claim (p.ej. "no separate
-      adjoint code to maintain" está bien porque es factual del diseño;
-      lo que no puede quedar es la implicación de que nadie más puede).
+- [x] Ajustar Abstract y Plain Language Summary.
+      **Resuelto (2026-07-02)**: Abstract → "none of the established
+      open-source kernels ships with AD: retrofitting AD onto a legacy
+      FORTRAN or C++ solver is a substantial re-engineering effort";
+      PLS → "written decades ago, in ways that make it hard to connect
+      with modern calibration and machine-learning tools" (sin duplicar
+      la frase de gradientes que ya venía dos líneas después).
+- [x] Revisar §2.5, §5 y cover letter por ecos.
+      **Resuelto (2026-07-02)**: los "no separate adjoint code to
+      maintain" quedan (factuales del diseño). Dos hallazgos extra
+      corregidos: (a) el cover letter afirmaba "the first such pattern
+      reported in a compiled environmental-modelling kernel" —
+      reescrito para reconocer el linaje y reclamar solo el design-time
+      commitment + gradientes verificados; (b) el "3-5× typical of
+      tracer-based AD" sin cita (§2.5 y §3.9) → reemplazado por el
+      band 2-3× de operator-overloading citando Griewank2008 +
+      Sagebaum2019CoDiPack.
 
 **Criterio de aceptación**: un lector que conoce Sacado/Enzyme/MITgcm
 lee §1 y asiente en vez de sacar el lápiz rojo. La contribución queda
@@ -550,6 +580,7 @@ los números sean los finales.
 | 2026-07-02 | WP2 | git-dep por `rev` (no tag) para no interferir con releases de surtgis; pin en UN lugar (Cargo.toml), CI simplificado sin doble-checkout | Claude |
 | 2026-07-02 | WP2 | Fixtures Huasco (~83 KB) commiteados a `examples/huasco_2d_phase2/data/` — inputs no viven más en `output/` gitignorado | Claude |
 | 2026-07-02 | WP2 | **WP2 COMPLETO** salvo release Zenodo v0.1 (opcional, decisión del usuario) y el pin final del commit (se hace en WP0). Clone limpio verificado end-to-end | Claude |
+| 2026-07-02 | WP1 | **WP1 COMPLETO**: 6 refs AD-compilado verificadas y citadas; §1/Abstract/PLS/cover letter reposicionados (linaje reconocido, hueco real = retrofit sobre kernels legacy + gradientes verificados); overclaims colaterales corregidos ("first such pattern" del cover letter, "3-5× tracer-based" sin cita) | Claude |
 
 ## Métricas viejas → nuevas (llenar en WP0)
 
