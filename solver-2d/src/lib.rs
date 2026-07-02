@@ -32,6 +32,7 @@ pub mod flux;
 pub mod geometry;
 pub mod io;
 pub mod riemann;
+pub mod sim;
 pub mod source;
 pub mod state;
 pub mod update;
@@ -73,10 +74,11 @@ pub use flux::{FluxX, FluxY};
 pub use flux::{FluxXG, FluxYG};
 pub use geometry::{Mesh2D, Mesh2DG};
 pub use io::{
-    depth_raster_from_states, esa_worldcover_to_manning, mesh_from_geotiff,
+    IoError, depth_raster_from_states, esa_worldcover_to_manning, mesh_from_geotiff,
     mesh_from_geotiff_with_landcover, write_depth_geotiff,
 };
 pub use riemann::{hllc_flux_x, hllc_flux_y};
+pub use sim::{Integrator, SimError, Simulation, SimulationConfig};
 pub use source::{PointSource, apply_point_sources, apply_rain, manning_friction_step};
 pub use state::{Conserved2D, Conserved2DG, Primitive2D, Primitive2DG};
 pub use update::{
