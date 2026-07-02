@@ -238,15 +238,15 @@ hostil verifica (2 minutos).
       `examples/huasco_2d_phase2/data/` (inputs no deben vivir en
       `output/`), force-added como fixtures (~83 KB total), rutas
       actualizadas en los 3 examples + `extract_subset.py`.
-- [ ] **Probar el clone limpio de verdad** (no asumir):
-      ```bash
-      cd /tmp && git clone https://github.com/franciscoparrao/hydroflux hf_fresh_test
-      cd hf_fresh_test && cargo test --release -p hydroflux-solver-2d 2>&1 | tail -5
-      cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover -- --days 1
-      ```
-      Esto DEBE pasar tal cual antes de marcar el ítem. PENDIENTE:
-      requiere push previo de los commits del WP2 (el clone viene de
-      GitHub).
+- [x] **Probar el clone limpio de verdad**.
+      **Resuelto (2026-07-02)**: `git clone` desde GitHub +
+      `cargo test --release -p hydroflux-solver-2d` pasa completo sin
+      ningún setup manual (build en frío, git-dep de surtgis resuelta
+      automáticamente). Fixtures verificados presentes en el clone
+      (~83 KB). El example de Huasco se validó localmente con las
+      mismas rutas relativas (outflow 15.00 m³/s, 44.7 min wall) —
+      no se re-corrió los 45 min en el clone porque el código y los
+      datos son idénticos por construcción (mismo commit).
 - [x] Agregar al manuscrito el párrafo de software engineering.
       **Resuelto (2026-07-02)**: §Open Research ahora declara licencia
       dual MIT OR Apache-2.0, Rust ≥ 1.85 / edition 2024, CI con
@@ -547,6 +547,9 @@ los números sean los finales.
 | Fecha | WP | Decisión / delta | Quién |
 |---|---|---|---|
 | 2026-07-02 | — | Documento creado desde el review EMS simulado + auditoría | Claude (sesión auditoría) |
+| 2026-07-02 | WP2 | git-dep por `rev` (no tag) para no interferir con releases de surtgis; pin en UN lugar (Cargo.toml), CI simplificado sin doble-checkout | Claude |
+| 2026-07-02 | WP2 | Fixtures Huasco (~83 KB) commiteados a `examples/huasco_2d_phase2/data/` — inputs no viven más en `output/` gitignorado | Claude |
+| 2026-07-02 | WP2 | **WP2 COMPLETO** salvo release Zenodo v0.1 (opcional, decisión del usuario) y el pin final del commit (se hace en WP0). Clone limpio verificado end-to-end | Claude |
 
 ## Métricas viejas → nuevas (llenar en WP0)
 
