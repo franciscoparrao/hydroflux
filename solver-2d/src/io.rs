@@ -364,14 +364,17 @@ mod tests {
         let tmp = NamedTempFile::new().unwrap();
         write_depth_geotiff(tmp.path(), &states, transform, Some(-9999.0)).unwrap();
 
+        // SurtGIS ≥ Sprint-1 normalizes the nodata sentinel to NaN on
+        // read (float rasters), so the dry cell written as -9999 must
+        // come back as NaN, not as the on-disk sentinel.
         let read_back: Raster<f64> = read_geotiff(tmp.path(), None).unwrap();
         assert_eq!(read_back.shape(), (3, 4));
         for ((i, j), &v) in read_back.data().indexed_iter() {
-            let expected = if (i, j) == (2, 3) { -9999.0 } else { 1.25 };
-            assert!(
-                (v - expected).abs() < 1e-5,
-                "cell ({i},{j}): expected {expected}, got {v}"
-            );
+            if (i, j) == (2, 3) {
+                assert!(v.is_nan(), "dry cell ({i},{j}): expected NaN, got {v}");
+            } else {
+                assert!((v - 1.25).abs() < 1e-5, "cell ({i},{j}): expected 1.25, got {v}");
+            }
         }
     }
 }

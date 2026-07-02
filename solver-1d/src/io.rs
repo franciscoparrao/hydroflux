@@ -49,7 +49,7 @@ pub type Result<T> = std::result::Result<T, IoError>;
 /// from `pixel_width` of the geotransform. Manning roughness is passed
 /// in by the caller (the raster does not carry it).
 pub fn read_channel<P: AsRef<Path>>(path: P, manning: f64) -> Result<Channel1D> {
-    let raster: Raster<f64> = read_geotiff(path, Some(1))?;
+    let raster: Raster<f64> = read_geotiff(path, Some(0))?;
     if raster.rows() != 1 {
         return Err(IoError::NotOneDimensional(raster.rows()));
     }
@@ -163,8 +163,8 @@ mod tests {
         write_discharge(&states, &channel, &path_hu).unwrap();
 
         // Read back as raw rasters and check the values + geotransform.
-        let r_h: Raster<f64> = read_geotiff(&path_h, Some(1)).unwrap();
-        let r_hu: Raster<f64> = read_geotiff(&path_hu, Some(1)).unwrap();
+        let r_h: Raster<f64> = read_geotiff(&path_h, Some(0)).unwrap();
+        let r_hu: Raster<f64> = read_geotiff(&path_hu, Some(0)).unwrap();
         for r in [&r_h, &r_hu] {
             assert_eq!(r.rows(), 1);
             assert_eq!(r.cols(), 4);
