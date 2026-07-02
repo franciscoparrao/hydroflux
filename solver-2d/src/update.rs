@@ -376,60 +376,60 @@ struct CellSlopesG<T> {
     v: T,
 }
 
-/// Cell-centered primitive values `(η, u, v)`. Films return
-/// `u = v = 0`: velocity is not meaningful below the `H_VEL` cutoff,
-/// and dividing residual momentum by a near-`H_DRY` depth produces
-/// unphysical velocities (see [`crate::H_VEL`]).
-fn primitives_at<T: Real>(
+/// Cell-centered primitive values `(η, u, v)`, materialised once per
+/// step. Films carry `u = v = 0`: velocity is not meaningful below the
+/// `H_VEL` cutoff, and dividing residual momentum by a near-`H_DRY`
+/// depth produces unphysical velocities (see [`crate::H_VEL`]).
+#[derive(Debug, Clone, Copy, Default)]
+struct PrimG<T> {
+    eta: T,
+    u: T,
+    v: T,
+}
+
+/// Fill the per-cell primitive buffer. One pass replaces the ~10
+/// redundant `hu/h`, `hv/h` divisions per cell per step that the
+/// slope and reconstruction stencils used to pay by recomputing
+/// primitives at every stencil visit.
+fn fill_primitives<T: Real>(
     states: &Array2<Conserved2DG<T>>,
     bed: &Array2<T>,
-    i: usize,
-    j: usize,
-) -> (T, T, T) {
-    let s = states[(i, j)];
-    if s.h.value() > H_VEL {
-        (s.h + bed[(i, j)], s.hu / s.h, s.hv / s.h)
-    } else {
-        (s.h + bed[(i, j)], T::zero(), T::zero())
+    out: &mut Array2<PrimG<T>>,
+) {
+    for ((i, j), p) in out.indexed_iter_mut() {
+        let s = states[(i, j)];
+        *p = if s.h.value() > H_VEL {
+            PrimG {
+                eta: s.h + bed[(i, j)],
+                u: s.hu / s.h,
+                v: s.hv / s.h,
+            }
+        } else {
+            PrimG {
+                eta: s.h + bed[(i, j)],
+                u: T::zero(),
+                v: T::zero(),
+            }
+        };
     }
 }
 
 /// Returns `true` if any cell within distance 2 of `(i, j)` along the
-/// `x` axis is dry (depth ≤ `H_DRY`). Used to drop slopes to zero in
-/// a 2-cell buffer around wet/dry fronts so that MUSCL reconstruction
-/// from a wet cell cannot extrapolate over a nearby dry cell and
-/// produce spurious overshoots at the front.
-fn any_neighbor_dry_x<T: Real>(
-    states: &Array2<Conserved2DG<T>>,
-    i: usize,
-    j: usize,
-    n_cols: usize,
-) -> bool {
+/// `x` axis is dry (depth ≤ `H_DRY`, per the pre-step snapshot). Used
+/// to drop slopes to zero in a 2-cell buffer around wet/dry fronts so
+/// that MUSCL reconstruction from a wet cell cannot extrapolate over a
+/// nearby dry cell and produce spurious overshoots at the front.
+fn any_neighbor_dry_x(dry: &Array2<bool>, i: usize, j: usize, n_cols: usize) -> bool {
     let j_lo = j.saturating_sub(2);
     let j_hi = (j + 2).min(n_cols - 1);
-    for jj in j_lo..=j_hi {
-        if states[(i, jj)].h.value() <= H_DRY {
-            return true;
-        }
-    }
-    false
+    (j_lo..=j_hi).any(|jj| dry[(i, jj)])
 }
 
 /// Same as [`any_neighbor_dry_x`] but along the `y` axis.
-fn any_neighbor_dry_y<T: Real>(
-    states: &Array2<Conserved2DG<T>>,
-    i: usize,
-    j: usize,
-    n_rows: usize,
-) -> bool {
+fn any_neighbor_dry_y(dry: &Array2<bool>, i: usize, j: usize, n_rows: usize) -> bool {
     let i_lo = i.saturating_sub(2);
     let i_hi = (i + 2).min(n_rows - 1);
-    for ii in i_lo..=i_hi {
-        if states[(ii, j)].h.value() <= H_DRY {
-            return true;
-        }
-    }
-    false
+    (i_lo..=i_hi).any(|ii| dry[(ii, j)])
 }
 
 /// Compute minmod-limited primitive slopes per cell in the `x`
@@ -445,91 +445,87 @@ fn any_neighbor_dry_y<T: Real>(
 /// (first-order at wet/dry fronts) — this prevents a MUSCL
 /// reconstruction from a wet cell from extrapolating over a nearby
 /// dry cell and producing a spurious overshoot.
-fn compute_slopes_x<T: Real>(
-    states: &Array2<Conserved2DG<T>>,
+fn fill_slopes_x<T: Real>(
+    prim: &Array2<PrimG<T>>,
+    dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
-) -> Array2<CellSlopesG<T>> {
+    out: &mut Array2<CellSlopesG<T>>,
+) {
     let n_cols = mesh.n_cols();
-    Array2::from_shape_fn(states.dim(), |(i, j)| {
-        if n_cols < 2 {
-            return CellSlopesG::default();
-        }
-        if any_neighbor_dry_x(states, i, j, n_cols) {
-            return CellSlopesG::default();
-        }
-        if j == 0 {
+    for ((i, j), slope) in out.indexed_iter_mut() {
+        *slope = if n_cols < 2 || any_neighbor_dry_x(dry, i, j, n_cols) {
+            CellSlopesG::default()
+        } else if j == 0 {
             // Forward one-sided difference: slope = (right − centre) / dx.
-            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, 0);
-            let (eta_r, u_r, v_r) = primitives_at(states, &mesh.bed, i, 1);
-            return CellSlopesG {
-                eta: (eta_r - eta_c) / mesh.dx,
-                u: (u_r - u_c) / mesh.dx,
-                v: (v_r - v_c) / mesh.dx,
-            };
-        }
-        if j + 1 == n_cols {
+            let c = prim[(i, 0)];
+            let r = prim[(i, 1)];
+            CellSlopesG {
+                eta: (r.eta - c.eta) / mesh.dx,
+                u: (r.u - c.u) / mesh.dx,
+                v: (r.v - c.v) / mesh.dx,
+            }
+        } else if j + 1 == n_cols {
             // Backward one-sided difference.
-            let (eta_l, u_l, v_l) = primitives_at(states, &mesh.bed, i, j - 1);
-            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
-            return CellSlopesG {
-                eta: (eta_c - eta_l) / mesh.dx,
-                u: (u_c - u_l) / mesh.dx,
-                v: (v_c - v_l) / mesh.dx,
-            };
-        }
-        // Interior: central minmod.
-        let (eta_l, u_l, v_l) = primitives_at(states, &mesh.bed, i, j - 1);
-        let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
-        let (eta_r, u_r, v_r) = primitives_at(states, &mesh.bed, i, j + 1);
-        CellSlopesG {
-            eta: minmod((eta_c - eta_l) / mesh.dx, (eta_r - eta_c) / mesh.dx),
-            u: minmod((u_c - u_l) / mesh.dx, (u_r - u_c) / mesh.dx),
-            v: minmod((v_c - v_l) / mesh.dx, (v_r - v_c) / mesh.dx),
-        }
-    })
+            let l = prim[(i, j - 1)];
+            let c = prim[(i, j)];
+            CellSlopesG {
+                eta: (c.eta - l.eta) / mesh.dx,
+                u: (c.u - l.u) / mesh.dx,
+                v: (c.v - l.v) / mesh.dx,
+            }
+        } else {
+            // Interior: central minmod.
+            let l = prim[(i, j - 1)];
+            let c = prim[(i, j)];
+            let r = prim[(i, j + 1)];
+            CellSlopesG {
+                eta: minmod((c.eta - l.eta) / mesh.dx, (r.eta - c.eta) / mesh.dx),
+                u: minmod((c.u - l.u) / mesh.dx, (r.u - c.u) / mesh.dx),
+                v: minmod((c.v - l.v) / mesh.dx, (r.v - c.v) / mesh.dx),
+            }
+        };
+    }
 }
 
-/// Compute minmod-limited primitive slopes per cell in the `y`
+/// Fill minmod-limited primitive slopes per cell in the `y`
 /// direction. Boundary cells use the available one-sided difference.
-fn compute_slopes_y<T: Real>(
-    states: &Array2<Conserved2DG<T>>,
+fn fill_slopes_y<T: Real>(
+    prim: &Array2<PrimG<T>>,
+    dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
-) -> Array2<CellSlopesG<T>> {
+    out: &mut Array2<CellSlopesG<T>>,
+) {
     let n_rows = mesh.n_rows();
-    Array2::from_shape_fn(states.dim(), |(i, j)| {
-        if n_rows < 2 {
-            return CellSlopesG::default();
-        }
-        if any_neighbor_dry_y(states, i, j, n_rows) {
-            return CellSlopesG::default();
-        }
-        if i == 0 {
-            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, 0, j);
-            let (eta_b, u_b, v_b) = primitives_at(states, &mesh.bed, 1, j);
-            return CellSlopesG {
-                eta: (eta_b - eta_c) / mesh.dy,
-                u: (u_b - u_c) / mesh.dy,
-                v: (v_b - v_c) / mesh.dy,
-            };
-        }
-        if i + 1 == n_rows {
-            let (eta_t, u_t, v_t) = primitives_at(states, &mesh.bed, i - 1, j);
-            let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
-            return CellSlopesG {
-                eta: (eta_c - eta_t) / mesh.dy,
-                u: (u_c - u_t) / mesh.dy,
-                v: (v_c - v_t) / mesh.dy,
-            };
-        }
-        let (eta_t, u_t, v_t) = primitives_at(states, &mesh.bed, i - 1, j);
-        let (eta_c, u_c, v_c) = primitives_at(states, &mesh.bed, i, j);
-        let (eta_b, u_b, v_b) = primitives_at(states, &mesh.bed, i + 1, j);
-        CellSlopesG {
-            eta: minmod((eta_c - eta_t) / mesh.dy, (eta_b - eta_c) / mesh.dy),
-            u: minmod((u_c - u_t) / mesh.dy, (u_b - u_c) / mesh.dy),
-            v: minmod((v_c - v_t) / mesh.dy, (v_b - v_c) / mesh.dy),
-        }
-    })
+    for ((i, j), slope) in out.indexed_iter_mut() {
+        *slope = if n_rows < 2 || any_neighbor_dry_y(dry, i, j, n_rows) {
+            CellSlopesG::default()
+        } else if i == 0 {
+            let c = prim[(0, j)];
+            let b = prim[(1, j)];
+            CellSlopesG {
+                eta: (b.eta - c.eta) / mesh.dy,
+                u: (b.u - c.u) / mesh.dy,
+                v: (b.v - c.v) / mesh.dy,
+            }
+        } else if i + 1 == n_rows {
+            let t = prim[(i - 1, j)];
+            let c = prim[(i, j)];
+            CellSlopesG {
+                eta: (c.eta - t.eta) / mesh.dy,
+                u: (c.u - t.u) / mesh.dy,
+                v: (c.v - t.v) / mesh.dy,
+            }
+        } else {
+            let t = prim[(i - 1, j)];
+            let c = prim[(i, j)];
+            let b = prim[(i + 1, j)];
+            CellSlopesG {
+                eta: minmod((c.eta - t.eta) / mesh.dy, (b.eta - c.eta) / mesh.dy),
+                u: minmod((c.u - t.u) / mesh.dy, (b.u - c.u) / mesh.dy),
+                v: minmod((c.v - t.v) / mesh.dy, (b.v - c.v) / mesh.dy),
+            }
+        };
+    }
 }
 
 /// Reconstruct the left/right cell states at an interior `x`-face
@@ -551,9 +547,8 @@ fn compute_slopes_y<T: Real>(
 /// [`forward_euler_step`] instead).
 #[allow(clippy::too_many_arguments)]
 fn reconstruct_x_face_states<T: Real>(
-    states: &Array2<Conserved2DG<T>>,
+    prim: &Array2<PrimG<T>>,
     slopes_x: &Array2<CellSlopesG<T>>,
-    bed: &Array2<T>,
     z_face: T,
     i: usize,
     j_left: usize,
@@ -562,15 +557,15 @@ fn reconstruct_x_face_states<T: Real>(
 ) -> (Conserved2DG<T>, Conserved2DG<T>) {
     let half_dx = 0.5 * dx;
 
-    let (eta_l, u_l, v_l) = primitives_at(states, bed, i, j_left);
-    let eta_minus = eta_l + slopes_x[(i, j_left)].eta * half_dx;
-    let u_minus = u_l + slopes_x[(i, j_left)].u * half_dx;
-    let v_minus = v_l + slopes_x[(i, j_left)].v * half_dx;
+    let l = prim[(i, j_left)];
+    let eta_minus = l.eta + slopes_x[(i, j_left)].eta * half_dx;
+    let u_minus = l.u + slopes_x[(i, j_left)].u * half_dx;
+    let v_minus = l.v + slopes_x[(i, j_left)].v * half_dx;
 
-    let (eta_r, u_r, v_r) = primitives_at(states, bed, i, j_right);
-    let eta_plus = eta_r - slopes_x[(i, j_right)].eta * half_dx;
-    let u_plus = u_r - slopes_x[(i, j_right)].u * half_dx;
-    let v_plus = v_r - slopes_x[(i, j_right)].v * half_dx;
+    let r = prim[(i, j_right)];
+    let eta_plus = r.eta - slopes_x[(i, j_right)].eta * half_dx;
+    let u_plus = r.u - slopes_x[(i, j_right)].u * half_dx;
+    let v_plus = r.v - slopes_x[(i, j_right)].v * half_dx;
 
     let h_minus = (eta_minus - z_face).max(T::zero());
     let h_plus = (eta_plus - z_face).max(T::zero());
@@ -587,9 +582,8 @@ fn reconstruct_x_face_states<T: Real>(
 /// [`reconstruct_x_face_states`] for the rationale.
 #[allow(clippy::too_many_arguments)]
 fn reconstruct_y_face_states<T: Real>(
-    states: &Array2<Conserved2DG<T>>,
+    prim: &Array2<PrimG<T>>,
     slopes_y: &Array2<CellSlopesG<T>>,
-    bed: &Array2<T>,
     z_face: T,
     i_top: usize,
     i_bottom: usize,
@@ -598,15 +592,15 @@ fn reconstruct_y_face_states<T: Real>(
 ) -> (Conserved2DG<T>, Conserved2DG<T>) {
     let half_dy = 0.5 * dy;
 
-    let (eta_t, u_t, v_t) = primitives_at(states, bed, i_top, j);
-    let eta_minus = eta_t + slopes_y[(i_top, j)].eta * half_dy;
-    let u_minus = u_t + slopes_y[(i_top, j)].u * half_dy;
-    let v_minus = v_t + slopes_y[(i_top, j)].v * half_dy;
+    let t = prim[(i_top, j)];
+    let eta_minus = t.eta + slopes_y[(i_top, j)].eta * half_dy;
+    let u_minus = t.u + slopes_y[(i_top, j)].u * half_dy;
+    let v_minus = t.v + slopes_y[(i_top, j)].v * half_dy;
 
-    let (eta_b, u_b, v_b) = primitives_at(states, bed, i_bottom, j);
-    let eta_plus = eta_b - slopes_y[(i_bottom, j)].eta * half_dy;
-    let u_plus = u_b - slopes_y[(i_bottom, j)].u * half_dy;
-    let v_plus = v_b - slopes_y[(i_bottom, j)].v * half_dy;
+    let b = prim[(i_bottom, j)];
+    let eta_plus = b.eta - slopes_y[(i_bottom, j)].eta * half_dy;
+    let u_plus = b.u - slopes_y[(i_bottom, j)].u * half_dy;
+    let v_plus = b.v - slopes_y[(i_bottom, j)].v * half_dy;
 
     let h_minus = (eta_minus - z_face).max(T::zero());
     let h_plus = (eta_plus - z_face).max(T::zero());
@@ -640,18 +634,17 @@ fn reconstruct_y_face_states<T: Real>(
 ///   rationale (MUSCL steady bias) does not apply at these faces.
 ///
 /// State-dependent by necessity — the C-property with wetting/drying
-/// cannot be enforced by a purely static face bed.
-fn interior_z_face<T: Real>(left: Conserved2DG<T>, z_l: T, right: Conserved2DG<T>, z_r: T) -> T {
-    let l_wet = left.h.value() > H_DRY;
-    let r_wet = right.h.value() > H_DRY;
-    if l_wet != r_wet {
+/// cannot be enforced by a purely static face bed. `l_dry`/`r_dry`
+/// come from the pre-step wet/dry snapshot.
+fn interior_z_face<T: Real>(l_dry: bool, z_l: T, r_dry: bool, z_r: T) -> T {
+    if l_dry != r_dry {
         z_l.max(z_r)
     } else {
         (z_l + z_r) * 0.5
     }
 }
 
-/// Build the array of face bed elevations `z_face_x[i, j]` for every
+/// Fill the array of face bed elevations `z_face_x[i, j]` for every
 /// `x`-face (interior and boundary).
 ///
 /// Interior `j ∈ 1..n_cols`: [`interior_z_face`] (midpoint on wet-wet,
@@ -669,15 +662,16 @@ fn interior_z_face<T: Real>(left: Conserved2DG<T>, z_l: T, right: Conserved2DG<T
 /// is what makes lake-at-rest exact on a general bed — the cell-by-
 /// cell cancellation between flux divergence and source only holds
 /// when both use the same face beds.
-fn build_z_face_x<T: Real>(
+fn fill_z_face_x<T: Real>(
     states: &Array2<Conserved2DG<T>>,
+    dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
     bcs: Boundaries2D,
-) -> Array2<T> {
-    let n_rows = mesh.n_rows();
+    out: &mut Array2<T>,
+) {
     let n_cols = mesh.n_cols();
-    Array2::from_shape_fn((n_rows, n_cols + 1), |(i, j)| {
-        if j == 0 {
+    for ((i, j), z) in out.indexed_iter_mut() {
+        *z = if j == 0 {
             let (_, z_g) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
             (z_g + mesh.bed[(i, 0)]) * 0.5
         } else if j == n_cols {
@@ -685,26 +679,27 @@ fn build_z_face_x<T: Real>(
             (mesh.bed[(i, n_cols - 1)] + z_g) * 0.5
         } else {
             interior_z_face(
-                states[(i, j - 1)],
+                dry[(i, j - 1)],
                 mesh.bed[(i, j - 1)],
-                states[(i, j)],
+                dry[(i, j)],
                 mesh.bed[(i, j)],
             )
-        }
-    })
+        };
+    }
 }
 
-/// Build the array of face bed elevations `z_face_y[i, j]` for every
-/// `y`-face. See [`build_z_face_x`] for the rationale.
-fn build_z_face_y<T: Real>(
+/// Fill the array of face bed elevations `z_face_y[i, j]` for every
+/// `y`-face. See [`fill_z_face_x`] for the rationale.
+fn fill_z_face_y<T: Real>(
     states: &Array2<Conserved2DG<T>>,
+    dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
     bcs: Boundaries2D,
-) -> Array2<T> {
+    out: &mut Array2<T>,
+) {
     let n_rows = mesh.n_rows();
-    let n_cols = mesh.n_cols();
-    Array2::from_shape_fn((n_rows + 1, n_cols), |(i, j)| {
-        if i == 0 {
+    for ((i, j), z) in out.indexed_iter_mut() {
+        *z = if i == 0 {
             let (_, z_g) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
             (z_g + mesh.bed[(0, j)]) * 0.5
         } else if i == n_rows {
@@ -712,21 +707,74 @@ fn build_z_face_y<T: Real>(
             (mesh.bed[(n_rows - 1, j)] + z_g) * 0.5
         } else {
             interior_z_face(
-                states[(i - 1, j)],
+                dry[(i - 1, j)],
                 mesh.bed[(i - 1, j)],
-                states[(i, j)],
+                dry[(i, j)],
                 mesh.bed[(i, j)],
             )
+        };
+    }
+}
+
+/// Reusable scratch buffers for the 2D time step.
+///
+/// [`forward_euler_step`] allocated seven fresh arrays per Euler step
+/// (slopes ×2, face beds ×2, face fluxes ×2, α) — ≈ 170 MB of
+/// alloc+write+read traffic per step on a 1024² mesh, which made the
+/// step memory-bandwidth-bound. Constructing one `StepWorkspace2D` per
+/// simulation and calling [`forward_euler_step_with`] /
+/// [`ssprk2_step_with`] reuses the buffers across steps (and holds the
+/// SSP-RK2 state snapshot, removing that clone too).
+///
+/// The buffers are an implementation detail: their contents are
+/// overwritten at the start of every step and carry no state between
+/// steps beyond capacity.
+pub struct StepWorkspace2D<T> {
+    prim: Array2<PrimG<T>>,
+    slopes_x: Array2<CellSlopesG<T>>,
+    slopes_y: Array2<CellSlopesG<T>>,
+    z_face_x: Array2<T>,
+    z_face_y: Array2<T>,
+    faces_x: Array2<FaceFluxXG<T>>,
+    faces_y: Array2<FaceFluxYG<T>>,
+    alpha: Array2<T>,
+    was_dry: Array2<bool>,
+    u_n: Array2<Conserved2DG<T>>,
+}
+
+impl<T: Real> StepWorkspace2D<T> {
+    /// Workspace for an `n_rows × n_cols` mesh.
+    pub fn new(n_rows: usize, n_cols: usize) -> Self {
+        Self {
+            prim: Array2::from_elem((n_rows, n_cols), PrimG::default()),
+            slopes_x: Array2::from_elem((n_rows, n_cols), CellSlopesG::default()),
+            slopes_y: Array2::from_elem((n_rows, n_cols), CellSlopesG::default()),
+            z_face_x: Array2::from_elem((n_rows, n_cols + 1), T::zero()),
+            z_face_y: Array2::from_elem((n_rows + 1, n_cols), T::zero()),
+            faces_x: Array2::from_elem((n_rows, n_cols + 1), FaceFluxXG::zero()),
+            faces_y: Array2::from_elem((n_rows + 1, n_cols), FaceFluxYG::zero()),
+            alpha: Array2::from_elem((n_rows, n_cols), T::one()),
+            was_dry: Array2::from_elem((n_rows, n_cols), false),
+            u_n: Array2::from_elem((n_rows, n_cols), Conserved2DG::dry()),
         }
-    })
+    }
+
+    /// Workspace sized for `mesh`.
+    pub fn for_mesh(mesh: &Mesh2DG<T>) -> Self {
+        Self::new(mesh.n_rows(), mesh.n_cols())
+    }
 }
 
 /// One forward-Euler update of the 2D FV solution. Modifies `states` in
 /// place.
 ///
 /// Includes the well-balanced bed-slope source via per-face hydrostatic
-/// reconstruction. Friction is **not** included — call the Manning
-/// friction step (forthcoming) separately.
+/// reconstruction. Friction is **not** included — call
+/// [`crate::source::manning_friction_step`] separately.
+///
+/// Allocates a fresh [`StepWorkspace2D`] on every call; loops that
+/// step many times should construct one workspace and call
+/// [`forward_euler_step_with`] instead.
 ///
 /// Panics if the shape of `states` does not match `(mesh.n_rows(),
 /// mesh.n_cols())`. The caller is responsible for keeping `dt` below
@@ -736,6 +784,19 @@ pub fn forward_euler_step<T: Real>(
     mesh: &Mesh2DG<T>,
     bcs: Boundaries2D,
     dt: f64,
+) {
+    let mut ws = StepWorkspace2D::for_mesh(mesh);
+    forward_euler_step_with(states, mesh, bcs, dt, &mut ws);
+}
+
+/// [`forward_euler_step`] over caller-owned scratch buffers — the
+/// allocation-free hot path.
+pub fn forward_euler_step_with<T: Real>(
+    states: &mut Array2<Conserved2DG<T>>,
+    mesh: &Mesh2DG<T>,
+    bcs: Boundaries2D,
+    dt: f64,
+    ws: &mut StepWorkspace2D<T>,
 ) {
     let n_rows = mesh.n_rows();
     let n_cols = mesh.n_cols();
@@ -750,19 +811,52 @@ pub fn forward_euler_step<T: Real>(
     if n_rows == 0 || n_cols == 0 {
         return;
     }
+    // Split borrows: every pass below reads some buffers and writes
+    // others; destructuring hands the borrow checker disjoint fields.
+    let StepWorkspace2D {
+        prim,
+        slopes_x,
+        slopes_y,
+        z_face_x,
+        z_face_y,
+        faces_x,
+        faces_y,
+        alpha,
+        was_dry,
+        u_n: _,
+    } = ws;
+    assert_eq!(
+        prim.shape(),
+        [n_rows, n_cols],
+        "workspace shape {:?} must match mesh ({}, {})",
+        prim.shape(),
+        n_rows,
+        n_cols,
+    );
 
-    // Compute MUSCL slopes per cell (one pass before face fluxes).
-    let slopes_x = compute_slopes_x(states, mesh);
-    let slopes_y = compute_slopes_y(states, mesh);
+    // Pre-step wet/dry snapshot. Feeds the slope front-buffer checks,
+    // the shoreline face-bed rule, the dry-dry face short-circuit, the
+    // face-scaling skip and the isolated-dry fast path — all of which
+    // must see the SAME (pre-step) pattern for the step to be
+    // consistent (the update loop mutates `states` in place).
+    for ((i, j), d) in was_dry.indexed_iter_mut() {
+        *d = states[(i, j)].h.value() <= H_DRY;
+    }
 
-    // Precompute the face bed elevations once: `z_face_x[i, j]` for
-    // every `x`-face and `z_face_y[i, j]` for every `y`-face. These
-    // arrays feed BOTH the face-flux pass (via Audusse-HLLC with
-    // `z_left = z_right = z_face`) and the explicit cell-centered
-    // source term that follows. The well-balancedness of the scheme
-    // hinges on this single source of truth for the face beds.
-    let z_face_x = build_z_face_x(states, mesh, bcs);
-    let z_face_y = build_z_face_y(states, mesh, bcs);
+    // Cell primitives (η, u, v), then MUSCL slopes per cell.
+    fill_primitives(states, &mesh.bed, prim);
+    fill_slopes_x(prim, was_dry, mesh, slopes_x);
+    fill_slopes_y(prim, was_dry, mesh, slopes_y);
+
+    // Face bed elevations: `z_face_x[i, j]` for every `x`-face and
+    // `z_face_y[i, j]` for every `y`-face. These arrays feed BOTH the
+    // face-flux pass (via Audusse-HLLC with `z_left = z_right =
+    // z_face`) and the explicit cell-centered source term that
+    // follows. The well-balancedness of the scheme hinges on this
+    // single source of truth for the face beds. State-dependent at
+    // shoreline faces (see `interior_z_face`), so filled per step.
+    fill_z_face_x(states, was_dry, mesh, bcs, z_face_x);
+    fill_z_face_y(states, was_dry, mesh, bcs, z_face_y);
 
     // Precompute all x-faces and y-faces. x-faces have shape
     // (n_rows, n_cols + 1); y-faces have shape (n_rows + 1, n_cols).
@@ -782,57 +876,39 @@ pub fn forward_euler_step<T: Real>(
     // interior cell for dryness is cheap but adds a branch that
     // never fires for the Wall / Transmissive cases that dominate
     // our event simulations, so the win there is marginal.
-    let faces_x = Array2::<FaceFluxXG<T>>::from_shape_fn((n_rows, n_cols + 1), |(i, j)| {
+    for ((i, j), face) in faces_x.indexed_iter_mut() {
         let z_face = z_face_x[(i, j)];
-        if j == 0 {
+        *face = if j == 0 {
             let (g, _) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
             well_balanced_x_face(g, z_face, states[(i, 0)], z_face)
         } else if j == n_cols {
             let (g, _) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
             well_balanced_x_face(states[(i, n_cols - 1)], z_face, g, z_face)
+        } else if was_dry[(i, j - 1)] && was_dry[(i, j)] {
+            FaceFluxXG::zero()
         } else {
-            if states[(i, j - 1)].h.value() <= H_DRY && states[(i, j)].h.value() <= H_DRY {
-                return FaceFluxXG::zero();
-            }
-            let (recon_l, recon_r) = reconstruct_x_face_states(
-                states,
-                &slopes_x,
-                &mesh.bed,
-                z_face,
-                i,
-                j - 1,
-                j,
-                mesh.dx,
-            );
+            let (recon_l, recon_r) =
+                reconstruct_x_face_states(prim, slopes_x, z_face, i, j - 1, j, mesh.dx);
             well_balanced_x_face(recon_l, z_face, recon_r, z_face)
-        }
-    });
+        };
+    }
 
-    let faces_y = Array2::<FaceFluxYG<T>>::from_shape_fn((n_rows + 1, n_cols), |(i, j)| {
+    for ((i, j), face) in faces_y.indexed_iter_mut() {
         let z_face = z_face_y[(i, j)];
-        if i == 0 {
+        *face = if i == 0 {
             let (g, _) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
             well_balanced_y_face(g, z_face, states[(0, j)], z_face)
         } else if i == n_rows {
             let (g, _) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
             well_balanced_y_face(states[(n_rows - 1, j)], z_face, g, z_face)
+        } else if was_dry[(i - 1, j)] && was_dry[(i, j)] {
+            FaceFluxYG::zero()
         } else {
-            if states[(i - 1, j)].h.value() <= H_DRY && states[(i, j)].h.value() <= H_DRY {
-                return FaceFluxYG::zero();
-            }
-            let (recon_t, recon_b) = reconstruct_y_face_states(
-                states,
-                &slopes_y,
-                &mesh.bed,
-                z_face,
-                i - 1,
-                i,
-                j,
-                mesh.dy,
-            );
+            let (recon_t, recon_b) =
+                reconstruct_y_face_states(prim, slopes_y, z_face, i - 1, i, j, mesh.dy);
             well_balanced_y_face(recon_t, z_face, recon_b, z_face)
-        }
-    });
+        };
+    }
 
     // FV update. For cell (i, j):
     //   right x-face is faces_x[(i, j+1)] — cell is on its LEFT side → .minus
@@ -863,7 +939,7 @@ pub fn forward_euler_step<T: Real>(
     //
     // α is T-typed so its dependence on h (the available mass)
     // carries the derivative through the rescaling.
-    let alpha = Array2::<T>::from_shape_fn((n_rows, n_cols), |(i, j)| {
+    for ((i, j), a) in alpha.indexed_iter_mut() {
         let fx_right = faces_x[(i, j + 1)].minus.mass;
         let fx_left = faces_x[(i, j)].plus.mass;
         let fy_bottom = faces_y[(i + 1, j)].minus.mass;
@@ -887,19 +963,25 @@ pub fn forward_euler_step<T: Real>(
         }
 
         let available = (states[(i, j)].h - H_DRY).max(T::zero());
-        if out_mass.value() > available.value() && out_mass.value() > 0.0 {
+        *a = if out_mass.value() > available.value() && out_mass.value() > 0.0 {
             available / out_mass
         } else {
             T::one()
-        }
-    });
+        };
+    }
 
     // Pass 2: for each face, determine the upstream cell (the side
-    // losing mass) and scale by that side's α. Same α applies to
-    // .minus and .plus (they differ only in Audusse's
-    // hydrostatic-pressure correction, which is also rescaled).
-    let scale_x_face = |i: usize, j: usize| -> FaceFluxXG<T> {
-        let face = faces_x[(i, j)];
+    // losing mass) and scale by that side's α, IN PLACE and once per
+    // face. Same α applies to .minus and .plus (they differ only in
+    // Audusse's hydrostatic-pressure correction, which is also
+    // rescaled). The former formulation evaluated this scaling lazily
+    // per cell, re-scaling every interior face twice (once from each
+    // adjacent cell). Interior dry-dry faces are identically zero and
+    // α of a dry cell is one, so they are skipped.
+    for ((i, j), face) in faces_x.indexed_iter_mut() {
+        if j > 0 && j < n_cols && was_dry[(i, j - 1)] && was_dry[(i, j)] {
+            continue;
+        }
         let alpha_up = if j == 0 {
             // West boundary face. Outflow from cell (i, 0) when face.mass < 0
             // (mass moves R→L, i.e. cell 0 loses mass into the ghost).
@@ -923,21 +1005,17 @@ pub fn forward_euler_step<T: Real>(
             // Interior, R→L (or zero): upstream is right cell (j).
             alpha[(i, j)]
         };
-        FaceFluxXG {
-            minus: FluxXG {
-                mass: face.minus.mass * alpha_up,
-                x_momentum: face.minus.x_momentum * alpha_up,
-                y_momentum: face.minus.y_momentum * alpha_up,
-            },
-            plus: FluxXG {
-                mass: face.plus.mass * alpha_up,
-                x_momentum: face.plus.x_momentum * alpha_up,
-                y_momentum: face.plus.y_momentum * alpha_up,
-            },
+        face.minus.mass = face.minus.mass * alpha_up;
+        face.minus.x_momentum = face.minus.x_momentum * alpha_up;
+        face.minus.y_momentum = face.minus.y_momentum * alpha_up;
+        face.plus.mass = face.plus.mass * alpha_up;
+        face.plus.x_momentum = face.plus.x_momentum * alpha_up;
+        face.plus.y_momentum = face.plus.y_momentum * alpha_up;
+    }
+    for ((i, j), face) in faces_y.indexed_iter_mut() {
+        if i > 0 && i < n_rows && was_dry[(i - 1, j)] && was_dry[(i, j)] {
+            continue;
         }
-    };
-    let scale_y_face = |i: usize, j: usize| -> FaceFluxYG<T> {
-        let face = faces_y[(i, j)];
         let alpha_up = if i == 0 {
             if face.minus.mass.value() < 0.0 {
                 alpha[(0, j)]
@@ -955,32 +1033,13 @@ pub fn forward_euler_step<T: Real>(
         } else {
             alpha[(i, j)]
         };
-        FaceFluxYG {
-            minus: FluxYG {
-                mass: face.minus.mass * alpha_up,
-                x_momentum: face.minus.x_momentum * alpha_up,
-                y_momentum: face.minus.y_momentum * alpha_up,
-            },
-            plus: FluxYG {
-                mass: face.plus.mass * alpha_up,
-                x_momentum: face.plus.x_momentum * alpha_up,
-                y_momentum: face.plus.y_momentum * alpha_up,
-            },
-        }
-    };
-
-    // Snapshot of the PRE-STEP wet/dry pattern for the fast path below.
-    // The update loop mutates `states` in place in row-major order, so
-    // at cell (i, j) the north (i−1) and west (j−1) neighbours are
-    // already post-step. The dry-dry face short-circuit and the α pass
-    // above were both evaluated on the pre-step state; the fast path
-    // must be too. Consulting mutated `states` instead would misfire
-    // when a wet upstream neighbour exported mass through the shared
-    // face and drained to dry in its own update: this cell would look
-    // isolated-dry, skip its update, and silently discard the inflow —
-    // destroying the mass the neighbour just exported.
-    let was_dry =
-        Array2::from_shape_fn((n_rows, n_cols), |(i, j)| states[(i, j)].h.value() <= H_DRY);
+        face.minus.mass = face.minus.mass * alpha_up;
+        face.minus.x_momentum = face.minus.x_momentum * alpha_up;
+        face.minus.y_momentum = face.minus.y_momentum * alpha_up;
+        face.plus.mass = face.plus.mass * alpha_up;
+        face.plus.x_momentum = face.plus.x_momentum * alpha_up;
+        face.plus.y_momentum = face.plus.y_momentum * alpha_up;
+    }
 
     // FV update with scaled face fluxes + explicit bed-slope source.
     //
@@ -1017,10 +1076,10 @@ pub fn forward_euler_step<T: Real>(
                 states[(i, j)].hv = T::zero();
                 continue;
             }
-            let fx_right = scale_x_face(i, j + 1).minus;
-            let fx_left = scale_x_face(i, j).plus;
-            let fy_bottom = scale_y_face(i + 1, j).minus;
-            let fy_top = scale_y_face(i, j).plus;
+            let fx_right = faces_x[(i, j + 1)].minus;
+            let fx_left = faces_x[(i, j)].plus;
+            let fy_bottom = faces_y[(i + 1, j)].minus;
+            let fy_top = faces_y[(i, j)].plus;
 
             let dh =
                 (fx_right.mass - fx_left.mass) * dt_dx + (fy_bottom.mass - fy_top.mass) * dt_dy;
@@ -1122,22 +1181,31 @@ pub fn ssprk2_step<T: Real>(
     bcs: Boundaries2D,
     dt: f64,
 ) {
-    // Snapshot U^n. Allocation per step is the cost we pay for the
-    // simple "two Euler steps + average" formulation. A scratch buffer
-    // owned by the caller would eliminate it; left to a later
-    // optimization since allocations are a small fraction of the
-    // total cost compared to the face-flux pass.
-    let u_n = states.clone();
+    let mut ws = StepWorkspace2D::for_mesh(mesh);
+    ssprk2_step_with(states, mesh, bcs, dt, &mut ws);
+}
+
+/// [`ssprk2_step`] over caller-owned scratch buffers — the
+/// allocation-free hot path (the U^n snapshot lives in the workspace).
+pub fn ssprk2_step_with<T: Real>(
+    states: &mut Array2<Conserved2DG<T>>,
+    mesh: &Mesh2DG<T>,
+    bcs: Boundaries2D,
+    dt: f64,
+    ws: &mut StepWorkspace2D<T>,
+) {
+    // Snapshot U^n into the workspace buffer (copy, no allocation).
+    ws.u_n.assign(states);
 
     // Predictor: states becomes U^(1) = U^n + dt L(U^n).
-    forward_euler_step(states, mesh, bcs, dt);
+    forward_euler_step_with(states, mesh, bcs, dt, ws);
 
     // Corrector: states becomes U^(2) = U^(1) + dt L(U^(1)).
-    forward_euler_step(states, mesh, bcs, dt);
+    forward_euler_step_with(states, mesh, bcs, dt, ws);
 
     // Convex combination: U^{n+1} = ½(U^n + U^(2)).
     for ((i, j), s) in states.indexed_iter_mut() {
-        let prev = u_n[(i, j)];
+        let prev = ws.u_n[(i, j)];
         s.h = (prev.h + s.h) * 0.5;
         s.hu = (prev.hu + s.hu) * 0.5;
         s.hv = (prev.hv + s.hv) * 0.5;
@@ -1507,6 +1575,49 @@ mod tests {
         // residual film, so the step conserves mass to roundoff.
         let m1 = total_mass(&states, 1.0, 1.0);
         assert_relative_eq!(m0, m1, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn reused_workspace_is_bit_identical_to_allocating_step() {
+        // The workspace buffers are overwritten in full at every step;
+        // nothing may leak from one step into the next. Run a
+        // wetting/drying-heavy scenario (dam break over an emerged
+        // bump, walls) twice — once through the allocating wrapper,
+        // once through a single reused workspace — and require
+        // bit-identical states after every step, for both integrators.
+        let n = 20;
+        let mesh = gaussian_bed(n, n, 1.0, 1.0, 1.5);
+        let init = Array2::from_shape_fn((n, n), |(_i, j)| {
+            if j < n / 3 {
+                Conserved2D::new(2.0, 0.0, 0.0)
+            } else {
+                Conserved2D::DRY
+            }
+        });
+
+        for use_ssprk2 in [false, true] {
+            let mut a = init.clone();
+            let mut b = init.clone();
+            let mut ws = StepWorkspace2D::for_mesh(&mesh);
+            for step in 0..50 {
+                let dt = cfl_time_step(&a, &mesh, 0.4);
+                if use_ssprk2 {
+                    ssprk2_step(&mut a, &mesh, Boundaries2D::WALLS, dt);
+                    ssprk2_step_with(&mut b, &mesh, Boundaries2D::WALLS, dt, &mut ws);
+                } else {
+                    forward_euler_step(&mut a, &mesh, Boundaries2D::WALLS, dt);
+                    forward_euler_step_with(&mut b, &mesh, Boundaries2D::WALLS, dt, &mut ws);
+                }
+                for ((i, j), sa) in a.indexed_iter() {
+                    let sb = b[(i, j)];
+                    assert!(
+                        sa.h == sb.h && sa.hu == sb.hu && sa.hv == sb.hv,
+                        "step {step} (ssprk2 = {use_ssprk2}) diverged at ({i},{j}): \
+                         {sa:?} vs {sb:?}"
+                    );
+                }
+            }
+        }
     }
 
     #[test]

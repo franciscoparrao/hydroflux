@@ -10,9 +10,20 @@
 //!   dominate. Guards the skip machinery against regressions.
 //!
 //! Baseline at the time of writing (2026-07-02, serial, quiet
-//! machine): `euler_all_wet` ≈ 16 ms/step (≈ 246 ns/cell),
-//! `ssprk2_all_wet` ≈ 31 ms/step, `euler_mostly_dry` ≈ 6.3 ms/step
-//! (the dry-cell short-circuits buy ~2.6× on the ~94 %-dry valley).
+//! machine, pre-workspace code): `euler_all_wet` ≈ 16 ms/step
+//! (≈ 246 ns/cell), `ssprk2_all_wet` ≈ 31 ms/step,
+//! `euler_mostly_dry` ≈ 6.3 ms/step (the dry-cell short-circuits buy
+//! ~2.6× on the ~94 %-dry valley).
+//!
+//! The `_ws` variants exercise the reusable [`StepWorkspace2D`] path.
+//! Same-run comparison under load (2026-07-02, loaded machine — treat
+//! only the RELATIVE delta as meaningful): `_ws` beat the allocating
+//! wrapper by ~26 % on all-wet and ~54 % on mostly-dry. The wrapper
+//! itself got slower than the pre-workspace code (it now initialises
+//! the buffers once and fills them again); step loops should call the
+//! `_with` API. Re-measure absolutes on a quiet machine before
+//! quoting them anywhere.
+//!
 //! Run with:
 //!
 //! ```text
@@ -21,7 +32,8 @@
 
 use criterion::{Criterion, criterion_group, criterion_main};
 use hydroflux_solver_2d::{
-    Boundaries2D, Conserved2D, Mesh2D, cfl_time_step, forward_euler_step, ssprk2_step,
+    Boundaries2D, Conserved2D, Mesh2D, StepWorkspace2D, cfl_time_step, forward_euler_step,
+    forward_euler_step_with, ssprk2_step, ssprk2_step_with,
 };
 use ndarray::Array2;
 use std::hint::black_box;
@@ -87,6 +99,29 @@ fn bench_steps(c: &mut Criterion) {
         )
     });
 
+    // Workspace variants: same numerics over caller-owned buffers.
+    let mut ws = StepWorkspace2D::for_mesh(&mesh);
+    group.bench_function("euler_all_wet_ws", |b| {
+        b.iter_batched(
+            || states0.clone(),
+            |mut s| {
+                forward_euler_step_with(&mut s, &mesh, Boundaries2D::WALLS, black_box(dt), &mut ws);
+                s
+            },
+            criterion::BatchSize::LargeInput,
+        )
+    });
+    group.bench_function("ssprk2_all_wet_ws", |b| {
+        b.iter_batched(
+            || states0.clone(),
+            |mut s| {
+                ssprk2_step_with(&mut s, &mesh, Boundaries2D::WALLS, black_box(dt), &mut ws);
+                s
+            },
+            criterion::BatchSize::LargeInput,
+        )
+    });
+
     let (mesh_d, states_d) = mostly_dry();
     let dt_d = cfl_time_step(&states_d, &mesh_d, 0.4);
     group.bench_function("euler_mostly_dry", |b| {
@@ -94,6 +129,23 @@ fn bench_steps(c: &mut Criterion) {
             || states_d.clone(),
             |mut s| {
                 forward_euler_step(&mut s, &mesh_d, Boundaries2D::WALLS, black_box(dt_d));
+                s
+            },
+            criterion::BatchSize::LargeInput,
+        )
+    });
+    let mut ws_d = StepWorkspace2D::for_mesh(&mesh_d);
+    group.bench_function("euler_mostly_dry_ws", |b| {
+        b.iter_batched(
+            || states_d.clone(),
+            |mut s| {
+                forward_euler_step_with(
+                    &mut s,
+                    &mesh_d,
+                    Boundaries2D::WALLS,
+                    black_box(dt_d),
+                    &mut ws_d,
+                );
                 s
             },
             criterion::BatchSize::LargeInput,

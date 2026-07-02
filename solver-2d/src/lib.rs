@@ -80,5 +80,6 @@ pub use riemann::{hllc_flux_x, hllc_flux_y};
 pub use source::{PointSource, apply_point_sources, apply_rain, manning_friction_step};
 pub use state::{Conserved2D, Conserved2DG, Primitive2D, Primitive2DG};
 pub use update::{
-    cfl_time_step, cfl_time_step_with_bcs, forward_euler_step, max_wave_speeds, ssprk2_step,
+    StepWorkspace2D, cfl_time_step, cfl_time_step_with_bcs, forward_euler_step,
+    forward_euler_step_with, max_wave_speeds, ssprk2_step, ssprk2_step_with,
 };
