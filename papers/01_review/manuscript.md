@@ -24,9 +24,9 @@ keywords: [shallow water equations, finite volume, well-balanced,
 # Highlights
 
 - A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
+- Gradients verified layer-by-layer against finite differences; overhead 1.98×.
 - HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
 - Verified on Thacker, Stoker, MacDonald, UK EA ×6; head-to-head against ANUGA.
-- Forward-mode AD costs 1.98× f64; 6.5× faster wall-clock than ANUGA on Stoker.
 - Applied to 2017 Aluvión Atacama (Río Huasco) with ESA WorldCover Manning.
 
 # Abstract
@@ -232,8 +232,8 @@ $s_x = \max(|u| + c)$, $s_y = \max(|v| + c)$, $c = \sqrt{g h}$.
 ## 2.4 Friction, wetting/drying, and boundary conditions
 
 Manning friction is applied as an operator-split point-implicit
-fractional step on the momentum, $(hu, hv) \leftarrow (hu, hv)/(1 + \alpha)$
-with $\alpha = \Delta t\, g\, n^2 |U| / h^{4/3}$, which is unconditionally
+fractional step on the momentum, $(hu, hv) \leftarrow (hu, hv)/(1 + \beta)$
+with $\beta = \Delta t\, g\, n^2 |U| / h^{4/3}$, which is unconditionally
 stable, preserves rest and dry cells exactly, and keeps the flow
 direction fixed (the shared factor divides both momentum components).
 The Manning coefficient $n$ is stored as a per-cell field, allowing a
@@ -327,8 +327,8 @@ the $report_*$ informational tests.
 
 | Benchmark | Type | Mesh | Metric | Result |
 |-----------|------|------|--------|--------|
-| Lake-at-rest, bumpy bed | analytical (C-property) | 20×20 | $\|\eta  - \eta _{0}\|_\infty$ | $< 10^{-10}$ (machine) |
-| Lake-at-rest, Thacker paraboloid | analytical (C-property) | — | $\|\eta  - \eta _{0}\|_\infty$ | $\approx  3\cdot 10^{-16}$ |
+| Lake-at-rest, bumpy bed | analytical (C-property) | 20×20 | $\|\eta  - \eta _{0}\|_\infty$ | $< 10^{-10}$ (test bound) |
+| Lake-at-rest, Thacker paraboloid | analytical (C-property) | — | $\|\eta  - \eta _{0}\|_\infty$ | $\approx  3\cdot 10^{-16}$ (measured) |
 | Thacker oscillating | analytical transient | 80×80 | rel. L² on $h$ | 0.068 % |
 | Thacker oscillating | analytical transient | 80×80 | mass error | $2.15\cdot 10^{-5}$ |
 | Stoker/Ritter dam-break | analytical transient | 400×3 | L¹ on $h$ | 1.0 % |
@@ -440,10 +440,12 @@ shallow-water solvers [@LiangMarche2009].
 ## 3.8 Head-to-head against ANUGA
 
 To position the solver against a mature open-source 2D shallow-water
-reference, we ran the Stoker dam-break in ANUGA [@Roberts2015] at the
-same effective resolution ($\Delta x = 1$ m, matched to a 100-cell hydroflux
-re-run) and the same physical setup (flat bed, walls on the long sides,
-transmissive ends, $h_L = 1$ m, $t_end = 4$ s). Both solvers reproduce
+reference, we ran the Stoker dam-break in ANUGA [@Roberts2015] — its
+default DE0 flow algorithm on the `rectangular_cross` triangulation —
+at the same effective resolution ($\Delta x = 1$ m, matched to a
+100-cell hydroflux re-run) and the same physical setup (flat bed,
+walls on the long sides, transmissive ends, $h_L = 1$ m,
+$t_end = 4$ s). Both solvers reproduce
 the Ritter rarefaction solution closely (Figure 6). On the analytical
 rarefaction fan $x ∈ [37.5, 75.1]$ m, the relative error norms are
 L1 4.1 %, L2 3.6 %, L∞ 5.3 % $h_L$ for hydroflux and L1 2.6 %, L2 2.7 %,
@@ -528,17 +530,25 @@ a GeoTIFF. Boundary conditions are Transmissive on the western
 (downstream) edge and Wall on the others, with a point-source inflow at
 the eastern channel cell driven by the daily DGA discharge series for
 the 21-day window 2017-02-20 → 2017-03-12 (the documented Aluvión
-Atacama event [@Wilcox2016AtacamaFlash], peak 38.9 m³/s). Channel cells
-are warm-started at the Manning normal depth for the day-1 discharge.
+Atacama event [@Wilcox2016AtacamaFlash], peak 38.9 m³/s). The
+daily-mean series is the finest resolution the public DGA record
+provides at this gauge; the smoothing of the sub-daily hydrograph
+shape means simulated peak inundation is conservative for a given
+daily volume — consistent with the sensitivity (not hindcast) scope
+of §4.3. Channel cells are warm-started at the Manning normal depth
+for the day-1 discharge.
 
 ## 4.2 Spatially variable Manning from land cover
 
 The solver ingests an ESA WorldCover 2021 land-cover raster
-[@ESAWorldCover2021] resampled to the DEM grid and maps each class
-to a Manning coefficient through a published lookup (Chow [@Chow1959]
-and compilations therein): bare/sparse ground (66 % of the domain,
+[@ESAWorldCover2021], resampled from its native 10 m to the 30 m DEM
+grid by majority (mode) resampling, and maps each class to a Manning
+coefficient through a published lookup (Chow [@Chow1959] and
+compilations therein): bare/sparse ground (66 % of the domain,
 $n = 0.025$), grassland (14 %, $n = 0.040$), tree cover (8 %,
-$n = 0.100$), and shrubland (8 %, $n = 0.060$), among minor classes.
+$n = 0.100$), shrubland (8 %, $n = 0.060$), cropland (3 %,
+$n = 0.035$), built-up (1 %, $n = 0.015$), and permanent water
+(< 0.1 %, $n = 0.030$).
 The land cover is not random with respect to the channel: riparian
 tree and shrub vegetation ($n = 0.06$–$0.10$) tracks the thalweg, while
 the surrounding hillslopes are bare desert ($n = 0.025$). The resulting
@@ -662,7 +672,8 @@ first building cluster ($x \approx  150$–170 m) by $t = 30$ s, wrapping around
 the obstacles with the expected wakes and inter-building jets. The six
 raised-bed buildings (grey) remain dry throughout — water navigates the
 array without overtopping them — while the wet/dry front is captured
-without spurious oscillation. Depth $scico$ devon scale; downstream
+without spurious oscillation. Depth on a perceptually uniform
+sequential colour scale (scico *devon*); downstream
 buildings ($x \geq  250$ m) are still dry at this time as the front has not
 yet arrived. Generated by `fig03_uk_ea_t6.R` from the
 `gen_verification_data` example output.

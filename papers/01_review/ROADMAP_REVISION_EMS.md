@@ -109,8 +109,11 @@ en frentes móviles → el `mass 2.15e-5` de Thacker debería BAJAR).
       ```bash
       cargo run --release -p hydroflux-solver-2d --example gen_verification_data
       cargo run --release -p hydroflux-solver-2d --example gen_stoker_coarse
-      python3 solver-2d/examples/anuga_stoker_compare.py   # requiere env con ANUGA; anotar versión (Issue menor)
+      python3 solver-2d/examples/anuga_stoker_compare.py   # requiere venv con ANUGA (el original era /tmp, recrear)
       ```
+      **Al re-correr ANUGA**: capturar `anuga.__version__` y agregarla a
+      §3.8 del manuscrito (WP8 dejó la config DE0+rectangular_cross pero
+      la versión se perdió con el venv efímero).
 - [ ] Regenerar aplicación Huasco (§4.3):
       ```bash
       cargo run --release -p hydroflux-solver-2d --example huasco_2d_event -- --days 1
@@ -528,25 +531,34 @@ los números sean los finales.
 
 ## WP8 — Issues menores (batch de texto, 1 sesión)
 
-- [ ] α usado para dos cosas (fricción §2.4 y rescaling §2.4) —
-      renombrar uno (p.ej. fricción → `k` o `β`).
-- [ ] Declarar la regla de resampling WorldCover→30 m (nearest/mode) y
-      listar las "minor classes" con su n.
-- [ ] Una frase justificando forcing diario para un evento flash
-      (limitación del dato DGA diario; se resuelve en WP5 si aparece
-      sub-diario).
-- [ ] Versión y configuración de ANUGA en §3.8 (flow_algorithm — está
-      en `anuga_stoker_compare.py`).
-- [ ] Licencia + toolchain Rust en Open Research (se hace en WP2).
-- [ ] Resolver "[name TBD]" en Acknowledgements (dato del usuario: el
-      nombre del IR del postdoc).
-- [ ] Tabla 1: aclarar por qué lake-at-rest aparece con <1e-10 y ~3e-16
-      (configs/mallas distintas — explicitar).
-- [ ] Fig 3 caption: "scico devon scale" → descripción plana
-      ("perceptually uniform sequential blue-to-white").
-- [ ] Highlights: reordenar — abrir con el gradiente verificado, no con
-      el 6.5× vs ANUGA (invita la crítica del Issue 4 en 10 segundos).
-- [ ] Citas nuevas de WP1 y WP4 integradas al flujo del §1.
+- [x] α doble uso → fricción renombrada a β en §2.4 (α queda para el
+      rescaling Liang-Marche, su símbolo de literatura). (2026-07-02)
+- [x] Resampling WorldCover: declarado "majority (mode), 10 m → 30 m"
+      (verificado del gdalwarp `-r mode` en el docstring del example).
+      Minor classes listadas con fracciones medidas del raster real:
+      cropland 3 % (n 0.035), built-up 1 % (n 0.015), agua <0.1 %
+      (n 0.030) — n_min=0.015 del campo queda explicado. (2026-07-02)
+- [x] Frase de forcing diario agregada a §4.1 (dato público DGA más
+      fino disponible; peak inundation conservador para el volumen
+      diario dado; consistente con el scope sensitivity). (2026-07-02)
+- [x] Config de ANUGA en §3.8: default DE0 + `rectangular_cross`.
+      **PENDIENTE WP0**: capturar la VERSIÓN de ANUGA al re-correr
+      `anuga_stoker_compare.py` (el venv original era /tmp, efímero)
+      y agregarla a §3.8. Anotado también en WP0.
+- [x] Licencia + toolchain (hecho en WP2).
+- [ ] Resolver "[name TBD]" en Acknowledgements — **dato del usuario**
+      (nombre del IR del postdoc DICYT). Preguntado 2026-07-02.
+- [x] Tabla 1: filas lake-at-rest anotadas "(test bound)" vs
+      "(measured)". (2026-07-02)
+- [x] Fig 3 caption: descripción plana + nombre del scale entre
+      paréntesis para reproducibilidad. (2026-07-02)
+- [x] Highlights reordenados: bullet 2 nuevo "Gradients verified
+      layer-by-layer against finite differences; overhead 1.98×";
+      el 6.5× vs ANUGA salió de los Highlights (queda en §3.9 ya
+      reposicionado como accuracy-matched). (2026-07-02)
+- [ ] Citas nuevas de WP4 integradas al flujo del §1 (las de WP1 ya
+      están; las de WP4 — SERGHEI/TRITON/LISFLOOD-FP GPU — se agregan
+      en WP4).
 
 ---
 
