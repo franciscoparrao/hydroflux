@@ -223,31 +223,38 @@ hostil verifica (2 minutos).
 
 **Tareas**:
 
-- [ ] Cambiar la dependencia a git-dep pinneada:
-      ```toml
-      surtgis-core = { git = "https://github.com/franciscoparrao/surtgis", tag = "vX.Y.Z", package = "surtgis-core" }
-      ```
-      Notas: (a) surtgis es público; (b) el CI ya pinnea el commit
-      `7348ac2` vía `SURTGIS_REF` en `.github/workflows/ci.yml` —
-      COORDINAR ambos pins (crear un tag en surtgis sobre ese commit o
-      uno más nuevo, y usar el mismo en Cargo.toml y CI); (c) al pasar
-      a git-dep, el doble-checkout del CI se puede simplificar (el
-      workflow ya no necesita clonar surtgis aparte — actualizarlo).
-      (d) verificar si el path dep está también en crates individuales.
+- [x] Cambiar la dependencia a git-dep pinneada.
+      **Resuelto (2026-07-02)**: se usó `rev` en vez de tag (inmutable,
+      no interfiere con el proceso de releases de surtgis):
+      `surtgis-core = { git = "...", rev = "7348ac2b..." }` en el
+      Cargo.toml raíz, con comentario que documenta cómo volver
+      temporalmente al path-dep para desarrollo local. CI simplificado:
+      eliminado el doble-checkout y el layout `postdoc/hydroflux`;
+      el pin ahora vive en UN solo lugar (Cargo.toml). Suite completa
+      299/0 en release con la git-dep.
+      **Hallazgo adicional**: los rasters del subset Huasco estaban
+      gitignorados (`*.tif` global) → el segundo comando del paper
+      también fallaba en clone limpio. Fix: movidos a
+      `examples/huasco_2d_phase2/data/` (inputs no deben vivir en
+      `output/`), force-added como fixtures (~83 KB total), rutas
+      actualizadas en los 3 examples + `extract_subset.py`.
 - [ ] **Probar el clone limpio de verdad** (no asumir):
       ```bash
       cd /tmp && git clone https://github.com/franciscoparrao/hydroflux hf_fresh_test
       cd hf_fresh_test && cargo test --release -p hydroflux-solver-2d 2>&1 | tail -5
+      cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover -- --days 1
       ```
-      Esto DEBE pasar tal cual antes de marcar el ítem.
-- [ ] Agregar al manuscrito (§Open Research o un §2.6 corto de
-      "Software engineering") un párrafo con: licencia (dual
-      MIT OR Apache-2.0 — está en el Cargo.toml del workspace),
-      toolchain mínimo (rust-version = 1.85, edition 2024), conteo de
-      tests, CI en GitHub Actions (tests release + verification gate),
-      `#![forbid(unsafe_code)]`, y una frase de intención de
-      mantenimiento/versionado (releases taggeados con DOI Zenodo —
-      la convención del proyecto, ver CLAUDE.md § Releases).
+      Esto DEBE pasar tal cual antes de marcar el ítem. PENDIENTE:
+      requiere push previo de los commits del WP2 (el clone viene de
+      GitHub).
+- [x] Agregar al manuscrito el párrafo de software engineering.
+      **Resuelto (2026-07-02)**: §Open Research ahora declara licencia
+      dual MIT OR Apache-2.0, Rust ≥ 1.85 / edition 2024, CI con
+      verification gate, `#![forbid(unsafe_code)]`, dependencia pinneada
+      y datos bundleados (con `extract_subset.py` para regenerarlos).
+      Conteo de tests: 299 con nota "TODO WP0: re-confirm at freeze".
+      Falta la frase de versionado/Zenodo si se hace el release v0.1
+      (ítem siguiente).
 - [ ] Considerar release `v0.1` + DOI Zenodo (skill `/zenodo` del
       usuario) — el outline del proyecto lo tiene como pendiente de
       Fase 3 y a EMS le encanta. Si se hace, el paper cita el DOI.

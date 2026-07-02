@@ -711,12 +711,26 @@ All authors read and approved the final manuscript.
 # Open Research
 
 All code is released open-source at <https://github.com/franciscoparrao/hydroflux>
-(commit hash TODO at submission). The $solver-2d$ crate contains the
-finite-volume solver ($state$, $flux$, $riemann$, $geometry$,
-`boundary`, $update$, $source$, $io$ modules) and its verification
-suite (143 tests; the $report_*$ ignored tests print the §3 metrics).
-The Huasco application is reproduced by the `huasco_2d_event` and
-`huasco_2d_event_landcover` examples. Build and verify:
+(commit hash TODO at submission), dual-licensed MIT OR Apache-2.0. The
+$solver-2d$ crate contains the finite-volume solver ($state$, $flux$,
+$riemann$, $geometry$, `boundary`, $update$, $source$, $io$ modules)
+and its verification suite (the $report_*$ ignored tests print the §3
+metrics; the workspace runs 299 automated tests at the pinned commit —
+TODO WP0: re-confirm count at freeze). The Huasco application is
+reproduced by the `huasco_2d_event` and `huasco_2d_event_landcover`
+examples. The repository is self-contained: the single external
+geospatial dependency (the SurtGIS raster I/O crate [@SurtgisRef]) is
+pinned by commit in the build manifest, and the 30 m Huasco subset
+rasters (DEM, flow accumulation, land cover; ~80 kB total) ship with
+the repository, so the commands below work from a fresh clone with a
+stock Rust toolchain (Rust ≥ 1.85, edition 2024) and require no manual
+dependency or data setup. The script that regenerates the subsets from
+the public SRTM and ESA WorldCover sources is included
+(`extract_subset.py`). Continuous
+integration (GitHub Actions) runs the full release-mode verification
+suite plus an analytical-benchmark gate that fails the build on any
+regression of the §3 criteria; the numerical core forbids unsafe code
+(`#![forbid(unsafe_code)]`). Build and verify:
 
 ```bash
 cargo test --release -p hydroflux-solver-2d   # verification suite
