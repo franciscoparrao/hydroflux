@@ -432,13 +432,33 @@ En orden de retorno/esfuerzo para el wedge:
     proptest (`autograd/tests/properties.rs`: roundtrips de sección, f64 ≡ Dual::constant
     bit-exacto sobre run completo, positividad bajo parámetros aleatorios).
 
-### Q4 2026 (performance CPU + API pública para release v0.1)
+### Q4 2026 (performance CPU + API pública) — PARCIAL 2026-07-02
 
-11. rayon en las 5 pasadas + reducción CFL (§3.3).
-12. SoA `Fields2D` + eliminación de bounds checks + minmod/HLLC branchless (§3.4) — decisión
-    tomada mirando GPU y reverse-mode a la vez.
-13. `Simulation`/config builder + project files TOML + errores en vez de panics en io 2D (§2.4-2.5).
-14. UK EA con datasets oficiales + suite Toro completa + convergencia 2D (§5.2).
+11. ⏳ rayon en las 5 pasadas + reducción CFL (§3.3). **Pendiente de sesión dedicada con
+    máquina quieta**: la medición honesta es imposible con load 8-18, y hay una sensibilidad
+    de paper — EMS §3.9 afirma que rayon per-face es ineficaz para este esquema, medición
+    hecha PRE-workspace (cuando el step era allocation-bound). La re-medición post-workspace
+    puede contradecir ese claim: **verificar el resultado contra la narrativa EMS antes de
+    la submission**. Estructuralmente ya está desbloqueado (dry-mask + update loop como mapa
+    puro + buffers del workspace).
+12. ⏳ SoA `Fields2D` + bounds checks + branchless (§3.4) — misma sesión de performance que
+    el 11; es además el prerequisito del port wgpu, la decisión se toma mirando GPU y
+    reverse-mode a la vez.
+13. ✅ Errores tipados en io 2D (`IoError`: ShapeMismatch/InvalidPixelSize/EmptyRaster —
+    datos del usuario ya no panican) + ✅ `Simulation`/`SimulationConfig`/`Integrator` en
+    `solver-2d/src/sim.rs`: el time-loop canónico (CFL con BCs → Euler/SSP-RK2 con workspace
+    → fricción) una sola vez, con errores tipados (DegenerateDt, StepBudgetExhausted) y test
+    de bit-identidad contra el loop hand-rolled. f64-only por diseño (la calibración Dual
+    maneja su propio loop). ⏳ Project files TOML: capa serde sobre SimulationConfig +
+    Boundaries2D + paths de mesh/output — diseñar cuando se migren los examples (post-hold).
+14. ✅ Suite Toro completa 1D (`solver-1d/tests/toro_suite.rs`): two-rarefaction near-dry
+    (con nota de resolución: LF/HLL primer orden sobre-profundiza el plateau en malla gruesa,
+    convergencia verificada), rarefacción transcrítica con assert de no-expansion-shock en el
+    punto sónico, Ritter con lecho seco a la IZQUIERDA (rama (dry,wet) + front tracking +
+    masa). ✅ Convergencia 2D (`solver-2d/tests/convergence_order.rs`): auto-convergencia
+    Richardson 32²/64²/128² sobre bump suave, orden observado > 1.3 asserted.
+    ⏳ UK EA datasets oficiales: requiere adquirir los datos del informe EA (externo);
+    los stand-ins sintéticos siguen siendo el gap para el claim "passes UK EA" del paper.
 
 ### 2027 (los dos tracks del outline)
 
