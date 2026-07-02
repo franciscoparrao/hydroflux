@@ -261,6 +261,15 @@ pub fn lax_friedrichs_step<T: Real>(
 }
 
 /// CFL-bounded `dt` for the power-law solver.
+///
+/// Returns `f64`, extracting `.value()` from the state: the time step
+/// is deliberately **not differentiated**. Consequence: the AD gradient
+/// is that of the scheme with a frozen dt sequence, which differs from
+/// the true sensitivity of the discrete map by an O(dt) term (the
+/// semi-implicit friction has ∂G/∂dt ≠ 0 even at steady state).
+/// Measured at ~1e-3 relative under CFL 0.4 in
+/// `ad_gradient_matches_central_finite_difference_for_n_c_p`; larger
+/// for transient QoIs.
 pub fn cfl_dt<T: Real>(
     section: &PowerLawSection<T>,
     a: &[T],
@@ -434,6 +443,129 @@ mod tests {
             (h_mid / h_n - 1.0).abs() < 0.10,
             "h_mid = {h_mid:.4}, h_n = {h_n:.4}"
         );
+    }
+
+    #[test]
+    fn ad_gradient_matches_central_finite_difference_for_n_c_p() {
+        // Independent ground truth for the AD gradient of the FULL
+        // solver — the same end-to-end check `swe1d.rs` has, ported
+        // to the module that actually feeds the calibration paper.
+        // For each of the three calibrated parameters θ ∈ {n, c, p},
+        // compute the steady-state stage h_mid(θ ± ε) with the plain
+        // f64 solver and compare the central difference against the
+        // Dual forward-mode derivative. The QoI is the STAGE (not the
+        // area), so the gradient also threads the stage() inversion —
+        // the same path the rating-curve loss of the paper uses.
+        //
+        // Setup mirrors `wide_channel_limit_recovers_swe1d_steady_state`
+        // but with a natural-channel exponent. Initial conditions and
+        // the Dirichlet BC are held FIXED across perturbations (they
+        // are Dual::constant on the AD side), so FD and AD measure the
+        // same quantity.
+        //
+        // Tolerance 5e-3, NOT machine-level: the CFL dt is state-
+        // dependent and deliberately not differentiated (`cfl_dt`
+        // extracts `.value()`), and the semi-implicit friction factor
+        // uses `|q_star| = |q + dt·R|`, so ∂G/∂dt ≠ 0 even at the
+        // steady fixed point — FD sees that term, AD does not. The
+        // residual is O(dt): measured 1.2e-3 / 2.2e-3 / 1.7e-3 for
+        // n / c / p at CFL 0.4, and it halves when CFL halves (checked
+        // 2026-07-02), which pins it to the frozen-dt term rather than
+        // a defect in the Dual rules — those would show up at O(1).
+        // For transient QoIs the frozen-dt gap is larger; re-derive
+        // the tolerance before reusing this pattern there.
+        let n_cells = 60;
+        let dx = 5.0;
+        let slope = 0.005_f64;
+        let bed: Vec<f64> = (0..n_cells).map(|i| -slope * (i as f64 + 0.5) * dx).collect();
+        let t_end = 2000.0_f64;
+        let mid = n_cells / 2;
+
+        let n0 = 0.04_f64;
+        let c0 = 22.0_f64;
+        let p0 = 5.0 / 6.0;
+        let q_in = 20.0_f64;
+
+        // Analytical normal depth for the baseline parameters; used
+        // as fixed IC/BC for every run (FD and AD alike).
+        let h_exp = 1.0 / (p0 + 5.0 / 3.0);
+        let prefactor = (p0 + 1.0).powf(5.0 / 3.0) * n0 / (c0 * slope.sqrt());
+        let h_bc = (prefactor * q_in).powf(h_exp);
+        let s0 = PowerLawSection::<f64> {
+            coefficient: c0,
+            exponent: p0,
+        };
+        let a_init = s0.area(h_bc);
+
+        let h_mid_f64 = |n: f64, c: f64, p: f64| -> f64 {
+            let s = PowerLawSection::<f64> {
+                coefficient: c,
+                exponent: p,
+            };
+            let (a, _, _) = run(
+                &s,
+                vec![a_init; n_cells],
+                vec![q_in; n_cells],
+                &bed,
+                dx,
+                t_end,
+                n,
+                G,
+                0.4,
+                LeftBc::Dirichlet { h: h_bc, q: q_in },
+                RightBc::Transmissive,
+            );
+            s.stage(a[mid])
+        };
+
+        let h_mid_ad = |n: Dual, c: Dual, p: Dual| -> Dual {
+            let s = PowerLawSection::<Dual> {
+                coefficient: c,
+                exponent: p,
+            };
+            let (a, _, _) = run(
+                &s,
+                vec![Dual::constant(a_init); n_cells],
+                vec![Dual::constant(q_in); n_cells],
+                &bed,
+                dx,
+                t_end,
+                n,
+                G,
+                0.4,
+                LeftBc::Dirichlet {
+                    h: Dual::constant(h_bc),
+                    q: Dual::constant(q_in),
+                },
+                RightBc::Transmissive,
+            );
+            s.stage(a[mid])
+        };
+
+        // (label, eps, FD gradient, AD gradient) per parameter.
+        let cases: [(&str, f64, f64, f64); 3] = [
+            ("manning_n", 1.0e-5, {
+                (h_mid_f64(n0 + 1.0e-5, c0, p0) - h_mid_f64(n0 - 1.0e-5, c0, p0)) / 2.0e-5
+            }, h_mid_ad(Dual::variable(n0), Dual::constant(c0), Dual::constant(p0)).dval),
+            ("coefficient_c", 1.0e-3, {
+                (h_mid_f64(n0, c0 + 1.0e-3, p0) - h_mid_f64(n0, c0 - 1.0e-3, p0)) / 2.0e-3
+            }, h_mid_ad(Dual::constant(n0), Dual::variable(c0), Dual::constant(p0)).dval),
+            ("exponent_p", 1.0e-5, {
+                (h_mid_f64(n0, c0, p0 + 1.0e-5) - h_mid_f64(n0, c0, p0 - 1.0e-5)) / 2.0e-5
+            }, h_mid_ad(Dual::constant(n0), Dual::constant(c0), Dual::variable(p0)).dval),
+        ];
+
+        for (label, _eps, grad_fd, grad_ad) in cases {
+            assert!(
+                grad_fd.abs() > 1.0e-9,
+                "{label}: FD gradient unexpectedly zero ({grad_fd:.3e}) — test is not exercising the parameter"
+            );
+            let rel_err = (grad_ad - grad_fd).abs() / grad_fd.abs();
+            assert!(
+                rel_err < 5.0e-3,
+                "{label}: AD vs FD mismatch: ad = {grad_ad:.6e}, fd = {grad_fd:.6e}, rel_err = {rel_err:.3e}"
+            );
+        }
     }
 
     #[test]

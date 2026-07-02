@@ -113,21 +113,12 @@ impl CompoundSection {
             h * h * (0.5 * self.w_main)
         } else {
             let h_b = T::from_f64(self.h_bank);
-            let half_main = T::from_f64(0.5 * self.w_main);
-            let half_flood = T::from_f64(0.5 * self.w_flood);
             // w_main · h_bank · (h − h_bank/2)
             let part1 = h_b * (h - h_b * 0.5) * self.w_main;
             // w_flood · (h − h_bank)²/2
-            let _ = half_main;
             let dh = h - h_b;
-            let part2 = dh * dh * half_flood * 2.0; // *2 cancels half then half
-            // Actually pressure_integral floodplain term is w_flood · (h-h_bank)² / 2.
-            // half_flood = 0.5 * w_flood. Multiplying by 2.0 gives w_flood. Then dh*dh.
-            // So part2 = dh * dh * w_flood / 2. Wait that's wrong, half_flood * 2 = w_flood,
-            // then we'd have part2 = dh * dh * w_flood (no /2). Let me redo:
-            let part2_correct = dh * dh * (0.5 * self.w_flood);
-            let _ = part2;
-            part1 + part2_correct
+            let part2 = dh * dh * (0.5 * self.w_flood);
+            part1 + part2
         }
     }
 
@@ -330,6 +321,11 @@ pub fn lax_friedrichs_step<T: Real>(
 }
 
 /// CFL-bounded `dt` for the compound solver.
+///
+/// Returns `f64`: the time step is deliberately **not differentiated**
+/// (see `power_law_swe1d::cfl_dt` for the quantified consequence — the
+/// AD gradient corresponds to a frozen dt sequence, an O(dt) deviation
+/// from the true sensitivity of the discrete map).
 pub fn cfl_dt<T: Real>(
     section: &CompoundSection,
     a: &[T],

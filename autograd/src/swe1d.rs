@@ -177,6 +177,11 @@ pub fn lax_friedrichs_step<T: Real>(
 }
 
 /// CFL-bounded time step for a state.
+///
+/// Returns `f64`: the time step is deliberately **not differentiated**
+/// (see `power_law_swe1d::cfl_dt` for the quantified consequence — the
+/// AD gradient corresponds to a frozen dt sequence, an O(dt) deviation
+/// from the true sensitivity of the discrete map).
 pub fn cfl_dt<T: Real>(h: &[T], q: &[T], dx: f64, gravity: f64, cfl: f64) -> f64 {
     let mut max_lambda = 0.0_f64;
     for i in 0..h.len() {
