@@ -34,13 +34,46 @@
 use std::path::Path;
 
 use ndarray::Array2;
-use surtgis_core::Result;
+use surtgis_core::Error as SurtgisError;
 use surtgis_core::io::{read_geotiff, write_geotiff};
 use surtgis_core::raster::{GeoTransform, Raster};
 
+use crate::H_DRY;
 use crate::geometry::Mesh2D;
 use crate::state::Conserved2D;
-use crate::H_DRY;
+
+/// Errors returned by the 2D I/O module. Mirrors the
+/// `hydroflux-solver-1d` convention: conditions caused by the user's
+/// input files are errors, not panics — a malformed DEM must not abort
+/// the calling process.
+#[derive(Debug, thiserror::Error)]
+pub enum IoError {
+    /// Underlying SurtGIS error (file format, libtiff, geotransform parsing, …).
+    #[error("SurtGIS error: {0}")]
+    Surtgis(#[from] SurtgisError),
+    /// DEM and landcover rasters differ in shape.
+    #[error("DEM shape {dem:?} and landcover shape {landcover:?} must match")]
+    ShapeMismatch {
+        /// DEM shape (rows, cols).
+        dem: (usize, usize),
+        /// Landcover shape (rows, cols).
+        landcover: (usize, usize),
+    },
+    /// Pixel size from the geotransform is not strictly positive.
+    #[error("pixel size must be strictly positive, got dx = {dx}, dy = {dy}")]
+    InvalidPixelSize {
+        /// Pixel width [m].
+        dx: f64,
+        /// Pixel height [m].
+        dy: f64,
+    },
+    /// The raster has no cells.
+    #[error("raster is empty")]
+    EmptyRaster,
+}
+
+/// Convenience alias for `Result<T, IoError>`.
+pub type Result<T> = std::result::Result<T, IoError>;
 
 /// Read a DEM GeoTIFF as a [`Mesh2D`] with uniform Manning `n`.
 ///
@@ -56,7 +89,16 @@ pub fn mesh_from_geotiff<P: AsRef<Path>>(
     let transform = *dem.transform();
     let dx = transform.pixel_width.abs();
     let dy = transform.pixel_height.abs();
+    // Validate before Mesh2D::new: its asserts are for programming
+    // errors, but a degenerate geotransform or an empty raster is a
+    // property of the user's file.
+    if !(dx > 0.0 && dy > 0.0) {
+        return Err(IoError::InvalidPixelSize { dx, dy });
+    }
     let bed = dem.into_array();
+    if bed.is_empty() {
+        return Err(IoError::EmptyRaster);
+    }
     let mesh = Mesh2D::new(bed, dx, dy, manning);
     Ok((mesh, transform))
 }
@@ -67,8 +109,9 @@ pub fn mesh_from_geotiff<P: AsRef<Path>>(
 /// (`u8`) to its Manning `n` value [s/m^(1/3)].
 ///
 /// The two rasters must have the same shape (number of rows × cols);
-/// the function panics if they don't. The DEM's [`GeoTransform`] is
-/// taken as the authoritative grid and returned to the caller.
+/// a mismatch is an [`IoError::ShapeMismatch`]. The DEM's
+/// [`GeoTransform`] is taken as the authoritative grid and returned to
+/// the caller.
 ///
 /// For ESA WorldCover (10 m global landcover, 11 classes), pass
 /// [`esa_worldcover_to_manning`] as the closure. For a custom mapping
@@ -98,17 +141,22 @@ where
 {
     let dem: Raster<f64> = read_geotiff(dem_path, None)?;
     let landcover: Raster<u8> = read_geotiff(landcover_path, None)?;
-    assert_eq!(
-        dem.shape(),
-        landcover.shape(),
-        "DEM shape {:?} and landcover shape {:?} must match",
-        dem.shape(),
-        landcover.shape(),
-    );
+    if dem.shape() != landcover.shape() {
+        return Err(IoError::ShapeMismatch {
+            dem: dem.shape(),
+            landcover: landcover.shape(),
+        });
+    }
     let transform = *dem.transform();
     let dx = transform.pixel_width.abs();
     let dy = transform.pixel_height.abs();
+    if !(dx > 0.0 && dy > 0.0) {
+        return Err(IoError::InvalidPixelSize { dx, dy });
+    }
     let bed = dem.into_array();
+    if bed.is_empty() {
+        return Err(IoError::EmptyRaster);
+    }
     let landcover_data = landcover.into_array();
     let manning_field =
         Array2::from_shape_fn(bed.dim(), |idx| landcover_to_manning(landcover_data[idx]));
@@ -197,7 +245,8 @@ pub fn write_depth_geotiff<P: AsRef<Path>>(
     nodata: Option<f64>,
 ) -> Result<()> {
     let raster = depth_raster_from_states(states, transform, nodata);
-    write_geotiff(&raster, path, None)
+    write_geotiff(&raster, path, None)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -338,10 +387,10 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "DEM shape")]
-    fn mesh_from_geotiff_with_landcover_panics_on_shape_mismatch() {
-        // DEM 4×5 vs landcover 3×3 — must abort cleanly rather than
-        // silently producing a zero-padded mesh.
+    fn mesh_from_geotiff_with_landcover_errors_on_shape_mismatch() {
+        // DEM 4×5 vs landcover 3×3 — must return a typed error rather
+        // than panicking (user-input condition) or silently producing
+        // a zero-padded mesh.
         let dem_in = synthetic_dem();
         let mut lc_raster = Raster::from_array(Array2::<u8>::from_elem((3, 3), 30));
         lc_raster.set_transform(*dem_in.transform());
@@ -349,11 +398,19 @@ mod tests {
         let lc_path = NamedTempFile::new().unwrap();
         write_geotiff(&dem_in, dem_path.path(), None).unwrap();
         write_geotiff(&lc_raster, lc_path.path(), None).unwrap();
-        let _ = mesh_from_geotiff_with_landcover(
+        let err = mesh_from_geotiff_with_landcover(
             dem_path.path(),
             lc_path.path(),
             esa_worldcover_to_manning,
-        );
+        )
+        .unwrap_err();
+        match err {
+            IoError::ShapeMismatch { dem, landcover } => {
+                assert_eq!(dem, (4, 5));
+                assert_eq!(landcover, (3, 3));
+            }
+            other => panic!("expected ShapeMismatch, got {other:?}"),
+        }
     }
 
     #[test]
