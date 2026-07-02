@@ -39,11 +39,15 @@ pub mod update;
 /// Standard gravity used throughout the solver, in m/s².
 pub const GRAVITY: f64 = 9.81;
 
-/// Wet/dry threshold [m]. After a forward-Euler step, cells whose
-/// updated depth falls below this value are clamped to dry: depth set
-/// to zero, both momentum components zeroed out. Above this threshold
-/// the cell is treated as wet by every consumer (CFL accounting,
-/// velocity computation, flux evaluation).
+/// Wet/dry threshold [m]. Cells with `h ≤ H_DRY` are treated as dry
+/// by every dynamic consumer (CFL accounting, velocity computation,
+/// flux evaluation, the dry-dry face short-circuit): their velocity is
+/// undefined and their faces carry no flux. Their **mass is kept**,
+/// however — a film below the threshold sits inert on the bed until
+/// inflow accumulates past `H_DRY`. Destroying it (the previous
+/// behaviour) leaked up to `H_DRY` of depth per cell-event along the
+/// entire wetting-front perimeter at every step, a systematic volume
+/// bias in long inundation runs.
 ///
 /// The choice 10⁻⁶ m is a balance: small enough that a 1 mm puddle is
 /// still "wet" (a millimetre of water carries meaningful momentum on
@@ -54,6 +58,15 @@ pub const GRAVITY: f64 = 9.81;
 /// wave speed; that is a separate concern from the cell-level
 /// definition of "dry".
 pub const H_DRY: f64 = 1.0e-6;
+
+/// Velocity cutoff [m], one order of magnitude above [`H_DRY`]. Cells
+/// with `h ≤ H_VEL` have their momentum zeroed by the post-update
+/// floor and contribute no velocity to the CFL bound: on a film this
+/// thin the depth-averaged velocity is not meaningful, and `u = hu/h`
+/// with residual momentum just above `H_DRY` produces arbitrarily
+/// large wave speeds that collapse `dt` (a stall, not an instability).
+/// The dual-threshold pattern follows BASEMENT/SERGHEI practice.
+pub const H_VEL: f64 = 1.0e-5;
 
 pub use boundary::{Boundaries2D, Boundary, Side, ghost_cell};
 pub use flux::{FluxX, FluxY};

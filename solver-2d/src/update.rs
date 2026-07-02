@@ -87,7 +87,7 @@ use crate::flux::{FluxXG, FluxYG};
 use crate::geometry::Mesh2DG;
 use crate::riemann::{hllc_flux_x, hllc_flux_y};
 use crate::state::Conserved2DG;
-use crate::{GRAVITY, H_DRY};
+use crate::{GRAVITY, H_DRY, H_VEL};
 use ndarray::Array2;
 
 /// Maximum signal speeds `(s_x, s_y)` across the state field, where
@@ -108,8 +108,16 @@ pub fn max_wave_speeds<T: Real>(states: &Array2<Conserved2DG<T>>) -> (f64, f64) 
         }
         let h = s.h.value();
         let c = (GRAVITY * h).sqrt();
-        let u = s.hu.value() / h;
-        let v = s.hv.value() / h;
+        // Velocity cutoff: below H_VEL the post-update floor keeps the
+        // momentum at zero, so hu/h is either zero or a stale residual
+        // (e.g. a user-supplied initial condition) that would collapse
+        // dt; either way the film carries no meaningful signal beyond
+        // its gravity-wave celerity.
+        let (u, v) = if h > H_VEL {
+            (s.hu.value() / h, s.hv.value() / h)
+        } else {
+            (0.0, 0.0)
+        };
         s_x = s_x.max(u.abs() + c);
         s_y = s_y.max(v.abs() + c);
     }
@@ -244,12 +252,17 @@ fn well_balanced_x_face<T: Real>(
     let h_star_left = (left.h + z_left - z_max).max(T::zero());
     let h_star_right = (right.h + z_right - z_max).max(T::zero());
 
-    let (u_left, v_left) = if left.h.value() > 0.0 {
+    // Velocity extraction under the H_VEL cutoff: a film's hu/h is
+    // either exactly zero (floor invariant) or a stale residual that
+    // must not enter the Riemann problem. Also removes the former
+    // `> 0.0` guard, whose window (0, H_DRY] could overflow on
+    // caller-supplied states with tiny h and non-zero momentum.
+    let (u_left, v_left) = if left.h.value() > H_VEL {
         (left.hu / left.h, left.hv / left.h)
     } else {
         (T::zero(), T::zero())
     };
-    let (u_right, v_right) = if right.h.value() > 0.0 {
+    let (u_right, v_right) = if right.h.value() > H_VEL {
         (right.hu / right.h, right.hv / right.h)
     } else {
         (T::zero(), T::zero())
@@ -292,12 +305,13 @@ fn well_balanced_y_face<T: Real>(
     let h_star_left = (left.h + z_left - z_max).max(T::zero());
     let h_star_right = (right.h + z_right - z_max).max(T::zero());
 
-    let (u_left, v_left) = if left.h.value() > 0.0 {
+    // See well_balanced_x_face for the H_VEL rationale.
+    let (u_left, v_left) = if left.h.value() > H_VEL {
         (left.hu / left.h, left.hv / left.h)
     } else {
         (T::zero(), T::zero())
     };
-    let (u_right, v_right) = if right.h.value() > 0.0 {
+    let (u_right, v_right) = if right.h.value() > H_VEL {
         (right.hu / right.h, right.hv / right.h)
     } else {
         (T::zero(), T::zero())
@@ -362,8 +376,10 @@ struct CellSlopesG<T> {
     v: T,
 }
 
-/// Cell-centered primitive values `(η, u, v)`. Dry cells return
-/// `u = v = 0` (velocity is undefined when `h ≤ H_DRY`).
+/// Cell-centered primitive values `(η, u, v)`. Films return
+/// `u = v = 0`: velocity is not meaningful below the `H_VEL` cutoff,
+/// and dividing residual momentum by a near-`H_DRY` depth produces
+/// unphysical velocities (see [`crate::H_VEL`]).
 fn primitives_at<T: Real>(
     states: &Array2<Conserved2DG<T>>,
     bed: &Array2<T>,
@@ -371,7 +387,7 @@ fn primitives_at<T: Real>(
     j: usize,
 ) -> (T, T, T) {
     let s = states[(i, j)];
-    if s.h.value() > H_DRY {
+    if s.h.value() > H_VEL {
         (s.h + bed[(i, j)], s.hu / s.h, s.hv / s.h)
     } else {
         (s.h + bed[(i, j)], T::zero(), T::zero())
@@ -601,12 +617,50 @@ fn reconstruct_y_face_states<T: Real>(
     )
 }
 
+/// Face bed elevation at an interior face given the two adjacent cell
+/// states and beds.
+///
+/// - **Both sides wet (or both dry)**: the linear-interpolation
+///   midpoint `½(z_L + z_R)` — the Liang & Marche (2009) construction
+///   that eliminates the steady-state bias of η-MUSCL on a sloped bed.
+/// - **Exactly one side wet** (shoreline / wetting front): the Audusse
+///   `max(z_L, z_R)`. The midpoint is wrong here in two ways. If the
+///   dry cell's bed stands above the wet surface (`z_dry ≥ η_wet`) the
+///   face is a physical wall, but the midpoint can sit below `η_wet`:
+///   the dry side then reconstructs a spurious column of half the bed
+///   jump, the α-rescaling zeroes the resulting flux, and the wet
+///   cell's source keeps an unbalanced `g·h_face²/(2Δ)` term — a
+///   permanent spurious acceleration toward the shore (broken
+///   C-property at shorelines). With `max`, both reconstructed depths
+///   vanish and flux and source balance exactly. If instead
+///   `z_dry < η_wet` (legitimate wetting), `max` removes the same
+///   spurious half-jump column from the dry side and lets the wet side
+///   carry its full head into the front. Slopes are already zeroed in
+///   a 2-cell buffer around wet/dry fronts, so the wet-wet midpoint
+///   rationale (MUSCL steady bias) does not apply at these faces.
+///
+/// State-dependent by necessity — the C-property with wetting/drying
+/// cannot be enforced by a purely static face bed.
+fn interior_z_face<T: Real>(left: Conserved2DG<T>, z_l: T, right: Conserved2DG<T>, z_r: T) -> T {
+    let l_wet = left.h.value() > H_DRY;
+    let r_wet = right.h.value() > H_DRY;
+    if l_wet != r_wet {
+        z_l.max(z_r)
+    } else {
+        (z_l + z_r) * 0.5
+    }
+}
+
 /// Build the array of face bed elevations `z_face_x[i, j]` for every
 /// `x`-face (interior and boundary).
 ///
-/// Interior `j ∈ 1..n_cols`: `z_face = ½(z[i, j-1] + z[i, j])`.
+/// Interior `j ∈ 1..n_cols`: [`interior_z_face`] (midpoint on wet-wet,
+/// `max` on wet/dry).
 /// West boundary `j = 0`: `z_face = ½(z_ghost_west + z[i, 0])`.
 /// East boundary `j = n_cols`: `z_face = ½(z[i, n_cols-1] + z_ghost_east)`.
+/// Boundary faces keep the midpoint unconditionally: the ghost mirrors
+/// the interior wetness for Wall/Transmissive (no wet/dry face arises),
+/// and the Discharge-on-dry override manages its own ghost depth.
 ///
 /// The cell-centered bed gradient used by the explicit source is then
 /// `(z_face[i, j+1] − z_face[i, j]) / dx`, which is **consistent with
@@ -630,7 +684,12 @@ fn build_z_face_x<T: Real>(
             let (_, z_g) = ghost_cell(mesh, states[(i, n_cols - 1)], bcs.east, Side::East, i);
             (mesh.bed[(i, n_cols - 1)] + z_g) * 0.5
         } else {
-            (mesh.bed[(i, j - 1)] + mesh.bed[(i, j)]) * 0.5
+            interior_z_face(
+                states[(i, j - 1)],
+                mesh.bed[(i, j - 1)],
+                states[(i, j)],
+                mesh.bed[(i, j)],
+            )
         }
     })
 }
@@ -652,7 +711,12 @@ fn build_z_face_y<T: Real>(
             let (_, z_g) = ghost_cell(mesh, states[(n_rows - 1, j)], bcs.south, Side::South, j);
             (mesh.bed[(n_rows - 1, j)] + z_g) * 0.5
         } else {
-            (mesh.bed[(i - 1, j)] + mesh.bed[(i, j)]) * 0.5
+            interior_z_face(
+                states[(i - 1, j)],
+                mesh.bed[(i - 1, j)],
+                states[(i, j)],
+                mesh.bed[(i, j)],
+            )
         }
     })
 }
@@ -925,15 +989,15 @@ pub fn forward_euler_step<T: Real>(
     // four face fluxes around the cell are all zero by the dry-dry
     // short-circuit above. The standard path would compute
     // `dh = dhu = dhv = 0` and only the bed-slope source `s_hu, s_hv`
-    // could be non-zero — but those would feed momentum into a cell
-    // with `h = 0`, which the `if new_h <= H_DRY` floor below resets
-    // to `Conserved2DG::dry()` anyway. Going straight to `dry()` is
-    // mathematically identical to running the full body and lets us
-    // skip ~12 FLOPs per dry interior cell. We restrict the shortcut
-    // to STRICT interior cells (`1 ≤ i ≤ n_rows − 2`,
-    // `1 ≤ j ≤ n_cols − 2`) so that boundary cells — which could
-    // receive injected mass from a `Discharge` / `Depth` ghost — keep
-    // the full path.
+    // could be non-zero — but those would feed momentum into an
+    // essentially dry cell, which the `new_h ≤ H_VEL` floor below
+    // zeroes anyway. Keeping `h` and zeroing just the momentum is
+    // mathematically identical to running the full body (dh = 0, so
+    // the floor keeps the same mass) and lets us skip ~12 FLOPs per
+    // dry interior cell. We restrict the shortcut to STRICT interior
+    // cells (`1 ≤ i ≤ n_rows − 2`, `1 ≤ j ≤ n_cols − 2`) so that
+    // boundary cells — which could receive injected mass from a
+    // `Discharge` / `Depth` ghost — keep the full path.
     for i in 0..n_rows {
         for j in 0..n_cols {
             if was_dry[(i, j)]
@@ -946,7 +1010,11 @@ pub fn forward_euler_step<T: Real>(
                 && was_dry[(i, j - 1)]
                 && was_dry[(i, j + 1)]
             {
-                states[(i, j)] = Conserved2DG::dry();
+                // Keep the moisture film (see the floor below); only
+                // the momentum is reset, matching what the full path
+                // does for h ≤ H_VEL.
+                states[(i, j)].hu = T::zero();
+                states[(i, j)].hv = T::zero();
                 continue;
             }
             let fx_right = scale_x_face(i, j + 1).minus;
@@ -982,17 +1050,37 @@ pub fn forward_euler_step<T: Real>(
             let h_face_bottom = (eta_cell - z_face_y[(i + 1, j)]).max(T::zero());
             let s_hv = (h_face_bottom.powi(2) - h_face_top.powi(2)) * (0.5 * GRAVITY) / mesh.dy;
 
-            if new_h.value() <= H_DRY {
-                // Floor: roundoff or starting dry. Set to dry (state
-                // already drained to ≤ H_DRY; rescaling brought us
-                // here by design when the cell ran out of mass).
-                states[(i, j)] = Conserved2DG::dry();
+            if new_h.value() <= H_VEL {
+                // Moisture floor. The mass is KEPT: a wetting-front
+                // cell that received δ ≤ H_DRY of inflow had that mass
+                // already leave its neighbour through the shared face,
+                // and zeroing it here destroyed volume all along the
+                // front perimeter at every step. The film stays inert
+                // on the bed (its faces are dry-dry for h ≤ H_DRY, and
+                // the α available-mass term is zero) until inflow
+                // accumulates past the threshold. Momentum is dropped
+                // for anything up to H_VEL: velocity on such a film is
+                // meaningless, and residual hu with h barely above
+                // H_DRY collapses dt through hu/h (see H_VEL doc).
+                states[(i, j)] = Conserved2DG::new_generic(
+                    new_h.max(T::zero()),
+                    T::zero(),
+                    T::zero(),
+                );
             } else {
+                // A cell that was a film inherits no momentum: the
+                // floor invariant keeps evolved films at hu = hv = 0,
+                // and a caller-supplied initial state violating it
+                // must not leak its stale momentum into the wetted
+                // cell (hu/h on the old film depth is unphysical).
+                let (hu_old, hv_old) = if h_old.value() > H_VEL {
+                    (states[(i, j)].hu, states[(i, j)].hv)
+                } else {
+                    (T::zero(), T::zero())
+                };
                 states[(i, j)].h = new_h;
-                states[(i, j)].hu = states[(i, j)].hu - dhu;
-                states[(i, j)].hu = states[(i, j)].hu + s_hu * dt;
-                states[(i, j)].hv = states[(i, j)].hv - dhv;
-                states[(i, j)].hv = states[(i, j)].hv + s_hv * dt;
+                states[(i, j)].hu = hu_old - dhu + s_hu * dt;
+                states[(i, j)].hv = hv_old - dhv + s_hv * dt;
             }
         }
     }
@@ -1053,11 +1141,13 @@ pub fn ssprk2_step<T: Real>(
         s.h = (prev.h + s.h) * 0.5;
         s.hu = (prev.hu + s.hu) * 0.5;
         s.hv = (prev.hv + s.hv) * 0.5;
-        // Re-clamp the averaged state to dry if it ended up below
-        // the threshold (can happen if one of the two halves was wet
-        // but very shallow; the average is below H_DRY).
-        if s.h.value() <= H_DRY {
-            *s = Conserved2DG::dry();
+        // Re-apply the moisture floor to the averaged state (one of
+        // the two halves may have been wet but very shallow): keep the
+        // mass, drop the momentum — same rule as the Euler floor.
+        if s.h.value() <= H_VEL {
+            s.h = s.h.max(T::zero());
+            s.hu = T::zero();
+            s.hv = T::zero();
         }
     }
 }
@@ -1296,6 +1386,91 @@ mod tests {
     }
 
     #[test]
+    fn lake_at_rest_with_emerged_island_is_preserved() {
+        // C-property at shorelines: a lake at rest around an island
+        // whose crest stands ABOVE the free surface must stay exactly
+        // at rest. With the interpolated face bed ½(z_L + z_R) at
+        // wet/dry faces, the face bed can sit below the wet-side
+        // surface while the dry cell stands above it: the α-rescaling
+        // zeroes the (spurious) face flux but the cell-centered source
+        // keeps a g·h_face²/(2Δ) pressure term, accelerating the
+        // shoreline cells toward the island every step. The wet/dry
+        // face rule z_face = max(z_L, z_R) closes both sides to zero
+        // depth and restores the exact balance.
+        let n = 21;
+        let eta = 1.0;
+        let mesh = gaussian_bed(n, n, 1.0, 1.0, 2.5); // crest 2.5 m > η
+        let initial = Array2::from_shape_fn((n, n), |(i, j)| {
+            let h = (eta - mesh.bed[(i, j)]).max(0.0);
+            Conserved2D::new(h, 0.0, 0.0)
+        });
+        let mut states = initial.clone();
+        let m0 = total_mass(&states, 1.0, 1.0);
+
+        for _ in 0..200 {
+            let dt = cfl_time_step(&states, &mesh, 0.4);
+            forward_euler_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
+        }
+        for ((i, j), s) in states.indexed_iter() {
+            assert!(
+                (s.h - initial[(i, j)].h).abs() < 1e-10,
+                "h drifted at ({i},{j}): {} vs {}",
+                s.h,
+                initial[(i, j)].h
+            );
+            assert!(
+                s.hu.abs() < 1e-10 && s.hv.abs() < 1e-10,
+                "spurious shoreline momentum at ({i},{j}): hu = {:e}, hv = {:e}",
+                s.hu,
+                s.hv
+            );
+        }
+        let m1 = total_mass(&states, 1.0, 1.0);
+        assert_relative_eq!(m0, m1, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn lake_at_rest_against_emerged_bank_is_preserved() {
+        // Same C-property, 1D-like geometry: a linear bank rising
+        // through the free surface (the "thin layer against a slope"
+        // configuration reviewers ask for). Exercises the x-axis
+        // shoreline correction in isolation.
+        let n_rows = 4;
+        let n_cols = 30;
+        let eta = 0.5;
+        // Bed rises from -0.5 to +1.5 across the columns; the
+        // shoreline sits mid-domain.
+        let bed = Array2::from_shape_fn((n_rows, n_cols), |(_i, j)| {
+            -0.5 + 2.0 * j as f64 / (n_cols - 1) as f64
+        });
+        let mesh = Mesh2D::new(bed, 1.0, 1.0, 0.0);
+        let initial = Array2::from_shape_fn((n_rows, n_cols), |(i, j)| {
+            let h = (eta - mesh.bed[(i, j)]).max(0.0);
+            Conserved2D::new(h, 0.0, 0.0)
+        });
+        let mut states = initial.clone();
+
+        for _ in 0..200 {
+            let dt = cfl_time_step(&states, &mesh, 0.4);
+            forward_euler_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
+        }
+        for ((i, j), s) in states.indexed_iter() {
+            assert!(
+                (s.h - initial[(i, j)].h).abs() < 1e-10,
+                "h drifted at ({i},{j}): {} vs {}",
+                s.h,
+                initial[(i, j)].h
+            );
+            assert!(
+                s.hu.abs() < 1e-10 && s.hv.abs() < 1e-10,
+                "spurious shoreline momentum at ({i},{j}): hu = {:e}, hv = {:e}",
+                s.hu,
+                s.hv
+            );
+        }
+    }
+
+    #[test]
     fn draining_cell_inflow_to_dry_neighbour_is_not_discarded() {
         // Regression test for the isolated-dry-cell fast path: it must
         // consult the PRE-step wet/dry pattern, not the in-place
@@ -1328,13 +1503,77 @@ mod tests {
             "inflow into the dry interior cell was discarded: h(1,1) = {}",
             states[(1, 1)].h
         );
-        // Only the floor reset of the drained source cell may destroy
-        // mass, and it is bounded by H_DRY per drained cell.
+        // With the moisture floor the drained source cell keeps its
+        // residual film, so the step conserves mass to roundoff.
         let m1 = total_mass(&states, 1.0, 1.0);
+        assert_relative_eq!(m0, m1, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn wetting_front_conserves_mass_in_closed_box() {
+        // Dam break onto a dry half of a closed box. Every cell the
+        // front touches first receives δ ≤ H_DRY of mass; the old
+        // floor reset those cells to exact dry, destroying δ along
+        // the whole front perimeter at every step — a systematic
+        // volume leak this test bounds at roundoff now that the
+        // moisture floor keeps sub-threshold films.
+        let n = 30;
+        let mesh = flat_mesh(n, n, 1.0, 1.0);
+        let mut states = Array2::from_shape_fn((n, n), |(_i, j)| {
+            if j < n / 2 {
+                Conserved2D::new(1.0, 0.0, 0.0)
+            } else {
+                Conserved2D::DRY
+            }
+        });
+        let m0 = total_mass(&states, 1.0, 1.0);
+
+        for _ in 0..300 {
+            let dt = cfl_time_step(&states, &mesh, 0.4);
+            forward_euler_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
+        }
+        for s in &states {
+            assert!(s.h.is_finite() && s.h >= 0.0, "bad depth: {}", s.h);
+        }
+        let m1 = total_mass(&states, 1.0, 1.0);
+        assert_relative_eq!(m0, m1, epsilon = 1e-12);
+    }
+
+    #[test]
+    fn residual_momentum_on_thin_film_does_not_collapse_dt() {
+        // A film barely above H_DRY carrying stale momentum (as a
+        // user-supplied IC can produce) must not drive u = hu/h into
+        // the CFL bound: with the H_VEL cutoff the film contributes
+        // only its celerity, and the first Euler step zeroes its
+        // momentum.
+        let mesh = flat_mesh(4, 4, 1.0, 1.0);
+        let mut states = Array2::from_elem((4, 4), Conserved2D::new(1.0, 0.0, 0.0));
+        states[(1, 1)] = Conserved2D::new(1.1 * H_DRY, 1.0, 1.0); // u ~ 1e6 m/s if honoured
+        let dt = cfl_time_step(&states, &mesh, 0.4);
+        // Wet-cell celerity dominates: dt is the ordinary bound, not
+        // a hu/h-collapsed one.
+        let c = (GRAVITY * 1.0_f64).sqrt();
+        let dt_expected = 0.4 / (2.0 * c); // dx = dy = 1
         assert!(
-            (m0 - m1).abs() <= 2.0 * H_DRY,
-            "mass not conserved across the draining step: before {m0}, after {m1}"
+            dt > 0.9 * dt_expected,
+            "dt collapsed by thin-film residual momentum: dt = {dt:e}, expected ~{dt_expected:e}"
         );
+        forward_euler_step(&mut states, &mesh, Boundaries2D::WALLS, dt);
+        // The film may legitimately wet up past H_VEL in this step
+        // (deep neighbours dump mass into it); what must NOT survive
+        // is the stale 1e6 m/s velocity. Bound |u| by the physical
+        // dam-break scale (2c ≈ 6.3 m/s for h = 1 m).
+        let s = states[(1, 1)];
+        if s.h > H_VEL {
+            let u = (s.hu / s.h).abs().max((s.hv / s.h).abs());
+            assert!(
+                u < 10.0,
+                "stale film momentum leaked into the wetted cell: |u| = {u:e}"
+            );
+        } else {
+            assert_eq!(s.hu, 0.0);
+            assert_eq!(s.hv, 0.0);
+        }
     }
 
     #[test]

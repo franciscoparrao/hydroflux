@@ -11,7 +11,7 @@ use crate::flux::Flux;
 use crate::geometry::Channel1D;
 use crate::riemann::hll_flux;
 use crate::state::Conserved;
-use crate::{GRAVITY, H_DRY};
+use crate::{GRAVITY, H_DRY, H_VEL};
 
 /// Maximum signal speed across the state vector. Used to bound the time
 /// step under the CFL condition. Returns 0 for an empty or all-dry state.
@@ -20,12 +20,14 @@ use crate::{GRAVITY, H_DRY};
 /// contributes `|u| + 2c` instead: the rarefaction front into the dry
 /// region propagates at `u ± 2c` (Toro 2009 §10.5.4), and bounding dt
 /// with `|u| + c` there would let the front outrun the CFL window,
-/// draining cells below zero depth.
+/// draining cells below zero depth. Films `h ≤ H_VEL` contribute only
+/// their celerity: the floor keeps their momentum at zero, and a stale
+/// residual (user-supplied IC) must not collapse dt through `hu/h`.
 pub fn max_wave_speed(states: &[Conserved]) -> f64 {
     let cell_speed = |s: &Conserved, front_factor: f64| -> f64 {
         if s.h > H_DRY {
             let c = (GRAVITY * s.h).sqrt();
-            let u = s.hu / s.h;
+            let u = if s.h > H_VEL { s.hu / s.h } else { 0.0 };
             u.abs() + front_factor * c
         } else {
             0.0
@@ -177,14 +179,14 @@ pub fn forward_euler_step(states: &mut [Conserved], channel: &Channel1D, bcs: Bo
         states[i].h -= dt_dx * (f_right.mass - f_left.mass);
         states[i].hu -= dt_dx * (f_right.momentum - f_left.momentum);
 
-        // Positivity safety net + dry-film momentum zeroing. Under the
+        // Positivity safety net + film momentum zeroing. Under the
         // CFL bound of `max_wave_speed` the update should not drive h
         // negative; if roundoff does, clamping to zero is the smallest
-        // consistent correction. A film of h ≤ H_DRY keeps its mass
+        // consistent correction. A film of h ≤ H_VEL keeps its mass
         // (destroying it would leak volume at every wetting front) but
         // has no meaningful velocity, so its momentum is dropped before
         // `hu/h` can amplify it into a spurious wave speed.
-        if states[i].h <= H_DRY {
+        if states[i].h <= H_VEL {
             states[i].h = states[i].h.max(0.0);
             states[i].hu = 0.0;
         }

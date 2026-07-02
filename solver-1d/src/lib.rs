@@ -29,6 +29,13 @@ pub const GRAVITY: f64 = 9.81;
 /// Matches the convention of `hydroflux-solver-2d`.
 pub const H_DRY: f64 = 1.0e-6;
 
+/// Velocity cutoff in metres, one order of magnitude above [`H_DRY`].
+/// The post-update floor zeroes `hu` for `h ≤ H_VEL`, and the CFL
+/// bound ignores the velocity of such films: `hu/h` with residual
+/// momentum just above `H_DRY` produces arbitrarily large wave speeds
+/// that collapse `dt`. Matches `hydroflux-solver-2d::H_VEL`.
+pub const H_VEL: f64 = 1.0e-5;
+
 pub use boundary::{Boundaries, Boundary, Side, ghost_cell};
 pub use flux::Flux;
 pub use geometry::Channel1D;
