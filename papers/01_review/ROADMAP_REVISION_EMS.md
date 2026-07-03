@@ -359,14 +359,69 @@ líneas ~14-34).
         mapeo de los 6 stand-ins sintéticos actuales contra la
         numeración oficial de Néelz & Pender (el reporte SC120002 tiene
         las specs; URL en el README de los datos).
-- [ ] **Etapa 2 — Implementación** (próxima sesión):
-      1. Lector ASCII-grid (o conversión GeoTIFF) para los `.dem`.
-      2. Runner por test con series en los puntos de control oficiales
-         (usar `Simulation` + `set_boundaries()` para el hidrograma).
-      3. Construir el DEM del Test 5 desde la spec paramétrica.
-      4. Comparar vs LISFLOOD ACC/DG2 (numérico) + envelopes del
-         informe (cualitativo). Métricas: RMSE/bias de nivel y timing
-         de llegada por punto de control.
+- [~] **Etapa 2 — Implementación, Test 4 (EN CURSO 2026-07-03)**:
+      1. [x] Lector ASCII-grid: `solver-2d/src/ascii_grid.rs` (nuevo
+             módulo de librería, dep `flate2` añadida al workspace).
+             `read_ascii_grid` (gunzip transparente si `.gz`) +
+             `AsciiGridHeader::cell_at` / `rows_overlapping_y_range`
+             para mapear coordenadas geográficas → `(row, col)` del
+             mesh (row 0 = norte, consistente con `mesh_from_geotiff`).
+             6 tests unitarios, todos verdes.
+      2. [x] Comparación contra referencia: `solver-2d/examples/
+             uk_ea_common.rs` (módulo compartido vía `#[path]`, no es
+             API pública — scaffolding de reproducción, no
+             funcionalidad del solver). Parser del formato `.stage` de
+             LISFLOOD-FP + `compare_point` (RMSE, peak bias, arrival
+             time por interpolación lineal sobre la malla temporal de
+             la referencia).
+      3. [x] Spec física del Test 4 extraída del informe SC120002
+             oficial (`pdftotext` sobre el PDF descargado en WP3
+             etapa 1): dominio 1000×2000 m, **peak flow 20 m³/s**
+             (§4.5.1) — esto resuelve la ambigüedad de unidades del
+             `.bdy`: el valor "1" en el hidrograma × 20 m del segmento
+             de entrada = 20 m³/s exactos (confirma que `QVAR` de
+             LISFLOOD-FP es caudal por unidad de ancho, m²/s).
+      4. [x] Runner: `solver-2d/examples/uk_ea_test4_official.rs`.
+             Malla oficial a 5 m (`ea4-5m.dem.gz`, matching resolution
+             con la referencia DG2 — el esquema LISFLOOD más
+             comparable al nuestro, full SWE 2do orden). Inflow via
+             4 `PointSource` en la columna oeste (filas calculadas por
+             `rows_overlapping_y_range(990,1010)`), hidrograma
+             trapezoidal interpolado de los breakpoints oficiales.
+      5. [x] **Bug encontrado y corregido**: con el dominio
+             completamente seco al inicio (BC de fondo `Wall`), el
+             primer paso de `cfl_time_step_with_bcs` devolvía
+             `dt = ∞` (nada de la inyección por `PointSource` es
+             visible al cálculo de CFL) — la simulación entera
+             "saltaba" los 18000 s en un solo paso, sin que entrara
+             agua. Arreglado usando el driver `Simulation` con
+             `SimulationConfig.max_dt = 15.0` (el mecanismo para
+             exactamente este caso, ya construido en el WP anterior)
+             en vez de un loop manual con `ssprk2_step` directo.
+      6. **[EN CURSO]** Corriendo el runner a 5 m (80,000 celdas): más
+             lento de lo estimado — a los 30 min de wall-clock llevaba
+             46% del tiempo simulado (24000 pasos, ~76 ms/paso
+             promedio), sin errores, `h_max` estabilizándose cerca del
+             punto de inyección (físicamente esperable). Proceso
+             desacoplado (`nohup`+`disown`, log en
+             `test4_run.log` del scratchpad) + `Monitor` persistente
+             armado para la notificación de fin. **Lección operativa**:
+             no encadenar Bash `run_in_background` con un segundo bucle
+             manual de espera (`until...sleep`) — el sistema lo mató
+             dos veces; usar `Monitor` (que tiene su propio mecanismo)
+             o simplemente esperar la notificación nativa de
+             `run_in_background`.
+      7. Pendiente al terminar: revisar los números de comparación
+             (RMSE/peak-bias/arrival-time por punto), decidir si son
+             publicables tal cual o si el mecanismo de inyección
+             (point-source vs. una verdadera BC de caudal en el borde)
+             necesita ajuste, y considerar si vale la pena además una
+             corrida a 10 m (más rápida, ~4× menos celdas) como
+             sanity-check rápido para iterar antes de repetir a 5 m.
+      8. Test 5 (construir DEM del valle desde la spec paramétrica) y
+             Test 8A Glasgow (rain+surcharge, mecanismo de BC nuevo)
+             quedan para una sesión siguiente — reusan
+             `ascii_grid.rs` y `uk_ea_common.rs` tal cual.
 - [ ] **Etapa 3 — Manuscrito**: reescribir §3.6 con resultados
       cuantitativos, actualizar Tabla 1, Highlights, Abstract y Key
       Point 2; decidir si los stand-ins sintéticos quedan como smoke

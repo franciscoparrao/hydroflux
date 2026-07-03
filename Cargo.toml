@@ -28,6 +28,7 @@ thiserror = "2"
 tempfile = "3"
 criterion = "0.5"
 proptest = "1"
+flate2 = "1"
 # Internal workspace members exposed as deps to siblings.
 hydroflux-autograd = { path = "autograd" }
 # SurtGIS pinned by commit so a fresh clone builds with cargo alone —

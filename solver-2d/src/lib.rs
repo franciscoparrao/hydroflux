@@ -27,6 +27,7 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod ascii_grid;
 pub mod boundary;
 pub mod flux;
 pub mod geometry;
@@ -69,6 +70,7 @@ pub const H_DRY: f64 = 1.0e-6;
 /// The dual-threshold pattern follows BASEMENT/SERGHEI practice.
 pub const H_VEL: f64 = 1.0e-5;
 
+pub use ascii_grid::{AsciiGridError, AsciiGridHeader, read_ascii_grid};
 pub use boundary::{Boundaries2D, Boundary, Side, ghost_cell};
 pub use flux::{FluxX, FluxY};
 pub use flux::{FluxXG, FluxYG};

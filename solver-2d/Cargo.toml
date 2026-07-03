@@ -15,6 +15,7 @@ ndarray.workspace            = true
 thiserror.workspace          = true
 surtgis-core.workspace       = true
 hydroflux-autograd.workspace = true
+flate2.workspace             = true
 
 [dev-dependencies]
 approx.workspace    = true
