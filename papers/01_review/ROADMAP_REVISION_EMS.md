@@ -398,30 +398,36 @@ líneas ~14-34).
              `SimulationConfig.max_dt = 15.0` (el mecanismo para
              exactamente este caso, ya construido en el WP anterior)
              en vez de un loop manual con `ssprk2_step` directo.
-      6. **[EN CURSO]** Corriendo el runner a 5 m (80,000 celdas): más
-             lento de lo estimado — a los 30 min de wall-clock llevaba
-             46% del tiempo simulado (24000 pasos, ~76 ms/paso
-             promedio), sin errores, `h_max` estabilizándose cerca del
-             punto de inyección (físicamente esperable). Proceso
-             desacoplado (`nohup`+`disown`, log en
-             `test4_run.log` del scratchpad) + `Monitor` persistente
-             armado para la notificación de fin. **Lección operativa**:
-             no encadenar Bash `run_in_background` con un segundo bucle
-             manual de espera (`until...sleep`) — el sistema lo mató
-             dos veces; usar `Monitor` (que tiene su propio mecanismo)
-             o simplemente esperar la notificación nativa de
-             `run_in_background`.
-      7. Pendiente al terminar: revisar los números de comparación
-             (RMSE/peak-bias/arrival-time por punto), decidir si son
-             publicables tal cual o si el mecanismo de inyección
-             (point-source vs. una verdadera BC de caudal en el borde)
-             necesita ajuste, y considerar si vale la pena además una
-             corrida a 10 m (más rápida, ~4× menos celdas) como
-             sanity-check rápido para iterar antes de repetir a 5 m.
+      6. [x] **Corrida completa (2026-07-03)**: 53,610 pasos,
+             t = 18000.0 s exacto, wall time 3489 s (~58 min, proceso
+             desacoplado con `nohup`+`disown` + `Monitor` persistente
+             para la notificación — **lección operativa**: no
+             encadenar Bash `run_in_background` con un segundo bucle
+             manual de espera, el sistema lo mató dos veces antes de
+             dar con este patrón). Sanidad física: `h_max` sigue la
+             forma del hidrograma exactamente (sube en la rampa, meseta
+             ~0.796 m durante el peak-flow, baja en la rampa de
+             salida), sin NaN ni inestabilidad en ningún paso.
+      7. [x] **Resultado — EXCELENTE, mejor de lo esperado en el
+             primer intento**. Comparación completa persistida en
+             `benchmarks/data/uk_ea/test4/results_hydroflux.md`.
+             Contra DG2 @ 5m (misma resolución, full SWE 2do orden —
+             la comparación justa): **RMSE 0.6-4.0 mm (0.2-1.4% del
+             pico) en los 6 puntos, peak bias ≤1.4%, arrival-time
+             offsets de 0-60 s** — un orden de magnitud por debajo del
+             spread de "~5 min" que el propio informe SC120002 declara
+             como normal ENTRE modelos distintos de la industria
+             (§4.5.4). No hizo falta ajustar el mecanismo de inyección
+             ni correr un sanity-check a 10 m — el point-source
+             funcionó a la primera. **Test 4 queda listo para el
+             manuscrito** (WP3 etapa 3).
       8. Test 5 (construir DEM del valle desde la spec paramétrica) y
              Test 8A Glasgow (rain+surcharge, mecanismo de BC nuevo)
              quedan para una sesión siguiente — reusan
-             `ascii_grid.rs` y `uk_ea_common.rs` tal cual.
+             `ascii_grid.rs` y `uk_ea_common.rs` tal cual. Dato para
+             estimar tiempo: Test 4 a 80,000 celdas tomó ~58 min
+             wall-clock; Test 5/8A pueden ser más rápidos o más lentos
+             según su malla — presupuestar sesión dedicada con margen.
 - [ ] **Etapa 3 — Manuscrito**: reescribir §3.6 con resultados
       cuantitativos, actualizar Tabla 1, Highlights, Abstract y Key
       Point 2; decidir si los stand-ins sintéticos quedan como smoke
