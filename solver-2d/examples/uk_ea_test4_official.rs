@@ -39,7 +39,7 @@
 //! cargo run --release -p hydroflux-solver-2d --example uk_ea_test4_official
 //! ```
 
-#[path = "uk_ea_common.rs"]
+#[path = "uk_ea_common/mod.rs"]
 mod uk_ea_common;
 
 use std::path::Path;
