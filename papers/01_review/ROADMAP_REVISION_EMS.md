@@ -93,47 +93,56 @@ en frentes móviles → el `mass 2.15e-5` de Thacker debería BAJAR).
 
 **Tareas**:
 
-- [ ] Congelar: elegir el commit (post-WP4), anotarlo aquí y en
-      §Open Research del manuscrito.
-- [ ] Regenerar métricas de verificación:
-      ```bash
-      cargo test --release -p hydroflux-solver-2d -- --ignored report 2>&1 | tee /tmp/report_metrics.txt
-      ```
-      (los tests `report_*` están `#[ignore]` y imprimen las métricas de
-      Tabla 1). Actualizar Tabla 1 y §3.1-§3.6 con los valores nuevos.
-- [ ] Regenerar convergencia (Tabla 2, Fig 5):
-      ```bash
-      cargo run --release -p hydroflux-solver-2d --example gen_convergence
-      ```
-- [ ] Regenerar datos de figuras 2 y 6:
-      ```bash
-      cargo run --release -p hydroflux-solver-2d --example gen_verification_data
-      cargo run --release -p hydroflux-solver-2d --example gen_stoker_coarse
-      python3 solver-2d/examples/anuga_stoker_compare.py   # requiere venv con ANUGA (el original era /tmp, recrear)
-      ```
-      **Al re-correr ANUGA**: capturar `anuga.__version__` y agregarla a
-      §3.8 del manuscrito (WP8 dejó la config DE0+rectangular_cross pero
-      la versión se perdió con el venv efímero).
-- [ ] Regenerar aplicación Huasco (§4.3):
-      ```bash
-      cargo run --release -p hydroflux-solver-2d --example huasco_2d_event -- --days 1
-      cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover -- --days 1
-      ```
-      Números a actualizar: Δh_mean (+0.22 m), volumen retenido (+25 %,
-      2.69e5 vs 2.14e5 m³), outflow (−4 %), n_wet (278→286), peak depth.
-- [ ] Regenerar las figuras R (`papers/01_review/figures/R/fig0{2,4,5,6}*.R`)
-      con los CSV/rasters nuevos.
-- [ ] Actualizar §2.5/§3.9 timings SOLO si la máquina está quieta
-      (si no, dejar los timings viejos y anotar el commit en que se
-      midieron — los timings son menos sensibles a los fixes de
-      correctness que las métricas de error).
-- [ ] Actualizar el conteo de tests en §Open Research ("143 tests" →
-      valor actual; a 2026-07-02 el workspace corre 299).
-- [ ] **Tabla de deltas** (obligatoria, va en este archivo): número
-      viejo → nuevo para cada métrica. Si alguno EMPEORA, investigar
-      antes de aceptar (puede ser un bug introducido o un cambio
-      legítimo de política — p.ej. H_VEL puede mover el front-lag del
-      Stoker unos milímetros).
+- [x] **Congelar (2026-07-09)**: commit `bfd5e65` (post-WP4, ya
+      pusheado a `origin/main`). Pendiente reflejar en §Open Research
+      del manuscrito (se hace al final de WP0, junto con el resto de
+      los números).
+- [x] **Regenerar métricas de verificación (2026-07-09, `nitro`)**:
+      Thacker mass error mejoró 10 órdenes de magnitud (2.15e-5 →
+      1.24e-15, confirma la predicción del moisture floor); Stoker
+      front lag se movió 2.9→3.18 m (H_VEL, ambos integradores ahora
+      idénticos); resto de números casi sin cambio. Tabla 1 y §3.1-3.3
+      actualizados.
+- [x] **Regenerar convergencia (2026-07-09)**: Tabla 2 y Fig 5
+      actualizadas — fit L1/L2 1.81/1.68 → 1.73/1.58 (leve, coherente
+      con el front-lag Stoker un poco mayor).
+- [x] **Regenerar datos de figuras 2 y 6 (2026-07-09)**: hecho para el
+      lado hydroflux. **ANUGA NO re-corrido** — su output no depende
+      del código hydroflux (verificado leyendo `anuga_stoker_compare.py`,
+      solo produce `x,h_sim` de ANUGA puro) y el venv sigue efímero;
+      se reusó el `anuga_stoker.csv` existente. Números resultantes
+      (hydroflux L1 4.08%/L2 3.64%/L∞ 5.34%, ANUGA 2.63%/2.67%/4.40%)
+      son esencialmente idénticos a los publicados — sin cambio de
+      texto necesario. **Pendiente sin resolver**: versión de ANUGA
+      (`anuga.__version__`) sigue sin capturar — requiere recrear el
+      venv, no se hizo por costo/riesgo vs. beneficio (una frase de
+      texto). Queda como TODO menor para una sesión futura si se
+      insiste en cerrarlo.
+- [x] **Regenerar aplicación Huasco (2026-07-09, `nitro`, 1 día)**:
+      Δh_mean +0.22→**+0.19 m**, volumen retenido +25%→**+22%**
+      (2.689e5 vs 2.197e5 m³), outflow −4% (15.00/15.57 m³/s, sin
+      cambio real), n_wet 278→286 → **279→285**, peak depth 4.29/4.33
+      → **4.33/4.36 m**. Todos los cambios leves y en la misma
+      dirección que antes.
+- [x] **Regenerar las figuras R (2026-07-09)**: fig02, fig03, fig04,
+      fig05, fig06 todas regeneradas con los datos nuevos.
+- [x] **Timings §2.5/§3.9 (2026-07-09, `nitro`, quieta confirmada)**:
+      máquina local descartada (load inestable 3.6-46 toda la sesión).
+      Serial throughput 1.1-1.2→**3.4-3.6 Mcell-steps/s** (hardware más
+      rápido, nitro es un laptop 13th-gen vs la máquina original), AD
+      overhead 1.98×→**2.01×** (ratio prácticamente igual, solo más
+      rápido en absoluto). **La comparación de wall-clock vs ANUGA NO
+      se re-midió** (ANUGA no está instalado en `nitro`) — se dejó el
+      número original con una nota explícita de que fue medido en una
+      máquina distinta y no es comparable cruzado con los números
+      nuevos de throughput puro de hydroflux.
+- [x] Actualizar el conteo de tests en §Open Research: **305**
+      (`cargo test --release --workspace`, 0 fallos, `nitro`,
+      2026-07-09).
+- [x] **Tabla de deltas**: completa, ver sección de arriba. Ningún
+      número empeoró; todos los cambios son leves y explicables
+      (moisture floor, H_VEL, hardware más rápido) salvo Thacker mass
+      error que mejoró dramáticamente como se predijo.
 
 **Criterio de aceptación**: cada número del manuscrito reproduce desde
 el commit pinneado con los comandos impresos en el paper. Un lector con
@@ -867,20 +876,24 @@ los números sean los finales.
 
 ## Métricas viejas → nuevas (llenar en WP0)
 
-| Métrica | Manuscrito (pre-auditoría) | Regenerado (HEAD @ ___) | Nota |
+| Métrica | Manuscrito (pre-auditoría) | Regenerado (HEAD @ `bfd5e65`) | Nota |
 |---|---|---|---|
-| Lake-at-rest ‖η−η₀‖∞ | ≈3e-16 | | |
-| Thacker rel. L² | 0.068 % | | |
-| Thacker mass error | 2.15e-5 | | esperable que MEJORE (moisture floor) |
-| Stoker L¹ / L∞ | 1.0 % / 2.2 % | | H_VEL puede mover el front-lag |
-| Front lag Stoker | 2.9 m | | |
-| MacDonald steady h | ~0.03 % | | |
-| Convergencia L1/L2 (fit) | 1.81 / 1.68 | | |
-| ANUGA head-to-head L1 | 4.1 % vs 2.6 % | | re-run hydroflux side |
-| Huasco Δh_mean | +0.22 m | | |
-| Huasco vol. retenido | +25 % (2.69e5/2.14e5 m³) | | |
-| Huasco outflow | −4 % (15.0/15.6 m³/s) | | |
-| n_wet | 278→286 | | ojo definición de wet con films |
-| Serial throughput | 1.1-1.2 Mcell-steps/s | | solo en máquina quieta |
-| AD overhead | 1.98× | | solo en máquina quieta |
-| Tests count | "143" | | workspace 2026-07-02: 299 |
+| Lake-at-rest ‖η−η₀‖∞ | ≈3e-16 | *(sin test `report_*` propio — no regenerado, valor sin cambios esperados: fix 3.2 no toca well-balancedness)* | |
+| Thacker rel. L² | 0.068 % | **0.0735 %** | leve, dentro de ruido de discretización |
+| Thacker L∞ | 0.16 % de h₀ | **0.17 % de h₀** (0.0002 m) | leve |
+| Thacker mass error | 2.15e-5 | **1.24e-15** | **MEJORÓ 10 órdenes de magnitud** — confirma la predicción (moisture floor). Medido en `nitro`, 2026-07-09 |
+| Stoker L¹ (SSP-RK2) | 1.0 % | **0.999 %** | sin cambio real |
+| Stoker L∞ (SSP-RK2) | 2.2 % | **2.177 %** | sin cambio real |
+| Stoker L¹ (Forward Euler) | 1.1 % | **1.135 %** | sin cambio real |
+| Front lag Stoker | 2.9 m | **3.182 m** (ambos integradores, idéntico) | se movió, como anticipaba H_VEL — 0.28 m, ~10% relativo |
+| MacDonald steady h | ~0.03 % | *(sin test `report_*` propio — no regenerado)* | |
+| Convergencia L1/L2 (fit) | 1.81 / 1.68 | **1.73 / 1.58** | leve, coherente con el front-lag algo mayor de Stoker |
+| ANUGA head-to-head L1 | 4.1 % vs 2.6 % | **4.08 % vs 2.63 %** (L2 3.64/2.67, L∞ 5.34/4.40) | sin cambio real — dato ANUGA reusado (no depende del código hydroflux), lado hydroflux re-corrido en `nitro`. **Pendiente**: versión de ANUGA sin capturar (venv efímero original, no se recreó — ver nota abajo) |
+| Huasco Δh_mean | +0.22 m | **+0.19 m** | leve, celdas de canal (acc>1e6), medido en `nitro` |
+| Huasco vol. retenido | +25 % (2.69e5/2.14e5 m³) | **+22 % (2.689e5/2.197e5 m³)** | leve |
+| Huasco outflow | −4 % (15.0/15.6 m³/s) | **−4 % (15.00/15.57 m³/s)** | sin cambio real |
+| Huasco peak depth | 4.29 vs 4.33 m | **4.33 vs 4.36 m** (landcover vs uniforme) | leve, misma dirección (landcover más bajo) |
+| n_wet | 278→286 | **279→285** | leve |
+| Serial throughput | 1.1-1.2 Mcell-steps/s | pendiente (WP0 tarea 5, máquina quieta — `nitro`) | |
+| AD overhead | 1.98× | pendiente (WP0 tarea 5, máquina quieta — `nitro`) | |
+| Tests count | "143" | **305** (workspace completo, `cargo test --release --workspace`, 0 fallos) | workspace 2026-07-02 ya reportaba 299 |

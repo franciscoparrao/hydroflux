@@ -24,7 +24,7 @@ keywords: [shallow water equations, finite volume, well-balanced,
 # Highlights
 
 - A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
-- Gradients verified layer-by-layer against finite differences; overhead 1.98×.
+- Gradients verified layer-by-layer against finite differences; overhead 2.01×.
 - HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
 - Verified on Thacker, Stoker, MacDonald, UK EA (6 synthetic + Tests 4/8A on official EA/LISFLOOD-FP geometry); head-to-head against ANUGA.
 - Applied to an observed high-flow event on the Río Huasco (2017, DGA gauge) with ESA WorldCover Manning.
@@ -46,7 +46,7 @@ integrator, a point-implicit Manning step, and a Liang–Marche flux
 rescaling for strictly mass-conservative wetting and drying. We verify against a benchmark
 hierarchy — lake-at-rest preserved to machine precision
 ($\|\eta  - \eta _{0}\|_\infty \approx  3\cdot 10^{-16}$), the Thacker oscillating paraboloid
-(relative L² 0.068 %, mass 2·10⁻⁵), the Stoker/Ritter dam-break
+(relative L² 0.07 %, mass 1.2·10⁻¹⁵), the Stoker/Ritter dam-break
 (L¹ 1.0 %), a radial dam-break, steady Manning uniform flow, and the
 UK Environment Agency 2D benchmark suite — six synthetic stand-ins
 plus two of the ten official configurations (Tests 4 and 8A)
@@ -59,7 +59,7 @@ on the Río Huasco — a semiarid Andean reach with a 92-year DGA
 record, peak 38.9 m³/s in early March 2017 — at 30 m, with a spatially variable Manning field
 derived from ESA WorldCover. As a one-day-peak sensitivity
 demonstration (not a calibrated hindcast), the variable field retains
-~25 % more water in the reach than a uniform value. The solver, its test suite, and the
+~22 % more water in the reach than a uniform value. The solver, its test suite, and the
 application scripts are released open-source as the verified 2D
 foundation of a multi-year programme toward differentiable, GPU-native,
 coupled hydrometeorological hazard simulation.
@@ -67,8 +67,8 @@ coupled hydrometeorological hazard simulation.
 # Key Points
 
 1. A 2D shallow-water finite-volume solver written generic over the numeric type evaluates the identical code in `f64` and in forward-mode dual numbers, making the entire forward model differentiable by construction without a separate adjoint implementation.
-2. The well-balanced HLLC/Audusse scheme preserves lake-at-rest to machine precision on arbitrary beds and passes a hierarchy of analytical (Thacker, Stoker, MacDonald) and community (UK EA: 6 synthetic stand-ins, plus Tests 4 and 8A reproduced on the official EA/LISFLOOD-FP geometry) benchmarks, conserving mass to $2\cdot 10^{-5}$ on the closed-domain Thacker oscillation, whose wet/dry shoreline moves continuously.
-3. Applied to an observed 2017 high-flow event on the Río Huasco, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field; in a one-day-peak sensitivity demonstration (not a validated hindcast) the riparian vegetation it places in the channel ($n \approx  0.10$) retains ~25 % more water in the reach than a single uniform value.
+2. The well-balanced HLLC/Audusse scheme preserves lake-at-rest to machine precision on arbitrary beds and passes a hierarchy of analytical (Thacker, Stoker, MacDonald) and community (UK EA: 6 synthetic stand-ins, plus Tests 4 and 8A reproduced on the official EA/LISFLOOD-FP geometry) benchmarks, conserving mass to $1.24\cdot 10^{-15}$ on the closed-domain Thacker oscillation, whose wet/dry shoreline moves continuously.
+3. Applied to an observed 2017 high-flow event on the Río Huasco, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field; in a one-day-peak sensitivity demonstration (not a validated hindcast) the riparian vegetation it places in the channel ($n \approx  0.10$) retains ~22 % more water in the reach than a single uniform value.
 
 # Plain Language Summary
 
@@ -301,7 +301,7 @@ $n_final = 0.040 000$ (relative error $< 10^{-15}$) in five iterations.
 
 The arithmetic overhead of the wedge is measured on a 64×64 cell
 domain over 200 SSP-RK2 + Manning steps. The Dual-typed run takes
-1.98× the wall-clock of the `f64` run ($1338$ vs $676$ ns per
+2.01× the wall-clock of the `f64` run ($549$ vs $273$ ns per
 cell-step, post-warm-up, release build). This is within the 2-3× band
 expected for operator-overloading forward AD on compiled code
 [@Griewank2008; @Sagebaum2019CoDiPack].
@@ -335,8 +335,8 @@ the $report_*$ informational tests.
 |-----------|------|------|--------|--------|
 | Lake-at-rest, bumpy bed | analytical (C-property) | 20×20 | $\|\eta  - \eta _{0}\|_\infty$ | $< 10^{-10}$ (test bound) |
 | Lake-at-rest, Thacker paraboloid | analytical (C-property) | — | $\|\eta  - \eta _{0}\|_\infty$ | $\approx  3\cdot 10^{-16}$ (measured) |
-| Thacker oscillating | analytical transient | 80×80 | rel. L² on $h$ | 0.068 % |
-| Thacker oscillating | analytical transient | 80×80 | mass error | $2.15\cdot 10^{-5}$ |
+| Thacker oscillating | analytical transient | 80×80 | rel. L² on $h$ | 0.0735 % |
+| Thacker oscillating | analytical transient | 80×80 | mass error | $1.24\cdot 10^{-15}$ |
 | Stoker/Ritter dam-break | analytical transient | 400×3 | L¹ on $h$ | 1.0 % |
 | Stoker/Ritter dam-break | analytical transient | 400×3 | L∞ on $h$ | 2.2 % |
 | Radial dam-break | symmetry | 160×160 | axisymmetry | preserved |
@@ -362,21 +362,25 @@ treatment. The cancellation is self-consistent in the face beds
 
 The Thacker planar-oscillation solution on a paraboloidal basin is a
 classic 2D analytical transient with a moving wet/dry shoreline. Over a
-half-period (864 steps on an 80×80 mesh), the solver reproduces the
-analytical depth with relative L² error 0.068 % and L∞ error
-$2\cdot 10^{-4}$ m (0.16 % of $h_{0}$), conserving mass to $2.15\cdot 10^{-5}$ despite
-the continuously moving shoreline.
+half-period (388 steps on an 80×80 mesh), the solver reproduces the
+analytical depth with relative L² error 0.0735 % and L∞ error
+$2\cdot 10^{-4}$ m (0.17 % of $h_{0}$), conserving mass to $1.24\cdot 10^{-15}$
+despite the continuously moving shoreline — ten orders of magnitude
+tighter than an earlier measurement on this benchmark, consistent
+with the wet/dry threshold treatment of §2.4 (a thin residual film is
+kept rather than zeroed at the shoreline, so mass is not discarded as
+the front sweeps back and forth).
 
 ## 3.3 Dam-break on a dry bed (Stoker/Ritter)
 
 The Ritter/Stoker dam-break has a closed-form rarefaction-plus-front
 solution. On a 400-cell channel with $h_L = 1$ m, the SSP-RK2 scheme
 attains L¹ error 1.0 %, L² 1.0 %, and L∞ 2.2 % of $h_L$ at $t = 4$ s,
-with the wet front lagging the analytical position by 2.9 m (the
+with the wet front lagging the analytical position by 3.18 m (the
 expected diffusive lag of a shock-capturing scheme at the dry front).
-The forward-Euler integrator gives a comparable L¹ (1.1 %) and a
-slightly larger front lag (3.2 m), confirming that the spatial scheme,
-not the time integrator, dominates the error budget.
+The forward-Euler integrator gives a comparable L¹ (1.1 %) and an
+identical front lag (3.18 m), confirming that the spatial scheme, not
+the time integrator, dominates the error budget.
 
 ## 3.4 Steady Manning uniform flow
 
@@ -477,14 +481,14 @@ measuring the relative L1 and L2 error in depth at $t = T/2$
 
 | $n$ | $\Delta x$ [m] | rel. L1 | rel. L2 | order L1 | order L2 |
 |-----|----------|---------|---------|----------|----------|
-| 32  | 0.0781   | 4.96·10⁻³ | 5.96·10⁻³ | —    | —    |
-| 64  | 0.0391   | 1.31·10⁻³ | 1.68·10⁻³ | 1.92 | 1.82 |
-| 128 | 0.0195   | 3.64·10⁻⁴ | 5.20·10⁻⁴ | 1.85 | 1.70 |
-| 256 | 0.0098   | 1.15·10⁻⁴ | 1.84·10⁻⁴ | 1.67 | 1.50 |
+| 32  | 0.0781   | 4.82·10⁻³ | 5.78·10⁻³ | —    | —    |
+| 64  | 0.0391   | 1.38·10⁻³ | 1.76·10⁻³ | 1.81 | 1.71 |
+| 128 | 0.0195   | 4.05·10⁻⁴ | 5.89·10⁻⁴ | 1.77 | 1.58 |
+| 256 | 0.0098   | 1.35·10⁻⁴ | 2.18·10⁻⁴ | 1.59 | 1.43 |
 
-The observed order starts near second (1.92 in L1 between the two
+The observed order starts near second (1.81 in L1 between the two
 coarsest grids) and relaxes toward ~1.5 at the finest, with overall
-log-log slopes of 1.81 (L1) and 1.68 (L2). This is the expected
+log-log slopes of 1.73 (L1) and 1.58 (L2). This is the expected
 signature of a formally second-order scheme (MUSCL + SSP-RK2) whose
 moving wet/dry shoreline is locally first order: as the smooth-interior
 error shrinks under refinement, the first-order shoreline becomes a
@@ -520,17 +524,21 @@ refinement, as the convergence rates predict.
 
 We characterise serial throughput on synthetic grids and report a
 wall-clock comparison against ANUGA on the same Stoker problem the
-accuracy comparison above used. All numbers are from a release build
-on a single x86-64 workstation (16-core but single-threaded
-measurements only; see below); the corresponding benchmark scripts
-(`m2_perf_large_grid.rs`, `m2_hydroflux_wallclock.rs`,
+accuracy comparison above used. Serial throughput and the AD-overhead
+measurement below are from a release build on a quiet 8-physical-
+core/12-thread x86-64 laptop (Intel i5-13420H, native Linux); the
+ANUGA wall-clock comparison that follows was measured earlier on a
+different (16-core) workstation and was not re-run here (no ANUGA
+installation on the quiet machine) — the two are not cross-comparable
+against each other, only within their own pairing. The corresponding
+benchmark scripts (`m2_perf_large_grid.rs`, `m2_hydroflux_wallclock.rs`,
 `m2_anuga_wallclock.py`) are released with the code.
 
 **Serial throughput.** On smooth Gaussian-bump initial conditions
 (no dry interior — the cell-mask early-skip optimisation cannot
 artificially flatter the timing), the solver sustains
-$1.1$–$1.2$ Mcell-steps per second at `f64` precision across grids
-from $256^{2}$ to $1024^{2}$: $918$, $801$ and $853$ ns per cell-step
+$3.4$–$3.6$ Mcell-steps per second at `f64` precision across grids
+from $256^{2}$ to $1024^{2}$: $282$, $292$ and $294$ ns per cell-step
 respectively at the three sizes. The throughput is consistent with the
 single-threaded CPU references cited by the Caviedes-Voullième-circle
 GPU papers [@Rak2024; @SaleemNorman2024] and falls in the band
@@ -543,8 +551,8 @@ SIMT port unlocks over single-threaded CPU execution; §5(i) motivates
 the $wgpu$ port this comparison sets up.
 
 **`f64` vs `Dual<f64>` overhead.** On a $64^{2}$ grid over $200$ SSP-RK2 +
-Manning steps, the forward-mode AD instance takes $1.98 ×$ the
-wall-clock of the `f64` instance ($676$ vs $1338$ ns per cell-step,
+Manning steps, the forward-mode AD instance takes $2.01 ×$ the
+wall-clock of the `f64` instance ($273$ vs $549$ ns per cell-step,
 §2.5). The ratio is inside the 2-3× band expected for
 operator-overloading forward AD on compiled code [@Griewank2008;
 @Sagebaum2019CoDiPack]. We treat this as the AD overhead headline.
@@ -645,15 +653,15 @@ quantitative magnitude is not.
 
 Over a one-day peak simulation, the spatially variable Manning field
 changes the inundation relative to a single calibrated $n = 0.04$: the
-mean channel depth increases by 0.22 m, the final wet volume retained
-in the reach grows by 25 % ($2.69\cdot 10^{5}$ vs $2.14\cdot 10^{5}$ m³), the mean
+mean channel depth increases by 0.19 m, the final wet volume retained
+in the reach grows by 22 % ($2.69\cdot 10^{5}$ vs $2.20\cdot 10^{5}$ m³), the mean
 outflow drops 4 % (15.0 vs 15.6 m³/s), and the wetted-cell count rises
-from 278 to 286. The mechanism is physical: the riparian vegetation
+from 279 to 285. The mechanism is physical: the riparian vegetation
 that the land cover places exactly in the channel ($n \approx  0.10$, four
 times the uniform value) slows the flow, deepens it locally, and
 retains more water in the reach — an effect a single domain-averaged
-roughness cannot represent. The peak depth is marginally lower (4.29
-vs 4.33 m) because the slowed flow spreads laterally rather than
+roughness cannot represent. The peak depth is marginally lower (4.33
+vs 4.36 m) because the slowed flow spreads laterally rather than
 building to the channel peak. Mass is conserved throughout (net storage
 change consistent with cumulative inflow minus outflow).
 
@@ -704,7 +712,7 @@ and 8A on the official EA/LISFLOOD-FP geometry) benchmarks. It ingests standard
 public GIS products directly and, applied to an observed 2017
 high-flow event on the Río Huasco, demonstrates a land-cover-derived spatially
 variable Manning field that, in a one-day-peak sensitivity test (not a
-validated hindcast), retains ~25 % more water in the reach than a
+validated hindcast), retains ~22 % more water in the reach than a
 single uniform roughness. The contribution is a verified, open
 artifact — the differentiable-by-design 2D foundation of a multi-year
 programme toward coupled, GPU-native, continental-scale hazard
@@ -766,8 +774,8 @@ inundation depth with a single uniform $n = 0.04$; (d) inundation
 depth with the variable $n(x, y)$; (e) the difference $\Delta h = (d) - (c)$,
 hill-shaded base, divergent scale. Panels (c)–(e) share a hillshade
 underlay. The positive Δh (warm) concentrated in the channel shows the
-riparian roughness deepening and retaining the flow — the +0.22 m mean
-channel deepening and +25 % retained volume reported in §4.3. Generated
+riparian roughness deepening and retaining the flow — the +0.19 m mean
+channel deepening and +22 % retained volume reported in §4.3. Generated
 by `fig04_huasco_application.R`, which reuses the solver-2d example
 rasters (`huasco_subset_{dem,landcover}.tif`,
 `huasco_2d_depth_day_01{,_landcover}.tif`).
@@ -778,7 +786,7 @@ the Thacker oscillation (§3.7): relative L1 (circles) and L2
 with order-1 and order-2 reference slopes (dashed). The data track the
 order-2 slope at coarse-to-medium grids and bend toward order 1 as the
 moving wet/dry shoreline (locally first order) dominates the shrinking
-smooth-region error; overall fitted slopes are 1.81 (L1) and 1.68 (L2).
+smooth-region error; overall fitted slopes are 1.73 (L1) and 1.58 (L2).
 Generated by `fig05_convergence.R` from the `gen_convergence` example.
 
 **Figure 6** (`fig06_head_to_head.pdf`). Head-to-head against ANUGA
@@ -819,12 +827,12 @@ All authors read and approved the final manuscript.
 # Open Research
 
 All code is released open-source at <https://github.com/franciscoparrao/hydroflux>
-(commit hash TODO at submission), dual-licensed MIT OR Apache-2.0. The
+(commit `bfd5e65`), dual-licensed MIT OR Apache-2.0. The
 $solver-2d$ crate contains the finite-volume solver ($state$, $flux$,
 $riemann$, $geometry$, `boundary`, $update$, $source$, $io$ modules)
 and its verification suite (the $report_*$ ignored tests print the §3
-metrics; the workspace runs 299 automated tests at the pinned commit —
-TODO WP0: re-confirm count at freeze). The Huasco application is
+metrics; the workspace runs 305 automated tests at the pinned commit,
+0 failures). The Huasco application is
 reproduced by the `huasco_2d_event` and `huasco_2d_event_landcover`
 examples. The repository is self-contained: the single external
 geospatial dependency (the SurtGIS raster I/O crate [@SurtgisRef]) is
@@ -934,3 +942,30 @@ Feng2022, Tsai2021] plus the verified JAX-Fluids and SynxFlow.)*
    session's Test 4/8A/5 runs are on HEAD `5c0fe0d`, not yet the
    frozen/pinned commit), and the Wilcox2016 citation fix in §4 (WP5
    finding, separate from this UK EA update).
+10. **WP4 (2026-07-09)**: implemented + measured row-chunked CPU
+    parallelism (`solver-2d/src/parallel.rs`, opt-in `parallel`
+    Cargo feature). Corrected SS3.9/SS5(i)'s factually wrong "CPU
+    parallelism is defeated" claim (measured on the old per-face
+    granularity) with the real result: 3.8-4.0x at 8 threads on dense
+    grids, 2.8x on the sparse regime closest to SS4's application.
+    GPU stays the top roadmap priority, now for the right reason
+    (ceiling vs. headroom, not a CPU failure). Added SERGHEI/TRITON
+    citations. WP5 citation fix (Wilcox2016 mismatch) also closed
+    this session. Full detail: `docs/wp4_rayon_results.md`.
+11. **WP0 (2026-07-09, commit `bfd5e65` pinned)**: regenerated every
+    number in SS3/SS4/Open Research on the frozen commit, measured
+    on `nitro` (quiet 8-core/12-thread machine — local dev machine
+    was unusably loaded, 3.6-46, for the entire session). Thacker
+    mass error improved 10 orders of magnitude (moisture floor, as
+    predicted); Stoker front lag moved 2.9->3.18 m (H_VEL); Huasco
+    SS4.3 numbers shifted slightly (Delta h_mean +0.22->+0.19 m, vol.
+    retained +25%->+22%); serial throughput jumped 1.1-1.2->3.4-3.6
+    Mcell-steps/s (faster hardware, not a code change) and AD
+    overhead is 2.01x (was 1.98x, same ratio, faster absolute
+    numbers). ANUGA wall-clock comparison NOT re-measured (not
+    installed on the quiet machine) -- left as the original number
+    with an explicit machine-mismatch caveat; its accuracy-only
+    numbers (L1/L2/Linf) WERE re-measured on the hydroflux side and
+    came back essentially unchanged. Workspace test count: 305 (was
+    "143"), 0 failures. Full delta table in
+    `ROADMAP_REVISION_EMS.md`. Nothing regressed.
