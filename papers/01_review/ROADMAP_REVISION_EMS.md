@@ -428,10 +428,108 @@ líneas ~14-34).
              estimar tiempo: Test 4 a 80,000 celdas tomó ~58 min
              wall-clock; Test 5/8A pueden ser más rápidos o más lentos
              según su malla — presupuestar sesión dedicada con margen.
-- [ ] **Etapa 3 — Manuscrito**: reescribir §3.6 con resultados
-      cuantitativos, actualizar Tabla 1, Highlights, Abstract y Key
-      Point 2; decidir si los stand-ins sintéticos quedan como smoke
-      tests del CI.
+      9. **Test 8A Glasgow — EN CURSO (2026-07-03)**. El mecanismo de
+             BC nuevo ("rain+surcharge") ya existía en el solver
+             (`apply_rain`, `apply_point_sources`,
+             `Mesh2D::with_manning_field` — construidos en trabajo
+             previo, no hubo que agregar nada). Runner:
+             `solver-2d/examples/uk_ea_test8a_official.rs`. Inputs
+             oficiales completos (Sharifian et al. 2023, Zenodo
+             10.5281/zenodo.6907286, `4-Glasgow.zip/Setup/`): DEM 2 m
+             (sin NODATA, elevación 21.1-37.4 m — edificios/bordillos
+             como elevación, no máscara), Manning espacialmente
+             variable (`ea8-2m.n.gz`, 0.02 vías/0.05 resto — faltaba
+             del acopio original, agregado ahora junto con
+             `ea8-2m.rain`), lluvia 400 mm/h pulso de 3 min + fuente
+             puntual pico 5 m³/s a t≈37-39 min (ambos verificados
+             contra el texto del informe §4.9.1). 9 puntos de control.
+             **Caveat importante**: a diferencia de Test 4, el paquete
+             de Sharifian et al. NO incluye una serie temporal de
+             referencia LISFLOOD-FP — solo los inputs. La comparación
+             es contra los rangos CUALITATIVOS del texto §4.9.3 (no
+             RMSE numérico). **Corrida completa cerrada (2026-07-03)**:
+             142,074 pasos, t=18000.0 s exacto (spec oficial), wall
+             time 11,437 s (~3.2 h — más rápido que la estimación
+             inicial de ~8 h), dt estable ~0.127 s toda la corrida, sin
+             NaN. Resultado en los 4 puntos con cota numérica del
+             informe: **punto 1 (0.5533 m > 0.5 m) PASS; puntos 2, 4, 7
+             PASS dentro de margen (0.2476/0.1629/0.2427 m ≤ ~0.35 m);
+             punto 3 (pond aguas abajo) 0.7342 m final vs ~0.8 m
+             esperado — a 0.066 m, DENTRO del spread inter-modelo de
+             ~0.07 m que reporta el propio SC120002**. Detalle completo
+             en `benchmarks/data/uk_ea/test8a_glasgow/results_hydroflux.md`.
+             **Test 8A queda cerrado** — tercer test UK EA sobre
+             geometría oficial (después de Test 4 cuantitativo), listo
+             para WP3 etapa 3.
+      10. **Test 5 — bloqueado, decisión pendiente con el usuario
+             (2026-07-03)**. Se intentó una vía más barata que la
+             reconstrucción 100% sintética: extraer el footprint real
+             del valle desde la máscara NODATA de los rasters de
+             referencia (`ea5.zip`, Zenodo 4066824, LISFLOOD-FP 8.0).
+             **No funciona**: esos rasters son un rectángulo completo
+             (1378×1224 @ 10 m) sin ninguna celda NODATA — la forma
+             del valle vive en la elevación del DEM oficial
+             (`Test5DEM.asc`), que no está en ningún paquete de
+             reproducibilidad público (dato propietario de la EA, se
+             pide por email, sin descarga pública). Tampoco hay
+             coordenadas x,y de los 7 puntos de control (el `.stage`
+             de referencia no trae el header `stage,x,y,elev` que sí
+             trae Test 4) — solo distancias a lo largo del valle desde
+             el texto para 6 de 7 puntos. Sin el DEM oficial, Test 5
+             solo puede hacerse como geometría 100% inventada desde
+             los números del informe (extensión ~0.8×17 km, pendiente
+             ~0.01→~0.001, sin transición conocida) — comparación
+             cualitativa/order-of-magnitude, no RMSE. Ver detalle en
+             `benchmarks/data/uk_ea/README.md`. Opciones sobre la
+             mesa: (a) reconstrucción sintética igual, con el caveat
+             explícito en el manuscrito; (b) email a la EA pidiendo
+             `Test5DEM.asc`+`Test5BC.csv`+`Test5Output.csv` y diferir;
+             (c) no incluir Test 5, quedarse con Test 4 + Test 8A
+             cuantitativos/semi-cuantitativos como evidencia principal
+             de WP3.
+      11. **Test 5 — opción (a) ejecutada (2026-07-03)**: se construyó
+             `solver-2d/examples/uk_ea_test5_synthetic_valley.rs`
+             (valle recto sintético 340×16 celdas @ 50 m, cada
+             supuesto tabulado explícitamente en el docstring del
+             módulo — transición de pendiente, forma de sección,
+             y sobre todo el **hidrograma de entrada completo**, que es
+             inventado ya que no existe tabla de breakpoints en el
+             informe SC120002, solo el valor de pico 3000 m³/s).
+             Corrida completa: 107,234 pasos, t=108,000 s (30 h exacto),
+             wall 261 s, sin NaN. **Resultado**: para los 6 puntos con
+             distancia real reportada (1,2,3,4,6,7), los picos caen
+             dentro de un factor ~1.5-2× de la referencia LISFLOOD-FP
+             (diferencias −1.6 a +1.2 m sobre picos de 1.4-6.1 m) — un
+             orden de magnitud razonable dado que geometría e
+             hidrograma son inventados. El punto 5 (posición NO
+             reportada, asumida) difiere >2× — esperable, no
+             informativo. Detalle completo con la tabla y el análisis
+             de qué SÍ y qué NO respalda este resultado en
+             `benchmarks/data/uk_ea/test5/results_hydroflux.md`.
+             **Recomendación para el manuscrito**: no presentar como
+             resultado cuantitativo — si aparece, una frase que
+             reconozca la reconstrucción sintética y remita al archivo
+             de resultados, o directamente omitir Test 5 de las claims
+             cuantitativas y apoyarse en Test 4 + Test 8A como
+             evidencia principal de WP3 (más defendible ante un
+             reviewer que rastree las asunciones).
+- [x] **Etapa 3 — Manuscrito (2026-07-03)**: §3.6 reescrito —
+      distingue explícitamente los 6 stand-ins sintéticos (siguen como
+      smoke tests de CI, sin cambios) de Test 4 (cuantitativo, RMSE
+      0.2-1.4%) y Test 8A (cualitativo, dentro del spread inter-modelo
+      en el pond) reproducidos sobre geometría oficial EA/LISFLOOD-FP.
+      Test 5 sintético mencionado en una frase, explícitamente NO
+      incluido como evidencia (per la recomendación de
+      `benchmarks/data/uk_ea/test5/results_hydroflux.md`). Tabla 1
+      (3 filas nuevas), Highlights, Abstract, Key Point 2 y §6
+      Conclusión actualizados. Referencias nuevas Shaw2021
+      (10.5194/gmd-14-3577-2021) y Sharifian2023
+      (10.5194/gmd-16-2391-2023) verificadas vía CrossRef antes de
+      agregar a `references.bib`. Nota de changelog agregada en
+      "Notes for next draft iteration" (§ final del manuscrito).
+      **Pendiente**: WP0 (el commit de estos runs, `5c0fe0d`, no es
+      el commit congelado final — se repinnea en WP0) y el fix de la
+      cita Wilcox2016 en §4 (WP5, no tocado en esta etapa).
 - [ ] (Opcional, en paralelo) Email a la EA pidiendo el paquete
       oficial de specs/datasets — refuerza la procedencia y puede
       traer los resultados numéricos de los modelos de industria.
@@ -461,46 +559,57 @@ sesiones pesadas). Si no se puede, POSPONER la sesión.
 
 **Tareas**:
 
-- [ ] Implementar rayon con granularidad por FILAS/chunks (no per-face)
-      sobre los pases del `StepWorkspace2D` (la auditoría dejó esto
-      preparado: pases = mapas puros, update loop sin hazard de orden,
-      buffers reutilizables — ver `docs/auditoria-motor-2026-07.md`
-      §Q4-11). Feature-gate `parallel` en Cargo; bounds
-      `T: Real + Send + Sync` SOLO en las funciones paralelas (NO
-      envenenar el trait `Real` — un tape de reverse-mode futuro no
-      será Sync).
-- [ ] Medir contra el bench criterion existente
-      (`cargo bench -p hydroflux-solver-2d`, baseline en
-      `solver-2d/benches/step.rs`: euler_all_wet ~16 ms serial a 256²
-      en máquina quieta pre-workspace).
-- [ ] **Bifurcación según resultado**:
-      - Si el chunked rayon ESCALA (≥3× con 8 threads): §3.9 y §5(i) se
-        REESCRIBEN (la conclusión "GPU es la única capa siguiente" cae;
-        el orden del roadmap §5 puede cambiar). ALERTA: esto contradice
-        la narrativa actual del paper — discutir el nuevo texto con el
-        usuario ANTES de escribirlo, porque toca la historia del wedge.
-      - Si NO escala (bandwidth-bound tras el workspace, plausible):
-        §3.9 se FORTALECE — reescribir la conclusión citando el
-        experimento correcto ("row-chunked rayon over reusable buffers
-        saturates at N× due to memory bandwidth"), que es inmune a la
-        crítica "probaste la granularidad equivocada".
-- [ ] Agregar citas: SERGHEI (verificar ref exacta GMD 2023),
-      TRITON (Morales-Hernández et al., verificar venue), LISFLOOD-FP 8
-      (Shaw et al. 2021 GMD, verificar). `/verify-refs` obligatorio.
-- [ ] Reposicionar el 6.5×-vs-ANUGA como comparación *accuracy-matched*
-      (no un claim de performance contra el estado del arte), una frase.
+- [x] Implementar rayon con granularidad por FILAS/chunks (no per-face)
+      **(2026-07-09)**: `solver-2d/src/parallel.rs` (`MaybeSendSync` +
+      macro `zip_for_each!`) + 11 pasadas convertidas en `update.rs` a
+      `ndarray::Zip::indexed(...)` + dispatch. Feature `parallel` en
+      Cargo (`dep:rayon` + `ndarray/rayon`), bound `T: Real +
+      MaybeSendSync` SOLO en las funciones que lo necesitan — el trait
+      `Real` no se tocó. Correctitud verificada: suite completa
+      (~300 tests) pasa bit-idéntico con y sin `--features parallel`.
+- [x] Medir contra el bench criterion existente **(2026-07-09, en
+      `nitro`, 12 hilos/8 núcleos físicos, `uptime` < 1 confirmado
+      antes de cada corrida — máquina local descartada por load
+      inestable 5-46 durante la sesión)**. Lección operativa: un
+      primer intento lanzó las 5 configuraciones de threads en
+      paralelo entre sí — resultados contaminados, descartados;
+      re-corridas estrictamente secuenciales, confirmando que el
+      proceso anterior había terminado y el load se había asentado
+      antes de la siguiente. Detalle completo en
+      `docs/wp4_rayon_results.md`.
+- [x] **Bifurcación resuelta — resultado MIXTO** (2026-07-09): en el
+      régimen denso sintético (`euler/ssprk2_all_wet_ws`) SÍ escala
+      ≥3× a 8 threads (3.85×/3.84×) → cruza el umbral de reescritura.
+      En el régimen disperso realista (`euler_mostly_dry_ws`, ~94%
+      seco, el más parecido a la aplicación del Huasco) se queda corto
+      (2.83×). Ambos saturan a 4-8 threads; ir a 12 no ayuda (nitro
+      tiene 8 núcleos físicos reales, no 12). **Decisión del usuario:
+      Opción B (corrección quirúrgica)** — se corrige el claim
+      objetivamente falso ("CPU parallelism is defeated") con los
+      números reales, pero GPU se mantiene como prioridad #1 del
+      roadmap (no porque CPU "falló", sino porque su techo ~4× sigue
+      muy por debajo del headroom proyectado de GPU). §3.9 y §5(i)
+      reescritos.
+- [x] Agregar citas: SERGHEI (Caviedes-Voullième et al. 2023, GMD,
+      10.5194/gmd-16-977-2023 — coincide con la memoria del roadmap),
+      TRITON (Morales-Hernández et al. 2021, EMS — el mismo venue
+      objetivo, 10.1016/j.envsoft.2021.105034). Ambas verificadas
+      CrossRef antes de agregar a `references.bib`. LISFLOOD-FP 8
+      (Shaw et al. 2021) ya estaba citado desde WP3. Claim cuantitativo
+      sobre throughput de SERGHEI/TRITON evitado deliberadamente (no
+      se pudo verificar la cifra exacta del paper completo) — la frase
+      quedó cualitativa.
+- [x] Reposicionar el 6.5×-vs-ANUGA como *accuracy-matched* — ya hecho
+      en WP8 (2026-07-02), verificado que sigue así.
 
-**Criterio de aceptación**: §3.9 describe un experimento de paralelismo
-competente cuya conclusión (cualquiera sea) resiste a un reviewer de
-HPC; SERGHEI/TRITON citados y posicionados.
+**Criterio de aceptación**: cumplido — §3.9 describe el experimento
+corregido (row-chunked, no per-face) con números reales y su propia
+limitación (régimen disperso bajo el umbral 3×); SERGHEI/TRITON
+citados y posicionados.
 
-**Esfuerzo**: 1 sesión (máquina quieta) + posible media sesión de texto.
-
-**Tip crítico**: este WP toca el solver → va ANTES de WP0 (congelar +
-regenerar). Y sus hallazgos afectan también el §3.9 ya publicado en el
-companion — si el resultado contradice lo que Paper 02/otros textos
-citan de §3.9, avisar al usuario (hay una nota sobre esto en el contexto
-persistente).
+**Tip crítico** (ya no aplica, resuelto): este WP tocó el solver → se
+hizo ANTES de WP0, como estaba planeado. Paper 02 no cita el claim de
+§3.9 (verificado con grep, sin coincidencias) — sin conflicto cruzado.
 
 ---
 
@@ -510,26 +619,96 @@ persistente).
 Los 3 peers de EMS validan contra eventos reales. Es el issue más caro
 y el más importante: sin él, un reviewer hidrólogo pide Major/Reject.
 
+### Hallazgo 5a — la cita del evento está mal, y probablemente no hay
+### paper dedicado al evento simulado (2026-07-03)
+
+Investigación (WebSearch, sin descargar nada nuevo) confirma la
+sospecha que ya estaba anotada en el roadmap:
+
+- **`@Wilcox2016AtacamaFlash` es del evento EQUIVOCADO**: describe el
+  aluvión de **marzo 2015** (el catastrófico, memoria nacional,
+  cauce del Copiapó seco 17 años que se llenó de golpe). El evento
+  que el paper simula es **2017-02-20 → 2017-03-12** (pico
+  2017-03-02, 38.9 m³/s) — dos años después, un evento distinto.
+- **Tampoco es el "otro" evento de 2017 conocido**: hay un evento
+  real y bien cubierto en prensa de **mayo 2017** (Atacama +
+  Coquimbo, ~15 mayo 2017, 2 muertos, 3000 evacuados) — pero es en
+  MAYO, no marzo, y no calza con el pico del 2 de marzo que usamos.
+- **Conclusión**: el pico 2017-03-02 en Santa Juana (38.9 m³/s) es
+  real (está en el registro DGA de 92 años, dato ya en
+  `examples/santa_juana_qflx/`) pero parece ser un evento
+  **"intermedio" sin paper dedicado** — no catastrófico. Contexto de
+  apoyo: para el río Copiapó (cuenca vecina, mismo desierto), la
+  literatura reciente (reconstrucción histórica multi-archivo,
+  ScienceDirect 2024) clasifica los eventos por umbral de caudal:
+  ordinario / intermedio (30-180 m³/s) / catastrófico (>180 m³/s).
+  Nuestro pico de 38.9 m³/s cae limpiamente en la categoría
+  "intermedio" — consistente con que no haya un paper dedicado (los
+  papers cubren predominantemente los catastróficos: marzo 2015,
+  mayo 2017 en otras cuencas).
+- **Implicación para el manuscrito**: dejar de llamarlo "Aluvión
+  Atacama 2017" (framing de evento-noticia que no le corresponde).
+  Recomendación: citar Wilcox2016 + Cabré et al. 2020 (`Progress in
+  Physical Geography` 44(5):679-699, sobre debris flows en
+  tributarios del Huasco) como contexto de **régimen** (la cuenca es
+  episódica semi-árida, bien documentada en general), pero describir
+  el evento simulado con llaneza: "an observed high-flow event in
+  the 92-year Santa Juana record (peak 38.9 m³/s, 2017-03-02)", sin
+  reclamar que sea un desastre documentado en la literatura. Esto es
+  un fix de texto en §4, independiente de qué pase con el resto de
+  WP5.
+- **Dato de nivel/stage**: el portal DGA HIDROlínea
+  (`dga.mop.gob.cl/sistema-hidrometrico-en-linea/`) solo expone
+  tiempo real, sin mecanismo público de consulta histórica por
+  estación/fecha — confirma la sospecha del roadmap original ("puede
+  requerir solicitud"). Conseguir nivel horario real de 2017 para
+  Santa Juana necesita pedido directo a DGA (acción del usuario,
+  mismo patrón que el email a la EA en WP3).
+
+**Fix de texto ejecutado (2026-07-03)**: reemplazado el framing
+"Aluvión Atacama 2017" / "the documented Aluvión Atacama event
+[@Wilcox2016AtacamaFlash]" en TODO el material vivo (no los `.tex`
+congelados, que se regeneran en la pasada final): Highlights,
+Abstract, Key Point 3, Plain Language Summary, Intro, título de §4,
+setup de §4.1 (ahora cita Wilcox2016 + el nuevo `Cabre2020HuascoENSO`
+—`Progress in Physical Geography` 44(5):679-699, DOI
+10.1177/0309133319898994, verificado CrossRef— solo como contexto de
+régimen, con una frase explícita de que no hay estudio dedicado al
+evento 2017), §6 Conclusión, caption Fig 4, `cover_letter_ems.md`, y
+el comentario de `figures/R/fig04_huasco_application.R`. Verificado
+con grep: cero ocurrencias restantes de "Aluvión/Atacama event" en
+esos archivos. Nueva convención: "an observed high-flow event on the
+Río Huasco (2017, peak 38.9 m³/s)". El título del paper y el nombre
+de archivo `fig04_huasco_application` no necesitaron cambio (ya eran
+genéricos). `references.bib`: nota de `Wilcox2016AtacamaFlash`
+actualizada con el hallazgo del mismatch de fechas.
+
 **Plan por etapas** (cada una es una sub-sesión):
 
-- [ ] **5a — Adquisición de datos** (puede empezar YA, paralelo a todo):
-      - Estación DGA 03820003 "Río Huasco en Santa Juana". Descargar del
-        CR2 (<https://www.cr2.cl/datos-de-caudales/>) el caudal diario;
-        investigar si la DGA tiene datos horarios/instantáneos del
-        evento 2017-02/03 (portal DGA "Información Oficial
-        Hidrometeorológica" — puede requerir solicitud).
-      - Buscar niveles (stage) además de caudal: la comparación más
-        limpia es stage simulado vs stage observado en la celda del
-        gauge, evitando la rating curve.
-      - Literatura del evento para high-water marks / extensión:
-        buscar papers del "aluvión de Atacama 2017" (¡OJO!: la cita
-        actual @Wilcox2016AtacamaFlash es de 2016 y probablemente
-        describe el evento de MARZO 2015 — VERIFICAR que la cita
-        corresponde al evento simulado; si el paper simula 2017,
-        necesita una referencia del evento 2017. Posible confusión de
-        eventos 25M-2015 vs 2017 — resolver esto es parte del WP).
-      - Imágenes satelitales del evento (Sentinel-2/Landsat) para
-        extensión de inundación como validación alternativa/extra.
+- [x] **5a — Adquisición de datos** (avance 2026-07-03, ver hallazgo 5a
+      arriba para el detalle completo de cada punto):
+      - Estación DGA 03820003 "Río Huasco en Santa Juana": caudal diario
+        ya en `examples/santa_juana_qflx/` (vía CR2). Portal DGA
+        HIDROlínea confirmado SIN consulta histórica pública por
+        estación/fecha — se necesita solicitud directa.
+      - Nivel (stage): NO disponible públicamente. Borrador de correo
+        a DGA listo en `papers/01_review/CORREO_DGA_SOLICITUD_DATOS.txt`
+        (pide nivel horario/sub-diario 2017-02-15→2017-03-15 + curva de
+        descarga + informes de terreno) — **falta que el usuario lo
+        revise y envíe** (acción del usuario, no del modelo).
+      - Cita del evento: **resuelta**. @Wilcox2016AtacamaFlash confirmado
+        como el evento equivocado (marzo 2015, no el 2017-02/03
+        simulado); tampoco es el evento conocido de mayo 2017. El pico
+        2017-03-02 (38.9 m³/s) es real pero parece ser un evento
+        "intermedio" sin paper dedicado. Fix de texto ya aplicado en
+        todo el manuscrito (ver más abajo, sección de fix ejecutado).
+      - Imágenes satelitales: **hecho** (Sentinel-2, 2017-02-18 vs
+        2017-02-28 near-peak, MNDWI vía STAC earth-search). Resultado:
+        sin señal de agua detectable — diagnóstico confirmado con el
+        propio DEM del modelo (corte transversal: ~5 m de relieve en
+        360 m de ancho de valle a 30 m de resolución). Limitación
+        honesta de DEM documentada, no una validación positiva de
+        extensión de inundación.
 - [ ] **5b — Decidir la variable de validación** con lo que exista:
       stage en el gauge (ideal) > caudal de salida vs gauge aguas abajo
       > extensión satelital > high-water marks. Documentar la decisión

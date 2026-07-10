@@ -1,0 +1,74 @@
+Para: dga.nivelcentral-ac@mop.gov.cl
+CC: (opcional) Dirección Regional de Aguas, Región de Atacama
+Asunto: Solicitud de datos de nivel horario/sub-diario — Estación Río Huasco en Santa Juana (código 03820003), febrero-marzo 2017
+
+Estimados/as,
+
+Mi nombre es Francisco Parra, investigador postdoctoral DICYT en la
+Universidad de Santiago de Chile. Estoy validando un modelo hidráulico
+2D de aguas someras (código abierto, en revisión para la revista
+Environmental Modelling & Software) contra un evento de crecida real
+registrado en la estación fluviométrica DGA "Río Huasco En Santa
+Juana" (código 03820003).
+
+El registro público de caudal diario que ya tenemos (vía CR2, derivado
+de su red) muestra un pico de 38.9 m³/s el 2017-03-02, dentro de una
+ventana de crecida del 2017-02-20 al 2017-03-12. Para poder comparar
+el nivel de agua que predice nuestro modelo contra una observación
+real (en vez de solo el caudal, que ya usamos como forzante de
+entrada), necesitaríamos:
+
+1. Nivel limnimétrico (altura de agua) horario o de la mayor
+   resolución sub-diaria disponible para la estación 03820003, en la
+   ventana 2017-02-15 a 2017-03-15 (agregamos margen antes/después del
+   evento).
+2. Si está disponible, la curva de descarga (rating curve) vigente
+   para esa estación en ese período — nos permite comparar nivel
+   simulado vs. nivel observado sin depender de la conversión interna
+   a caudal que ya usamos como forzante.
+3. Cualquier informe de terreno, fotografía, o marca de agua (high
+   water mark) asociada a ese evento en el tramo Santa Juana, si
+   existe en sus archivos — sería una validación adicional de la
+   extensión de inundación.
+
+Entendemos que el Sistema Hidrométrico en Línea de la DGA solo expone
+datos en tiempo real, sin consulta histórica pública por
+estación/fecha — por eso escribimos directamente. Si el canal
+apropiado para esta solicitud es el Portal de Transparencia
+(Ley 20.285) en vez de este correo, agradeceríamos que nos lo indiquen
+y iniciamos ese trámite en paralelo.
+
+El resultado se usaría únicamente con fines de investigación académica
+(validación observacional de un modelo hidráulico, sin fines
+comerciales), y se citaría apropiadamente a la DGA como fuente de los
+datos en la publicación resultante.
+
+Quedamos atentos y agradecemos de antemano su ayuda.
+
+Saludos cordiales,
+
+Francisco Parra
+Investigador postdoctoral, DICYT
+Universidad de Santiago de Chile
+francisco.parra.o@usach.cl
+
+----------------------------------------------------------------------
+Notas para Francisco (no van en el correo):
+----------------------------------------------------------------------
+
+- Contacto verificado 2026-07-03 vía búsqueda web (no confirmado por
+  llamada): dga.nivelcentral-ac@mop.gov.cl es el correo técnico
+  público de la DGA (Departamento Información de Recursos Hídricos,
+  DIRH). Verificar antes de enviar que sigue vigente.
+- Alternativa/complemento: llamar al +56 2 2449 4000, opción 4 (DIRH)
+  — a veces una llamada previa agiliza la respuesta al correo o aclara
+  si conviene ir directo al Portal de Transparencia
+  (portaltransparencia.cl, Ley 20.285, respuesta en máx. 20 días
+  hábiles + 10 hábiles extensión, requiere solo nombre + email/domicilio,
+  sin necesidad de cuenta).
+- Si no hay respuesta en ~2 semanas, escalar directamente a
+  portaltransparencia.cl con el mismo texto adaptado a formato de
+  solicitud de información pública.
+- Ver `ROADMAP_REVISION_EMS.md` WP5 para el contexto completo de por
+  qué se necesita este dato (validación observacional, el issue más
+  caro y más importante del review simulado EMS).

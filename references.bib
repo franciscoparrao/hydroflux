@@ -154,8 +154,75 @@
   title       = {Benchmarking the Latest Generation of 2D Hydraulic Modelling Packages},
   institution = {UK Environment Agency},
   year        = {2013},
-  note        = {UK EA benchmark suite (6 casos). Estándar para validar solvers 2D.
-                 Imprescindible para el methods paper de 2027.}
+  note        = {Report SC120002. UK EA benchmark suite (10 casos: 1,2,3,4,5,6A,6B,7,8A,8B).
+                 Estándar para validar solvers 2D. Test 4 y Test 8A reproducidos
+                 cuantitativamente sobre geometría oficial (WP3 2026-07-03) contra
+                 las series LISFLOOD-FP redistribuidas por Shaw2021/Sharifian2023.}
+}
+
+@article{Shaw2021,
+  author  = {Shaw, James and Kesserwani, Georges and Neal, Jeffrey and Bates, Paul
+             and Sharifian, Mohammad Kazem},
+  title   = {LISFLOOD-FP 8.0: the new discontinuous Galerkin shallow-water solver
+             for multi-core CPUs and GPUs},
+  journal = {Geoscientific Model Development},
+  volume  = {14},
+  number  = {6},
+  pages   = {3577--3602},
+  year    = {2021},
+  doi     = {10.5194/gmd-14-3577-2021},
+  note    = {Fuente de las series de referencia LISFLOOD-FP para UK EA Test 4
+             (Zenodo 10.5281/zenodo.4066824, CC-BY-4.0), usadas en la
+             reproducción cuantitativa de WP3 (2026-07-03).}
+}
+
+@article{Sharifian2023,
+  author  = {Sharifian, Mohammad Kazem and Kesserwani, Georges and Chowdhury,
+             Alovya Ahmed and Neal, Jeffrey and Bates, Paul},
+  title   = {LISFLOOD-FP 8.1: new GPU-accelerated solvers for faster
+             fluvial/pluvial flood simulations},
+  journal = {Geoscientific Model Development},
+  volume  = {16},
+  number  = {9},
+  pages   = {2391--2413},
+  year    = {2023},
+  doi     = {10.5194/gmd-16-2391-2023},
+  note    = {Fuente de los inputs oficiales de UK EA Test 8A (Glasgow, Zenodo
+             10.5281/zenodo.6907286, CC-BY-4.0), usados en la reproducción de
+             WP3 (2026-07-03). No redistribuye serie de referencia numérica
+             para Test 8A -- comparación cualitativa contra SC120002 §4.9.3.}
+}
+
+@article{CaviedesVoullieme2023SERGHEI,
+  author  = {Caviedes-Voulli\`eme, Daniel and Morales-Hern\'andez, Mario
+             and Norman, Matthew R. and \"Ozgen-Xian, Ilhan},
+  title   = {{SERGHEI} ({SERGHEI}-{SWE}) v1.0: a performance-portable
+             high-performance parallel-computing shallow-water solver
+             for hydrology and environmental hydraulics},
+  journal = {Geoscientific Model Development},
+  volume  = {16},
+  number  = {3},
+  pages   = {977--1008},
+  year    = {2023},
+  doi     = {10.5194/gmd-16-977-2023},
+  note    = {Verificado CrossRef (2026-07-09, WP4). GPU/HPC shallow-water
+             solver de referencia -- Caviedes-Voulli\`eme está en la lista
+             de reviewers sugeridos del cover letter EMS.}
+}
+
+@article{MoralesHernandez2021TRITON,
+  author  = {Morales-Hern\'andez, M. and Sharif, Md B. and Kalyanapu, A.
+             and Ghafoor, S.K. and Dullo, T.T. and Gangrade, S.
+             and Kao, S.-C. and Norman, M.R. and Evans, K.J.},
+  title   = {{TRITON}: A Multi-{GPU} open source {2D} hydrodynamic
+             flood model},
+  journal = {Environmental Modelling \& Software},
+  volume  = {141},
+  pages   = {105034},
+  year    = {2021},
+  doi     = {10.1016/j.envsoft.2021.105034},
+  note    = {Verificado CrossRef (2026-07-09, WP4). Publicado en EMS --
+             el mismo venue objetivo de este manuscrito.}
 }
 
 @book{Hervouet2007,
@@ -475,7 +542,30 @@
              rainfall→landslide→debris flow→inundation.
              Autorías verificadas con verify-refs/CrossRef (2026-05-18):
              Castro, Lina (no Luis); Otárola con acento; Cristian/Gironás
-             corregidos.}
+             corregidos.
+             OJO (2026-07-03, WP5): este evento es MARZO 2015, DISTINTO del
+             evento 2017-02/03 simulado en §4 (Santa Juana, pico 2017-03-02,
+             38.9 m³/s) -- confirmado no ser tampoco el evento de mayo 2017
+             (Atacama+Coquimbo). En §4 se cita solo como contexto de RÉGIMEN
+             episódico semiárido, no como documentación del evento simulado.}
+}
+
+@article{Cabre2020HuascoENSO,
+  author  = {Cabr\'e, Albert and Aguilar, Germ\'an and Mather, Anne E.
+             and Fredes, V\'ictor and Riquelme, Rodrigo},
+  title   = {Tributary-junction alluvial fan response to an {ENSO} rainfall
+             event in the {El Huasco} watershed, northern {Chile}},
+  journal = {Progress in Physical Geography: Earth and Environment},
+  volume  = {44},
+  number  = {5},
+  pages   = {679--699},
+  year    = {2020},
+  doi     = {10.1177/0309133319898994},
+  note    = {Verificado CrossRef (2026-07-03, WP5). Sobre el evento de marzo
+             2015 en el Huasco (mismo evento de Wilcox2016AtacamaFlash, no el
+             de 2017 simulado en §4) -- citado en §4 solo como contexto de
+             régimen episódico semiárido de la cuenca, no como documentación
+             del evento específico simulado.}
 }
 
 @article{Serey2019MauleInventory,

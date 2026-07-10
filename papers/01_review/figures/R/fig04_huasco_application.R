@@ -1,6 +1,6 @@
 # fig04_huasco_application.R — methods-paper Figure 4.
 #
-# Five-panel composite of the Huasco 2017 Atacama application (§4),
+# Five-panel composite of the Río Huasco 2017 high-flow-event application (§4),
 # combining the logic of the two solver-2d example figures
 # (fig_huasco_2d_manning_field + fig_huasco_2d_depth_compare) into a
 # single publication figure:

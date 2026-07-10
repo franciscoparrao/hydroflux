@@ -32,9 +32,10 @@ The manuscript fits the journal's Aims & Scope on three explicit axes:
    repository.
 
 2. **Real-world environmental application illustrating the methodology.**
-   The solver is applied to the 2017 Aluvión Atacama event on the Río
-   Huasco at Santa Juana — a semiarid Andean reach with a 92-year DGA
-   record — on a 30 m DEM, using a spatially variable Manning field
+   The solver is applied to an observed high-flow event (peak
+   38.9 m³/s, March 2017) on the Río Huasco at Santa Juana — a
+   semiarid Andean reach with a 92-year DGA record — on a 30 m DEM,
+   using a spatially variable Manning field
    derived from ESA WorldCover land cover. The result is reported
    honestly as a one-day-peak sensitivity demonstration (not a
    calibrated hindcast); the calibration companion is in preparation as

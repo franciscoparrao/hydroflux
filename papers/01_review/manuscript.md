@@ -26,8 +26,8 @@ keywords: [shallow water equations, finite volume, well-balanced,
 - A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
 - Gradients verified layer-by-layer against finite differences; overhead 1.98×.
 - HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
-- Verified on Thacker, Stoker, MacDonald, UK EA ×6; head-to-head against ANUGA.
-- Applied to 2017 Aluvión Atacama (Río Huasco) with ESA WorldCover Manning.
+- Verified on Thacker, Stoker, MacDonald, UK EA (6 synthetic + Tests 4/8A on official EA/LISFLOOD-FP geometry); head-to-head against ANUGA.
+- Applied to an observed high-flow event on the Río Huasco (2017, DGA gauge) with ESA WorldCover Manning.
 
 # Abstract
 
@@ -48,10 +48,15 @@ hierarchy — lake-at-rest preserved to machine precision
 ($\|\eta  - \eta _{0}\|_\infty \approx  3\cdot 10^{-16}$), the Thacker oscillating paraboloid
 (relative L² 0.068 %, mass 2·10⁻⁵), the Stoker/Ritter dam-break
 (L¹ 1.0 %), a radial dam-break, steady Manning uniform flow, and the
-six UK Environment Agency 2D benchmarks — and a matched head-to-head
-against ANUGA on Stoker recovers the same accuracy class. We apply the solver to the 2017 Aluvión
-Atacama event on the Río Huasco — a semiarid Andean reach with a
-92-year DGA record — at 30 m, with a spatially variable Manning field
+UK Environment Agency 2D benchmark suite — six synthetic stand-ins
+plus two of the ten official configurations (Tests 4 and 8A)
+reproduced directly from the redistributed EA/LISFLOOD-FP geometry,
+matching the published reference series to 0.2–1.4 % RMSE (Test 4)
+and falling inside the reported inter-model spread (Test 8A) — and a
+matched head-to-head against ANUGA on Stoker recovers the same
+accuracy class. We apply the solver to an observed high-flow event
+on the Río Huasco — a semiarid Andean reach with a 92-year DGA
+record, peak 38.9 m³/s in early March 2017 — at 30 m, with a spatially variable Manning field
 derived from ESA WorldCover. As a one-day-peak sensitivity
 demonstration (not a calibrated hindcast), the variable field retains
 ~25 % more water in the reach than a uniform value. The solver, its test suite, and the
@@ -62,8 +67,8 @@ coupled hydrometeorological hazard simulation.
 # Key Points
 
 1. A 2D shallow-water finite-volume solver written generic over the numeric type evaluates the identical code in `f64` and in forward-mode dual numbers, making the entire forward model differentiable by construction without a separate adjoint implementation.
-2. The well-balanced HLLC/Audusse scheme preserves lake-at-rest to machine precision on arbitrary beds and passes a hierarchy of analytical (Thacker, Stoker, MacDonald) and community (UK EA ×6) benchmarks, conserving mass to $2\cdot 10^{-5}$ on the closed-domain Thacker oscillation, whose wet/dry shoreline moves continuously.
-3. Applied to the 2017 Aluvión Atacama event on the Río Huasco, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field; in a one-day-peak sensitivity demonstration (not a validated hindcast) the riparian vegetation it places in the channel ($n \approx  0.10$) retains ~25 % more water in the reach than a single uniform value.
+2. The well-balanced HLLC/Audusse scheme preserves lake-at-rest to machine precision on arbitrary beds and passes a hierarchy of analytical (Thacker, Stoker, MacDonald) and community (UK EA: 6 synthetic stand-ins, plus Tests 4 and 8A reproduced on the official EA/LISFLOOD-FP geometry) benchmarks, conserving mass to $2\cdot 10^{-5}$ on the closed-domain Thacker oscillation, whose wet/dry shoreline moves continuously.
+3. Applied to an observed 2017 high-flow event on the Río Huasco, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field; in a one-day-peak sensitivity demonstration (not a validated hindcast) the riparian vegetation it places in the channel ($n \approx  0.10$) retains ~25 % more water in the reach than a single uniform value.
 
 # Plain Language Summary
 
@@ -79,8 +84,9 @@ against textbook problems with exact mathematical answers and against
 an international set of standard test cases, confirming it conserves
 water mass and reproduces known flood waves accurately, with errors
 comparable to those of an established open-source alternative. We then
-ran it on a real flood — the 2017 Atacama event on the Río Huasco in
-northern Chile — feeding it public elevation and land-cover maps. The
+ran it on a real flood — a high-flow event recorded on the Río Huasco
+in northern Chile in 2017 — feeding it public elevation and land-cover
+maps. The
 model shows that accounting for riverside vegetation, which slows the
 flow, keeps about a quarter more water in the channel than assuming a
 single uniform roughness. The code and all test cases are released
@@ -160,7 +166,7 @@ about differentiable hydraulics per se.
 The paper proceeds with the governing equations and numerical scheme
 (§2), a verification hierarchy from machine-precision well-balancedness
 through analytical and community benchmarks (§3), an application to the
-2017 Aluvión Atacama event with land-cover-derived roughness (§4), the
+2017 Río Huasco high-flow event with land-cover-derived roughness (§4), the
 roadmap toward coupling, GPU acceleration, and native autodifferentiation
 (§5), and conclusions (§6).
 
@@ -335,7 +341,9 @@ the $report_*$ informational tests.
 | Stoker/Ritter dam-break | analytical transient | 400×3 | L∞ on $h$ | 2.2 % |
 | Radial dam-break | symmetry | 160×160 | axisymmetry | preserved |
 | MacDonald uniform flow | steady, well-balanced | — | steady-state $h$ | ~0.03 % (guard 2 %) |
-| UK EA Tests 1–6 | community suite | various | qualitative + mass | pass |
+| UK EA Tests 1–6 (synthetic stand-ins) | community suite | various | qualitative + mass | pass |
+| UK EA Test 4 (official EA/LISFLOOD-FP geometry) | community suite, quantitative | 400×200 @ 5 m | RMSE vs LISFLOOD-FP DG2 (6 control points) | 0.2–1.4 % of peak depth |
+| UK EA Test 8A (official EA/LISFLOOD-FP geometry) | community suite, qualitative | 481×199 @ 2 m | vs SC120002 inter-model bounds (4 scored points) | pass, incl. inside industry spread |
 
 ## 3.1 Well-balancedness (lake-at-rest)
 
@@ -395,17 +403,67 @@ assembly carries no directional bias.
 
 ## 3.6 UK Environment Agency 2D benchmark suite
 
-The six UK EA 2D benchmark tests [@NeelzPender2013] exercise the
-features that matter operationally: filling of a disconnected
-low-lying pond (Test 1), rainfall on a floodplain (Test 2), flow past
-an obstruction (Test 3), long-wave propagation in a valley (Test 4),
-valley flooding with multiple inflows (Test 5), and an urban dam-break
-through a building array (Test 6). The solver passes all six, with
-buildings remaining dry and no spurious oscillations at the wet/dry
-fronts (the strict mass-conservation figures are reported for the
-closed-domain tests in §3.1–§3.2; the UK EA cases use open inflow/
-outflow boundaries). Test 6 in particular exercises the wetting/drying
-and the cell-mask skip on a realistically heterogeneous domain.
+The UK EA 2D benchmark report [@NeelzPender2013] specifies ten
+configurations (Tests 1, 2, 3, 4, 5, 6A, 6B, 7, 8A, 8B) built to
+exercise features that matter operationally in flood modelling. We use
+this suite in two complementary ways: six lightweight synthetic
+stand-ins as fast CI regression tests, and — on top of that — two of
+the tests reproduced on the *official* EA geometry with a quantitative
+or semi-quantitative comparison against published reference results.
+
+**Synthetic stand-ins (Tests 1–6, `solver-2d/tests/uk_ea_test*.rs`).**
+These capture the essential physics of the analogous official
+configurations — filling of a disconnected low-lying pond, rainfall on
+a floodplain, flow past an obstruction, long-wave propagation in a
+valley, valley flooding with a parabolic cross-section, and an urban
+dam-break through a building array — without reproducing the exact EA
+geometry files. The solver passes all six, with buildings remaining
+dry and no spurious oscillations at the wet/dry fronts (the strict
+mass-conservation figures are reported for the closed-domain tests in
+§3.1–§3.2; the UK EA cases use open inflow/outflow boundaries). These
+run in seconds and stay in CI as regression guards; they are not
+presented as a validation against the official benchmark.
+
+**Official-geometry reproduction (Tests 4 and 8A).** For a
+quantitative claim, we reproduce two of the ten official
+configurations directly from EA/LISFLOOD-FP data redistributed under
+CC-BY-4.0 by the LISFLOOD-FP team [@Shaw2021; @Sharifian2023] — the
+proprietary EA originals are not publicly downloadable.
+
+*Test 4* ("speed of propagation of a flood wave") uses the official
+1000 m × 2000 m flat floodplain (5 m mesh, Manning $n=0.05$), the
+official trapezoidal hydrograph peaking at 20 m³/s through a 20 m
+inlet, and the six official control points. Comparing simulated depth
+against the redistributed LISFLOOD-FP DG2 reference series (5 m,
+full second-order shallow-water scheme — the resolution- and
+scheme-matched comparison) gives RMSE of 0.2–1.4 % of peak depth at
+every point, peak bias within ±1.4 %, and arrival-time offsets of
+0–60 s — an order of magnitude below the ~5 min spread the SC120002
+report itself documents *between different industry models* on this
+test. Full detail in `benchmarks/data/uk_ea/test4/results_hydroflux.md`.
+
+*Test 8A* ("rainfall and point source surface flow in urban areas",
+Cockenzie Street, Glasgow) uses the official 2 m DEM, a spatially
+variable Manning field (roads vs. background), a 400 mm/h 3-minute
+rainfall pulse, and a point inflow peaking at 5 m³/s. No numeric
+LISFLOOD-FP reference series is redistributed for this test, so the
+comparison is against the *qualitative bounds reported in the text* of
+SC120002 §4.9.3 — agreement ranges observed across the ~15 industry
+packages that ran the official test. All four control points with a
+stated numeric bound pass, including the downstream pond (point 3):
+simulated final depth is within 0.066 m of the expected ~0.8 m, inside
+the ~0.07 m spread the report documents *between* the ~15 industry
+models. Full detail in
+`benchmarks/data/uk_ea/test8a_glasgow/results_hydroflux.md`.
+
+We attempted a similar official-geometry reproduction of Test 5
+("valley flooding"); the official DEM is not in any public
+redistribution (only proprietary from the EA), and an idealised
+synthetic valley built from the report's text description alone
+produced order-of-magnitude but not quantitatively meaningful
+agreement, dominated by the necessarily invented inflow hydrograph
+rather than by solver behaviour — we do not include it as evidence
+here.
 
 ## 3.7 Mesh-refinement convergence
 
@@ -477,7 +535,12 @@ respectively at the three sizes. The throughput is consistent with the
 single-threaded CPU references cited by the Caviedes-Voullième-circle
 GPU papers [@Rak2024; @SaleemNorman2024] and falls in the band
 typical of HLLC + MUSCL + SSP-RK2 implementations on cache-resident
-problems.
+problems. Community GPU/HPC shallow-water solvers — SERGHEI-SWE
+[@CaviedesVoullieme2023SERGHEI], scaled to hundreds of GPUs on
+TOP500-class systems, and the multi-GPU TRITON
+[@MoralesHernandez2021TRITON] — demonstrate the throughput headroom a
+SIMT port unlocks over single-threaded CPU execution; §5(i) motivates
+the $wgpu$ port this comparison sets up.
 
 **`f64` vs `Dual<f64>` overhead.** On a $64^{2}$ grid over $200$ SSP-RK2 +
 Manning steps, the forward-mode AD instance takes $1.98 ×$ the
@@ -499,26 +562,36 @@ solver requires) so cell-count throughput is not directly comparable;
 the simulated-second metric is the meaningful one because the user-
 visible cost of running a flood event scales with this quantity.
 
-**Bottleneck and next layer.** Profiling the forward Euler step (rough
-profile from `cargo flamegraph` on the $512^{2}$ Gaussian bump) shows
-that the `well_balanced_x_face` + `well_balanced_y_face` assembly
-takes ~60 % of the wall-clock, the cell update (with the explicit
-bed-slope source) ~25 %, and the cell-mask + MUSCL slope pass the
-remainder. Both dominant pieces are embarrassingly parallel on a
-per-face/per-cell basis. We attempted a CPU-parallel face-flux pass
-via $rayon$ for this submission and found that the per-face
-arithmetic ($~200-500$ ns at the FV face level) is small relative to
-the rayon task-dispatch and Vec-collect overhead — even at 8 threads,
-the multi-threaded version was slower than the serial baseline by
-about 2× on $512^{2}$. The conclusion we draw is the opposite of the
-naive one: this scheme's next throughput layer is not CPU
-parallelisation but GPU offload, where the face- and cell-loops map
-to a single-instruction multiple-thread kernel without the per-task
-overhead that defeats CPU rayon on a fine-grained per-face workload.
-Section §5 carries the GPU port (via $wgpu$ compute shaders) as the
-immediate next deliverable.
+**Bottleneck and CPU parallelism.** Profiling the forward Euler step
+(rough profile from `cargo flamegraph` on the $512^{2}$ Gaussian bump)
+shows that the `well_balanced_x_face` + `well_balanced_y_face`
+assembly takes ~60 % of the wall-clock, the cell update (with the
+explicit bed-slope source) ~25 %, and the cell-mask + MUSCL slope pass
+the remainder. Both dominant pieces are embarrassingly parallel on a
+per-face/per-cell basis. An initial attempt at CPU parallelism, one
+$rayon$ task per face, was defeated by task-dispatch overhead relative
+to the ~200-500 ns of per-face arithmetic. Re-measured at **row
+granularity** instead — `ndarray`'s `Zip::par_for_each` over each
+`StepWorkspace2D` pass, which splits work by recursively bisecting the
+outer axis rather than per-element — CPU parallelism *is* worthwhile:
+on a $256^{2}$ all-wet grid (quiet 8-core/12-thread machine, release
+build), the reusable-workspace step reaches $3.2×$ at 4 threads and
+saturates at $3.8$–$4.0×$ by 8 threads (`ssprk2_step_with`: serial
+13.9 ms → 3.6 ms). On a mostly-dry grid resembling the §4 application
+(~94 % dry, dominated by the wet/dry short-circuit), the same measure
+saturates lower, at $2.8×$: less per-cell work survives the dry skip
+to parallelise, and row chunks are unevenly loaded when the wet
+channel occupies a small, uneven fraction of rows. Both regimes
+plateau by 4-8 threads; the remaining threads on our 12-thread test
+machine (8 physical cores) buy nothing further. This is now a
+feature-gated capability (`--features parallel`, `T: Send + Sync`
+required only on that path, not on the `Real` trait), not a research
+dead end — but its ceiling is well below the throughput SIMT execution
+is expected to offer on the same embarrassingly parallel face/cell
+loops. Section §5 carries the GPU port (via $wgpu$ compute shaders) as
+the immediate next deliverable.
 
-# 4. Application: the 2017 Aluvión Atacama on the Río Huasco
+# 4. Application: an observed high-flow event on the Río Huasco (2017)
 
 ## 4.1 Setup
 
@@ -529,8 +602,12 @@ DEM (6 km × 2 km, UTM 19S) centred on the gauge, ingested directly as
 a GeoTIFF. Boundary conditions are Transmissive on the western
 (downstream) edge and Wall on the others, with a point-source inflow at
 the eastern channel cell driven by the daily DGA discharge series for
-the 21-day window 2017-02-20 → 2017-03-12 (the documented Aluvión
-Atacama event [@Wilcox2016AtacamaFlash], peak 38.9 m³/s). The
+the 21-day window 2017-02-20 → 2017-03-12 — an observed high-flow
+event in the gauge's 92-year record (peak 38.9 m³/s on 2017-03-02),
+consistent with the episodic semiarid flooding regime documented for
+this basin [@Wilcox2016AtacamaFlash; @Cabre2020HuascoENSO], though we
+are not aware of a dedicated study of this specific 2017 event (the
+cited catastrophic Atacama floods occurred in March 2015). The
 daily-mean series is the finest resolution the public DGA record
 provides at this gauge; the smoothing of the sub-daily hydrograph
 shape means simulated peak inundation is conservative for a given
@@ -593,14 +670,14 @@ that a continental-scale, multi-basin programme requires.
 
 The verified 2D solver is the foundation of a staged programme. The
 immediate next layers are: (i) **GPU acceleration** via $wgpu$ compute
-shaders, prioritised by the §3.9 finding that CPU-side parallelism
-($rayon$ over the per-face FV work) is defeated by the small
-per-face arithmetic relative to task-dispatch overhead — the next
-throughput layer is SIMT, not multi-threaded; both the well-balanced
-flux assembly and the cell-mask skip map naturally to per-face/per-cell
-kernels, and the `Real`-trait dispatch shown to work at no run-time
-cost in §2.5 is one of the structural assumptions that should carry
-through unchanged on the GPU side. (ii) *Physical coupling* — rainfall
+shaders, prioritised because even the corrected, row-chunked CPU
+parallelism (§3.9) saturates at $3$–$4×$ on commodity multi-core
+hardware — well short of the throughput SIMT execution is expected to
+provide on the same embarrassingly parallel face/cell loops; both the
+well-balanced flux assembly and the cell-mask skip map naturally to
+per-face/per-cell kernels, and the `Real`-trait dispatch shown to work
+at no run-time cost in §2.5 is one of the structural assumptions that
+should carry through unchanged on the GPU side. (ii) *Physical coupling* — rainfall
 → slope-failure → granular propagation → inundation in a single
 engine, beginning with an Iverson-type debris-flow source
 [@Iverson2000; @Christen2010] feeding the SW momentum. (iii)
@@ -622,9 +699,10 @@ hydroflux is a 2D shallow-water finite-volume solver, written in Rust
 and generic over its numeric type, that is well-balanced to machine
 precision, mass-conservative on moving wet/dry fronts, and verified
 against a hierarchy of analytical (lake-at-rest, Thacker, Stoker,
-MacDonald) and community (UK EA ×6) benchmarks. It ingests standard
-public GIS products directly and, applied to the 2017 Aluvión Atacama
-event on the Río Huasco, demonstrates a land-cover-derived spatially
+MacDonald) and community (UK EA: 6 synthetic stand-ins, plus Tests 4
+and 8A on the official EA/LISFLOOD-FP geometry) benchmarks. It ingests standard
+public GIS products directly and, applied to an observed 2017
+high-flow event on the Río Huasco, demonstrates a land-cover-derived spatially
 variable Manning field that, in a one-day-peak sensitivity test (not a
 validated hindcast), retains ~25 % more water in the reach than a
 single uniform roughness. The contribution is a verified, open
@@ -678,8 +756,8 @@ buildings ($x \geq  250$ m) are still dry at this time as the front has not
 yet arrived. Generated by `fig03_uk_ea_t6.R` from the
 `gen_verification_data` example output.
 
-**Figure 4** (`fig04_huasco_application.pdf`). Huasco 2017 Atacama
-application, 200 × 67-cell 30 m subset (UTM 19S), one-day peak. Five
+**Figure 4** (`fig04_huasco_application.pdf`). Río Huasco 2017
+high-flow-event application, 200 × 67-cell 30 m subset (UTM 19S), one-day peak. Five
 panels sharing the reach extent: (a) ESA WorldCover 2021 land cover —
 riparian tree and shrub vegetation tracks the thalweg within bare
 Atacama hillslopes; (b) the derived Manning field $n(x, y)$ mapping
@@ -839,3 +917,20 @@ Feng2022, Tsai2021] plus the verified JAX-Fluids and SynxFlow.)*
    `anuga_stoker_compare.py` + `gen_stoker_coarse` — Stoker dam-break
    at Δx = 1 m: L1 4.1 % hydroflux vs 2.6 % ANUGA, same accuracy class,
    gap closes under refinement).
+9. **§3.6 rewritten 2026-07-03 (WP3 stage 3, pre-submission EMS
+   revision roadmap)**: reframed the "UK EA ×6 pass" claim as 6
+   synthetic CI stand-ins, and ADDED two of the ten official
+   configurations (Test 4, Test 8A) reproduced directly from the
+   EA/LISFLOOD-FP geometry redistributed by Shaw2021/Sharifian2023
+   (CC-BY-4.0) — Test 4 quantitative (RMSE 0.2–1.4 % vs DG2 @ 5 m),
+   Test 8A qualitative (inside the SC120002 inter-model spread at the
+   downstream pond). Test 5 attempted on a synthetic reconstruction
+   (no official DEM available anywhere public) but NOT included as
+   evidence — order-of-magnitude only, dominated by the necessarily
+   invented inflow hydrograph. Table 1, Highlights, Abstract, Key
+   Point 2, and §6 Conclusion updated to match. Full numeric detail:
+   `benchmarks/data/uk_ea/test{4,8a_glasgow,5}/results_hydroflux.md`.
+   Still pending: WP0 (freeze code + regenerate all numbers — this
+   session's Test 4/8A/5 runs are on HEAD `5c0fe0d`, not yet the
+   frozen/pinned commit), and the Wilcox2016 citation fix in §4 (WP5
+   finding, separate from this UK EA update).
