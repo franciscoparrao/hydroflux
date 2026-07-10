@@ -85,10 +85,11 @@ use hydroflux_autograd::Real;
 use crate::boundary::{Boundaries2D, Side, ghost_cell};
 use crate::flux::{FluxXG, FluxYG};
 use crate::geometry::Mesh2DG;
+use crate::parallel::{MaybeSendSync, zip_for_each};
 use crate::riemann::{hllc_flux_x, hllc_flux_y};
 use crate::state::Conserved2DG;
 use crate::{GRAVITY, H_DRY, H_VEL};
-use ndarray::Array2;
+use ndarray::{Array2, Zip};
 
 /// Maximum signal speeds `(s_x, s_y)` across the state field, where
 /// `s_x = max(|u| + c)` and `s_y = max(|v| + c)`. Returns `(0, 0)` for
@@ -391,12 +392,12 @@ struct PrimG<T> {
 /// redundant `hu/h`, `hv/h` divisions per cell per step that the
 /// slope and reconstruction stencils used to pay by recomputing
 /// primitives at every stencil visit.
-fn fill_primitives<T: Real>(
+fn fill_primitives<T: Real + MaybeSendSync>(
     states: &Array2<Conserved2DG<T>>,
     bed: &Array2<T>,
     out: &mut Array2<PrimG<T>>,
 ) {
-    for ((i, j), p) in out.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(out), |(i, j), p| {
         let s = states[(i, j)];
         *p = if s.h.value() > H_VEL {
             PrimG {
@@ -411,7 +412,7 @@ fn fill_primitives<T: Real>(
                 v: T::zero(),
             }
         };
-    }
+    });
 }
 
 /// Returns `true` if any cell within distance 2 of `(i, j)` along the
@@ -445,14 +446,14 @@ fn any_neighbor_dry_y(dry: &Array2<bool>, i: usize, j: usize, n_rows: usize) -> 
 /// (first-order at wet/dry fronts) — this prevents a MUSCL
 /// reconstruction from a wet cell from extrapolating over a nearby
 /// dry cell and producing a spurious overshoot.
-fn fill_slopes_x<T: Real>(
+fn fill_slopes_x<T: Real + MaybeSendSync>(
     prim: &Array2<PrimG<T>>,
     dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
     out: &mut Array2<CellSlopesG<T>>,
 ) {
     let n_cols = mesh.n_cols();
-    for ((i, j), slope) in out.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(out), |(i, j), slope| {
         *slope = if n_cols < 2 || any_neighbor_dry_x(dry, i, j, n_cols) {
             CellSlopesG::default()
         } else if j == 0 {
@@ -484,19 +485,19 @@ fn fill_slopes_x<T: Real>(
                 v: minmod((c.v - l.v) / mesh.dx, (r.v - c.v) / mesh.dx),
             }
         };
-    }
+    });
 }
 
 /// Fill minmod-limited primitive slopes per cell in the `y`
 /// direction. Boundary cells use the available one-sided difference.
-fn fill_slopes_y<T: Real>(
+fn fill_slopes_y<T: Real + MaybeSendSync>(
     prim: &Array2<PrimG<T>>,
     dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
     out: &mut Array2<CellSlopesG<T>>,
 ) {
     let n_rows = mesh.n_rows();
-    for ((i, j), slope) in out.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(out), |(i, j), slope| {
         *slope = if n_rows < 2 || any_neighbor_dry_y(dry, i, j, n_rows) {
             CellSlopesG::default()
         } else if i == 0 {
@@ -525,7 +526,7 @@ fn fill_slopes_y<T: Real>(
                 v: minmod((c.v - t.v) / mesh.dy, (b.v - c.v) / mesh.dy),
             }
         };
-    }
+    });
 }
 
 /// Reconstruct the left/right cell states at an interior `x`-face
@@ -662,7 +663,7 @@ fn interior_z_face<T: Real>(l_dry: bool, z_l: T, r_dry: bool, z_r: T) -> T {
 /// is what makes lake-at-rest exact on a general bed — the cell-by-
 /// cell cancellation between flux divergence and source only holds
 /// when both use the same face beds.
-fn fill_z_face_x<T: Real>(
+fn fill_z_face_x<T: Real + MaybeSendSync>(
     states: &Array2<Conserved2DG<T>>,
     dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
@@ -670,7 +671,7 @@ fn fill_z_face_x<T: Real>(
     out: &mut Array2<T>,
 ) {
     let n_cols = mesh.n_cols();
-    for ((i, j), z) in out.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(out), |(i, j), z| {
         *z = if j == 0 {
             let (_, z_g) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
             (z_g + mesh.bed[(i, 0)]) * 0.5
@@ -685,12 +686,12 @@ fn fill_z_face_x<T: Real>(
                 mesh.bed[(i, j)],
             )
         };
-    }
+    });
 }
 
 /// Fill the array of face bed elevations `z_face_y[i, j]` for every
 /// `y`-face. See [`fill_z_face_x`] for the rationale.
-fn fill_z_face_y<T: Real>(
+fn fill_z_face_y<T: Real + MaybeSendSync>(
     states: &Array2<Conserved2DG<T>>,
     dry: &Array2<bool>,
     mesh: &Mesh2DG<T>,
@@ -698,7 +699,7 @@ fn fill_z_face_y<T: Real>(
     out: &mut Array2<T>,
 ) {
     let n_rows = mesh.n_rows();
-    for ((i, j), z) in out.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(out), |(i, j), z| {
         *z = if i == 0 {
             let (_, z_g) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
             (z_g + mesh.bed[(0, j)]) * 0.5
@@ -713,7 +714,7 @@ fn fill_z_face_y<T: Real>(
                 mesh.bed[(i, j)],
             )
         };
-    }
+    });
 }
 
 /// Reusable scratch buffers for the 2D time step.
@@ -779,7 +780,7 @@ impl<T: Real> StepWorkspace2D<T> {
 /// Panics if the shape of `states` does not match `(mesh.n_rows(),
 /// mesh.n_cols())`. The caller is responsible for keeping `dt` below
 /// the CFL bound (see [`cfl_time_step`]).
-pub fn forward_euler_step<T: Real>(
+pub fn forward_euler_step<T: Real + MaybeSendSync>(
     states: &mut Array2<Conserved2DG<T>>,
     mesh: &Mesh2DG<T>,
     bcs: Boundaries2D,
@@ -791,7 +792,7 @@ pub fn forward_euler_step<T: Real>(
 
 /// [`forward_euler_step`] over caller-owned scratch buffers — the
 /// allocation-free hot path.
-pub fn forward_euler_step_with<T: Real>(
+pub fn forward_euler_step_with<T: Real + MaybeSendSync>(
     states: &mut Array2<Conserved2DG<T>>,
     mesh: &Mesh2DG<T>,
     bcs: Boundaries2D,
@@ -839,9 +840,9 @@ pub fn forward_euler_step_with<T: Real>(
     // face-scaling skip and the isolated-dry fast path — all of which
     // must see the SAME (pre-step) pattern for the step to be
     // consistent (the update loop mutates `states` in place).
-    for ((i, j), d) in was_dry.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(&mut *was_dry), |(i, j), d| {
         *d = states[(i, j)].h.value() <= H_DRY;
-    }
+    });
 
     // Cell primitives (η, u, v), then MUSCL slopes per cell.
     fill_primitives(states, &mesh.bed, prim);
@@ -876,7 +877,7 @@ pub fn forward_euler_step_with<T: Real>(
     // interior cell for dryness is cheap but adds a branch that
     // never fires for the Wall / Transmissive cases that dominate
     // our event simulations, so the win there is marginal.
-    for ((i, j), face) in faces_x.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(&mut *faces_x), |(i, j), face| {
         let z_face = z_face_x[(i, j)];
         *face = if j == 0 {
             let (g, _) = ghost_cell(mesh, states[(i, 0)], bcs.west, Side::West, i);
@@ -891,9 +892,9 @@ pub fn forward_euler_step_with<T: Real>(
                 reconstruct_x_face_states(prim, slopes_x, z_face, i, j - 1, j, mesh.dx);
             well_balanced_x_face(recon_l, z_face, recon_r, z_face)
         };
-    }
+    });
 
-    for ((i, j), face) in faces_y.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(&mut *faces_y), |(i, j), face| {
         let z_face = z_face_y[(i, j)];
         *face = if i == 0 {
             let (g, _) = ghost_cell(mesh, states[(0, j)], bcs.north, Side::North, j);
@@ -908,7 +909,7 @@ pub fn forward_euler_step_with<T: Real>(
                 reconstruct_y_face_states(prim, slopes_y, z_face, i - 1, i, j, mesh.dy);
             well_balanced_y_face(recon_t, z_face, recon_b, z_face)
         };
-    }
+    });
 
     // FV update. For cell (i, j):
     //   right x-face is faces_x[(i, j+1)] — cell is on its LEFT side → .minus
@@ -939,7 +940,7 @@ pub fn forward_euler_step_with<T: Real>(
     //
     // α is T-typed so its dependence on h (the available mass)
     // carries the derivative through the rescaling.
-    for ((i, j), a) in alpha.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(&mut *alpha), |(i, j), a| {
         let fx_right = faces_x[(i, j + 1)].minus.mass;
         let fx_left = faces_x[(i, j)].plus.mass;
         let fy_bottom = faces_y[(i + 1, j)].minus.mass;
@@ -968,7 +969,7 @@ pub fn forward_euler_step_with<T: Real>(
         } else {
             T::one()
         };
-    }
+    });
 
     // Pass 2: for each face, determine the upstream cell (the side
     // losing mass) and scale by that side's α, IN PLACE and once per
@@ -978,9 +979,9 @@ pub fn forward_euler_step_with<T: Real>(
     // per cell, re-scaling every interior face twice (once from each
     // adjacent cell). Interior dry-dry faces are identically zero and
     // α of a dry cell is one, so they are skipped.
-    for ((i, j), face) in faces_x.indexed_iter_mut() {
+    zip_for_each!(Zip::indexed(&mut *faces_x), |(i, j), face| 'cell: {
         if j > 0 && j < n_cols && was_dry[(i, j - 1)] && was_dry[(i, j)] {
-            continue;
+            break 'cell;
         }
         let alpha_up = if j == 0 {
             // West boundary face. Outflow from cell (i, 0) when face.mass < 0
@@ -1011,10 +1012,10 @@ pub fn forward_euler_step_with<T: Real>(
         face.plus.mass = face.plus.mass * alpha_up;
         face.plus.x_momentum = face.plus.x_momentum * alpha_up;
         face.plus.y_momentum = face.plus.y_momentum * alpha_up;
-    }
-    for ((i, j), face) in faces_y.indexed_iter_mut() {
+    });
+    zip_for_each!(Zip::indexed(&mut *faces_y), |(i, j), face| 'cell: {
         if i > 0 && i < n_rows && was_dry[(i - 1, j)] && was_dry[(i, j)] {
-            continue;
+            break 'cell;
         }
         let alpha_up = if i == 0 {
             if face.minus.mass.value() < 0.0 {
@@ -1039,7 +1040,7 @@ pub fn forward_euler_step_with<T: Real>(
         face.plus.mass = face.plus.mass * alpha_up;
         face.plus.x_momentum = face.plus.x_momentum * alpha_up;
         face.plus.y_momentum = face.plus.y_momentum * alpha_up;
-    }
+    });
 
     // FV update with scaled face fluxes + explicit bed-slope source.
     //
@@ -1057,92 +1058,85 @@ pub fn forward_euler_step_with<T: Real>(
     // cells (`1 ≤ i ≤ n_rows − 2`, `1 ≤ j ≤ n_cols − 2`) so that
     // boundary cells — which could receive injected mass from a
     // `Discharge` / `Depth` ghost — keep the full path.
-    for i in 0..n_rows {
-        for j in 0..n_cols {
-            if was_dry[(i, j)]
-                && i > 0
-                && i + 1 < n_rows
-                && j > 0
-                && j + 1 < n_cols
-                && was_dry[(i - 1, j)]
-                && was_dry[(i + 1, j)]
-                && was_dry[(i, j - 1)]
-                && was_dry[(i, j + 1)]
-            {
-                // Keep the moisture film (see the floor below); only
-                // the momentum is reset, matching what the full path
-                // does for h ≤ H_VEL.
-                states[(i, j)].hu = T::zero();
-                states[(i, j)].hv = T::zero();
-                continue;
-            }
-            let fx_right = faces_x[(i, j + 1)].minus;
-            let fx_left = faces_x[(i, j)].plus;
-            let fy_bottom = faces_y[(i + 1, j)].minus;
-            let fy_top = faces_y[(i, j)].plus;
-
-            let dh =
-                (fx_right.mass - fx_left.mass) * dt_dx + (fy_bottom.mass - fy_top.mass) * dt_dy;
-            let new_h = states[(i, j)].h - dh;
-
-            // After flux rescaling new_h ≥ H_DRY by construction
-            // for cells that started wet. A residual floor catches
-            // floating-point roundoff that could nudge a barely-
-            // wet cell below the threshold.
-            let dhu = (fx_right.x_momentum - fx_left.x_momentum) * dt_dx
-                + (fy_bottom.x_momentum - fy_top.x_momentum) * dt_dy;
-            let dhv = (fx_right.y_momentum - fx_left.y_momentum) * dt_dx
-                + (fy_bottom.y_momentum - fy_top.y_momentum) * dt_dy;
-
-            // Explicit bed-slope source — see module doc. Algebraic
-            // form `S = (g/2) · (h_R_at_face² − h_L_at_face²)/Δx`
-            // that cancels the pressure-flux divergence exactly for
-            // lake-at-rest on any bed. `h_face` from cell's own `η`.
-            let h_old = states[(i, j)].h;
-            let eta_cell = h_old + mesh.bed[(i, j)];
-
-            let h_face_left = (eta_cell - z_face_x[(i, j)]).max(T::zero());
-            let h_face_right = (eta_cell - z_face_x[(i, j + 1)]).max(T::zero());
-            let s_hu = (h_face_right.powi(2) - h_face_left.powi(2)) * (0.5 * GRAVITY) / mesh.dx;
-
-            let h_face_top = (eta_cell - z_face_y[(i, j)]).max(T::zero());
-            let h_face_bottom = (eta_cell - z_face_y[(i + 1, j)]).max(T::zero());
-            let s_hv = (h_face_bottom.powi(2) - h_face_top.powi(2)) * (0.5 * GRAVITY) / mesh.dy;
-
-            if new_h.value() <= H_VEL {
-                // Moisture floor. The mass is KEPT: a wetting-front
-                // cell that received δ ≤ H_DRY of inflow had that mass
-                // already leave its neighbour through the shared face,
-                // and zeroing it here destroyed volume all along the
-                // front perimeter at every step. The film stays inert
-                // on the bed (its faces are dry-dry for h ≤ H_DRY, and
-                // the α available-mass term is zero) until inflow
-                // accumulates past the threshold. Momentum is dropped
-                // for anything up to H_VEL: velocity on such a film is
-                // meaningless, and residual hu with h barely above
-                // H_DRY collapses dt through hu/h (see H_VEL doc).
-                states[(i, j)] = Conserved2DG::new_generic(
-                    new_h.max(T::zero()),
-                    T::zero(),
-                    T::zero(),
-                );
-            } else {
-                // A cell that was a film inherits no momentum: the
-                // floor invariant keeps evolved films at hu = hv = 0,
-                // and a caller-supplied initial state violating it
-                // must not leak its stale momentum into the wetted
-                // cell (hu/h on the old film depth is unphysical).
-                let (hu_old, hv_old) = if h_old.value() > H_VEL {
-                    (states[(i, j)].hu, states[(i, j)].hv)
-                } else {
-                    (T::zero(), T::zero())
-                };
-                states[(i, j)].h = new_h;
-                states[(i, j)].hu = hu_old - dhu + s_hu * dt;
-                states[(i, j)].hv = hv_old - dhv + s_hv * dt;
-            }
+    zip_for_each!(Zip::indexed(&mut *states), |(i, j), cell| 'cell: {
+        if was_dry[(i, j)]
+            && i > 0
+            && i + 1 < n_rows
+            && j > 0
+            && j + 1 < n_cols
+            && was_dry[(i - 1, j)]
+            && was_dry[(i + 1, j)]
+            && was_dry[(i, j - 1)]
+            && was_dry[(i, j + 1)]
+        {
+            // Keep the moisture film (see the floor below); only
+            // the momentum is reset, matching what the full path
+            // does for h ≤ H_VEL.
+            cell.hu = T::zero();
+            cell.hv = T::zero();
+            break 'cell;
         }
-    }
+        let fx_right = faces_x[(i, j + 1)].minus;
+        let fx_left = faces_x[(i, j)].plus;
+        let fy_bottom = faces_y[(i + 1, j)].minus;
+        let fy_top = faces_y[(i, j)].plus;
+
+        let dh = (fx_right.mass - fx_left.mass) * dt_dx + (fy_bottom.mass - fy_top.mass) * dt_dy;
+        let new_h = cell.h - dh;
+
+        // After flux rescaling new_h ≥ H_DRY by construction
+        // for cells that started wet. A residual floor catches
+        // floating-point roundoff that could nudge a barely-
+        // wet cell below the threshold.
+        let dhu = (fx_right.x_momentum - fx_left.x_momentum) * dt_dx
+            + (fy_bottom.x_momentum - fy_top.x_momentum) * dt_dy;
+        let dhv = (fx_right.y_momentum - fx_left.y_momentum) * dt_dx
+            + (fy_bottom.y_momentum - fy_top.y_momentum) * dt_dy;
+
+        // Explicit bed-slope source — see module doc. Algebraic
+        // form `S = (g/2) · (h_R_at_face² − h_L_at_face²)/Δx`
+        // that cancels the pressure-flux divergence exactly for
+        // lake-at-rest on any bed. `h_face` from cell's own `η`.
+        let h_old = cell.h;
+        let eta_cell = h_old + mesh.bed[(i, j)];
+
+        let h_face_left = (eta_cell - z_face_x[(i, j)]).max(T::zero());
+        let h_face_right = (eta_cell - z_face_x[(i, j + 1)]).max(T::zero());
+        let s_hu = (h_face_right.powi(2) - h_face_left.powi(2)) * (0.5 * GRAVITY) / mesh.dx;
+
+        let h_face_top = (eta_cell - z_face_y[(i, j)]).max(T::zero());
+        let h_face_bottom = (eta_cell - z_face_y[(i + 1, j)]).max(T::zero());
+        let s_hv = (h_face_bottom.powi(2) - h_face_top.powi(2)) * (0.5 * GRAVITY) / mesh.dy;
+
+        if new_h.value() <= H_VEL {
+            // Moisture floor. The mass is KEPT: a wetting-front
+            // cell that received δ ≤ H_DRY of inflow had that mass
+            // already leave its neighbour through the shared face,
+            // and zeroing it here destroyed volume all along the
+            // front perimeter at every step. The film stays inert
+            // on the bed (its faces are dry-dry for h ≤ H_DRY, and
+            // the α available-mass term is zero) until inflow
+            // accumulates past the threshold. Momentum is dropped
+            // for anything up to H_VEL: velocity on such a film is
+            // meaningless, and residual hu with h barely above
+            // H_DRY collapses dt through hu/h (see H_VEL doc).
+            *cell = Conserved2DG::new_generic(new_h.max(T::zero()), T::zero(), T::zero());
+        } else {
+            // A cell that was a film inherits no momentum: the
+            // floor invariant keeps evolved films at hu = hv = 0,
+            // and a caller-supplied initial state violating it
+            // must not leak its stale momentum into the wetted
+            // cell (hu/h on the old film depth is unphysical).
+            let (hu_old, hv_old) = if h_old.value() > H_VEL {
+                (cell.hu, cell.hv)
+            } else {
+                (T::zero(), T::zero())
+            };
+            cell.h = new_h;
+            cell.hu = hu_old - dhu + s_hu * dt;
+            cell.hv = hv_old - dhv + s_hv * dt;
+        }
+    });
 }
 
 /// Strong-stability-preserving Runge-Kutta second-order step
@@ -1175,7 +1169,7 @@ pub fn forward_euler_step_with<T: Real>(
 ///
 /// `dt` is bounded by the same `cfl_time_step` as forward Euler.
 /// Panics on shape mismatch (same as [`forward_euler_step`]).
-pub fn ssprk2_step<T: Real>(
+pub fn ssprk2_step<T: Real + MaybeSendSync>(
     states: &mut Array2<Conserved2DG<T>>,
     mesh: &Mesh2DG<T>,
     bcs: Boundaries2D,
@@ -1187,7 +1181,7 @@ pub fn ssprk2_step<T: Real>(
 
 /// [`ssprk2_step`] over caller-owned scratch buffers — the
 /// allocation-free hot path (the U^n snapshot lives in the workspace).
-pub fn ssprk2_step_with<T: Real>(
+pub fn ssprk2_step_with<T: Real + MaybeSendSync>(
     states: &mut Array2<Conserved2DG<T>>,
     mesh: &Mesh2DG<T>,
     bcs: Boundaries2D,
@@ -1204,8 +1198,9 @@ pub fn ssprk2_step_with<T: Real>(
     forward_euler_step_with(states, mesh, bcs, dt, ws);
 
     // Convex combination: U^{n+1} = ½(U^n + U^(2)).
-    for ((i, j), s) in states.indexed_iter_mut() {
-        let prev = ws.u_n[(i, j)];
+    let u_n = &ws.u_n;
+    zip_for_each!(Zip::indexed(&mut *states), |(i, j), s| {
+        let prev = u_n[(i, j)];
         s.h = (prev.h + s.h) * 0.5;
         s.hu = (prev.hu + s.hu) * 0.5;
         s.hv = (prev.hv + s.hv) * 0.5;
@@ -1217,7 +1212,7 @@ pub fn ssprk2_step_with<T: Real>(
             s.hu = T::zero();
             s.hv = T::zero();
         }
-    }
+    });
 }
 
 #[cfg(test)]
@@ -1894,7 +1889,7 @@ mod tests {
         // independent cross-check.
         use hydroflux_autograd::{Dual, Real as _};
 
-        fn one_step_mass<T: hydroflux_autograd::Real>(h_init: T) -> T {
+        fn one_step_mass<T: hydroflux_autograd::Real + MaybeSendSync>(h_init: T) -> T {
             let n_rows = 4usize;
             let n_cols = 5usize;
             let dx = 1.0;
@@ -1939,7 +1934,7 @@ mod tests {
         // the gradient must respect.
         use hydroflux_autograd::{Dual, Real as _};
 
-        fn ssprk_mass<T: hydroflux_autograd::Real>(z_seed: T) -> T {
+        fn ssprk_mass<T: hydroflux_autograd::Real + MaybeSendSync>(z_seed: T) -> T {
             let n_rows = 6usize;
             let n_cols = 6usize;
             let dx = 1.0;

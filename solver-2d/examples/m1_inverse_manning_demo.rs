@@ -33,8 +33,8 @@ use hydroflux_autograd::{Dual, Real};
 use ndarray::Array2;
 
 use hydroflux_solver_2d::{
-    Boundaries2D, Boundary, Conserved2DG, Mesh2DG, cfl_time_step, manning_friction_step,
-    ssprk2_step,
+    Boundaries2D, Boundary, Conserved2DG, MaybeSendSync, Mesh2DG, cfl_time_step,
+    manning_friction_step, ssprk2_step,
 };
 
 const OUT_CSV: &str = "papers/01_review/figures/data/m1_inverse_manning.csv";
@@ -71,7 +71,7 @@ fn initial_states<T: Real>() -> Array2<Conserved2DG<T>> {
 /// centroid of the wet region — `Σ x · h / Σ h` — along the long axis.
 /// Generic over T so the same code evaluates with f64 (for the
 /// synthetic observation) and with Dual (for AD-based inversion).
-fn depth_centroid<T: Real>(n: T) -> T {
+fn depth_centroid<T: Real + MaybeSendSync>(n: T) -> T {
     let mesh = build_mesh(n);
     let mut states = initial_states::<T>();
     let bcs = Boundaries2D {

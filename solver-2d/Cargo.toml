@@ -16,6 +16,15 @@ thiserror.workspace          = true
 surtgis-core.workspace       = true
 hydroflux-autograd.workspace = true
 flate2.workspace             = true
+rayon = { workspace = true, optional = true }
+
+[features]
+# Row-chunked rayon parallelism over the step's per-cell passes (WP4,
+# 2026-07). Off by default: single-threaded is the reproducible,
+# zero-dependency-surprise default for the verification suite and for
+# anyone building the paper's exact numbers. See
+# `src/parallel.rs` for the `T: Send + Sync` bound this gates.
+parallel = ["dep:rayon", "ndarray/rayon"]
 
 [dev-dependencies]
 approx.workspace    = true

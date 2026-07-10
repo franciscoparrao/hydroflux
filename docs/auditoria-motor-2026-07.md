@@ -218,11 +218,25 @@ el estado post-update y descarta el inflow. El argumento de equivalencia matemá
   escaneos de ventana `any_neighbor_dry_x/y` (`update.rs:386-417`, ~10 loads + 10 branches por
   celda incluso en dominios 100% mojados) y sirve al skip de slopes en regiones secas.
 
-### 3.3 P1 — paralelismo CPU: inexistente, estructura casi lista
+### 3.3 P1 — paralelismo CPU: implementado y medido (WP4, 2026-07-09)
 
-No hay rayon en el workspace. Las pasadas (slopes, faces, alpha, fricción) son mapas puros →
-`Zip::par_for_each` directo; CFL es una reducción max. Tras el fix 3.2, el loop final también.
-Escalado esperado en desktop 8-16 cores: 5-10× (sin arreglar 3.1 primero, se satura en 3-4×).
+**Actualización 2026-07-09**: implementado y medido — ver
+`docs/wp4_rayon_results.md` para el detalle completo. Resultado real,
+NO la proyección de abajo (dejada tal cual por trazabilidad): la
+predicción "5-10× en desktop 8-16 cores" resultó optimista incluso con
+el fix 3.1 ya aplicado (`StepWorkspace2D`, commit `4485d94`) — el
+escalado medido en `nitro` (8 núcleos físicos) satura en **3.8-4.0×**
+a 8 threads para el régimen denso (`all_wet`) y **2.8×** para el
+régimen disperso realista (`mostly_dry`, ~94% seco, el más parecido a
+la aplicación del Huasco). Ambos saturan a 4-8 threads sin beneficio
+adicional más allá. Confirma que sin SoA+SIMD (§3.4, no hecho), el
+paralelismo por sí solo no alcanza la parte alta del rango proyectado.
+
+Predicción original (2026-07-02, para referencia): no había rayon en
+el workspace. Las pasadas (slopes, faces, alpha, fricción) son mapas
+puros → `Zip::par_for_each` directo; CFL es una reducción max. Tras el
+fix 3.2, el loop final también. Escalado esperado en desktop 8-16
+cores: 5-10× (sin arreglar 3.1 primero, se satura en 3-4×).
 
 ### 3.4 P2 — SoA + SIMD
 
@@ -236,12 +250,17 @@ Escalado esperado en desktop 8-16 cores: 5-10× (sin arreglar 3.1 primero, se sa
 
 ### 3.5 Headroom estimado
 
-| Optimización | Ganancia | Acumulado |
-|---|---|---|
-| Workspace + precómputos (3.1) | 2-3× | 2-3× |
-| SoA + sin bounds checks + branchless (3.4) | 1.5-2× | 3-6× |
-| rayon 8-16 cores (3.3) | 5-10× | **15-50×** |
-| SIMD residual | 1.2-2× | 20-60× |
+| Optimización | Ganancia (proyectada) | Ganancia (medida) | Acumulado (proyectado) |
+|---|---|---|---|
+| Workspace + precómputos (3.1) | 2-3× | ✅ hecho (commit `4485d94`) | 2-3× |
+| SoA + sin bounds checks + branchless (3.4) | 1.5-2× | no hecho | 3-6× |
+| rayon 8-16 cores (3.3) | 5-10× | **3.8-4.0× (dense) / 2.8× (sparse), medido 2026-07-09, `docs/wp4_rayon_results.md`** | **15-50×** |
+| SIMD residual | 1.2-2× | no hecho | 20-60× |
+
+La fila de rayon confirma que la proyección "5-10×" solo se cumpliría
+CON el fix 3.4 (SoA+SIMD) ya aplicado, que sigue pendiente — el
+acumulado real hoy, con solo 3.1+3.3 hechos, es ~4× (denso) / ~2.8×
+(disperso), no 15-50×.
 
 De ~1 a **~20-60 Mcell-steps/s en CPU** — el orden de LISFLOOD-FP 8 / TRITON CPU — **sin GPU**.
 La GPU (wgpu) añadiría 10-50× sobre eso (solvers SWE publicados: 1-3 Gcell-steps/s en gama media).

@@ -29,7 +29,8 @@ use hydroflux_autograd::{Dual, Real};
 use ndarray::Array2;
 
 use hydroflux_solver_2d::{
-    Boundaries2D, Boundary, Conserved2DG, Mesh2DG, manning_friction_step, ssprk2_step,
+    Boundaries2D, Boundary, Conserved2DG, MaybeSendSync, Mesh2DG, manning_friction_step,
+    ssprk2_step,
 };
 
 const OUT_CSV: &str = "papers/01_review/figures/data/m1_timing.csv";
@@ -62,7 +63,7 @@ fn build_state<T: Real>() -> (Array2<Conserved2DG<T>>, Mesh2DG<T>) {
     (states, mesh)
 }
 
-fn time_run<T: Real>(label: &str, n_seed: T) -> (f64, f64) {
+fn time_run<T: Real + MaybeSendSync>(label: &str, n_seed: T) -> (f64, f64) {
     let (mut states, mut mesh) = build_state::<T>();
     // Seed the Manning n if requested — for the Dual run this turns
     // every cell into a derivative-carrying value during the friction
