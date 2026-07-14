@@ -326,10 +326,23 @@ tests) y `-- --ignored --nocapture` (los `report_*` que imprimen los números de
 | UK EA Test 4 mass balance ratio | 1.151 | 1.151 | volumen absoluto cambia ~0.01%, ratio igual |
 | Convergencia L1/L2 (test, no solo report) | pasa | pasa | sin número impreso separado, solo pass/fail |
 
-**Pendiente**: Huasco (el benchmark de DEM real, ~1 día de cómputo según WP0) no se volvió a
-correr en esta sesión por costo — es la única pieza de la batería de WP0 sin verificar
-directamente. Todo lo demás (los 5 benchmarks sintéticos + los 305 tests) está verificado con
-evidencia dura, no argumentado.
+**Huasco (DEM real, 2026-07-13, mismo protocolo `git checkout <commit> -- update.rs sim.rs`
+antes/después, no `git stash` porque el fix ya estaba commiteado)** — 1 día de pico (`--days 1`,
+el comando exacto de WP0: `cargo run --release -p hydroflux-solver-2d --example huasco_2d_event[_landcover] -- --days 1`),
+~6.5 min de wall time cada corrida, no ~1 día como se estimaba (esa cifra del roadmap incluía
+overhead de sesión, no cómputo puro):
+
+| Métrica | Uniforme antes | Uniforme después | Δ | Landcover antes | Landcover después | Δ |
+|---|---|---|---|---|---|---|
+| h_max [m] | 4.356 | 4.370 | +0.014 (+0.32%) | 4.332 | 4.371 | +0.039 (+0.90%) |
+| mass final [m³] | 2.197e5 | 2.205e5 | +0.36% | 2.689e5 | 2.689e5 | ~0% |
+| n_wet | 279 | 278 | −1 celda | 285 | 287 | +2 celdas |
+| outflow medio [m³/s] | 15.57 | 15.56 | −0.06% | 15.00 | 15.00 | ~0% |
+
+Todos los deltas caben cómodamente dentro de lo que la propia tabla de WP0 ya aceptó como "leve y
+explicable" (esa tabla documenta cambios de 0.03-0.04 m en h_max y de varias celdas en n_wet por
+el moisture floor/H_VEL — del mismo orden que esto). **Los 6 benchmarks de la batería WP0 quedan
+verificados con evidencia dura, ninguno pendiente.**
 
 **Reproductor** (`solver-2d/examples/debug_boundary_slope_instability.rs`, con más presupuesto de
 pasos para dejarlo converger): el caso B original (pendiente 70%) pasó de **divergencia sin
@@ -357,9 +370,20 @@ ese repo desde acá.
 
 ### 7.9 Qué falta antes de considerar esto para el commit congelado del paper
 
-- [ ] Correr Huasco (aplicación real) antes/después y agregar la fila a la tabla de §7.7.
-- [ ] Si Huasco también sale dentro de tolerancia: decidir si este fix acotado se integra al
-      commit congelado de WP0 (repitiendo WP0 formalmente) o se mantiene como rama separada hasta
-      que el fix de fondo esté listo.
+- [x] **Correr Huasco (aplicación real) antes/después (2026-07-13)** — ver tabla en §7.7. Deltas
+      de 0.32-0.90% en h_max, ~0% en mass/outflow, ±1-2 celdas en n_wet — dentro de lo que WP0 ya
+      aceptó. **Los 6 benchmarks de la batería completa (5 sintéticos + Huasco) están verificados
+      con evidencia dura.**
+- [ ] Decidir si este fix acotado se integra al commit congelado de WP0 (repitiendo WP0
+      formalmente) o se mantiene como rama separada hasta que el fix de fondo esté listo —
+      decisión del usuario, no técnica.
 - [ ] El fix de fondo (§7.6, "hacer que la fuente use el mismo estado MUSCL que el flujo") sigue
       pendiente, en su propia sesión, sin apuro — según lo acordado.
+
+**Nota de precisión para cualquier resumen o texto de paper** (pedido explícito del usuario,
+2026-07-13): "ya no diverge" y "es físicamente correcto" son afirmaciones distintas. Este fix
+está confirmado en la primera (elimina la divergencia sin límite, validado contra 6 benchmarks) —
+NO está confirmado en la segunda para el régimen más extremo del reproductor sintético (§7.7,
+"Limitación residual honesta": la meseta de ~36 m en el caso de 70% de pendiente es acotada y
+convergente, pero sigue por encima de lo físicamente esperable para ese forzante). No mezclar
+ambas afirmaciones en ningún texto que alguien pueda citar.
