@@ -91,6 +91,32 @@ use crate::state::Conserved2DG;
 use crate::{GRAVITY, H_DRY, H_VEL};
 use ndarray::{Array2, Zip};
 
+/// Ratio threshold for the explicit bed-slope source's bounded-slope
+/// safety valve (see the comment at its use site in
+/// [`forward_euler_step_with`], and
+/// docs/bug-report-2026-07-boundary-slope-instability.md §7). An
+/// ordinary (non-shoreline) face's `h_face` exceeding `h_old` by more
+/// than this multiple only happens when the neighbouring bed sits far
+/// enough below this cell's own bed that the quadratic source form
+/// scales with the bed jump rather than the depth.
+///
+/// A ratio of 5 looked generous against the flat/uniformly-sloped
+/// fixtures (worst case ~1.03), but `lake_at_rest_with_emerged_island_
+/// is_preserved` broke that intuition: on a smooth Gaussian shoreline,
+/// `h -> 0` continuously approaching the shore while the local bed
+/// gradient does NOT vanish, so an ordinary (non-shoreline-rule) wet
+/// cell one ring outside the actual wet/dry boundary can legitimately
+/// see a ratio around 6 -- "thin water near a real shoreline", not
+/// "thin film on steep terrain far from any shoreline", and the two
+/// are indistinguishable by ratio alone at that scale. Calibrated
+/// instead well above the worst ratio empirically observed across the
+/// full lake-at-rest suite (~6) and still ~100x below the pathological
+/// ratio in the bug report's reproducer (> 10^4): the gap between
+/// "smooth benchmark bed, however close to a shoreline" and "thin film
+/// on steep terrain" is still several orders of magnitude, just not as
+/// many as first assumed.
+const STEEP_SOURCE_RATIO: f64 = 500.0;
+
 /// Maximum signal speeds `(s_x, s_y)` across the state field, where
 /// `s_x = max(|u| + c)` and `s_y = max(|v| + c)`. Returns `(0, 0)` for
 /// an empty or all-dry state. Wave speeds are reduced to `f64` (via
@@ -1102,11 +1128,78 @@ pub fn forward_euler_step_with<T: Real + MaybeSendSync>(
 
         let h_face_left = (eta_cell - z_face_x[(i, j)]).max(T::zero());
         let h_face_right = (eta_cell - z_face_x[(i, j + 1)]).max(T::zero());
-        let s_hu = (h_face_right.powi(2) - h_face_left.powi(2)) * (0.5 * GRAVITY) / mesh.dx;
+
+        // Bounded-slope safety valve — see
+        // docs/bug-report-2026-07-boundary-slope-instability.md §7.
+        // An EARLIER version of this guard fired whenever `h_face` on
+        // either side exceeded `h_old`, on the (wrong) assumption that
+        // this could only happen at a bed jump much larger than the
+        // depth. That is false in general: on an ORDINARY (non-
+        // shoreline) sloped face, `h_face_downhill = h_old + Δz/2` for
+        // ANY `Δz > 0` — lake-at-rest on a sloped bed legitimately
+        // exceeds `h_old` on the downhill side by design (that
+        // asymmetry is exactly what the well-balanced cancellation
+        // needs). A SECOND earlier version required BOTH faces of the
+        // cell to be interior/ordinary before applying the cap, which
+        // excluded the very cells the bug report's reproducer blows up
+        // first (column adjacent to an open boundary, where one face
+        // is the boundary itself but the OTHER face is an ordinary
+        // interior face with the same pathology).
+        //
+        // The corrected guard caps each SIDE of the quadratic term
+        // independently: `h_face_side` is soft-clamped to at most
+        // `STEEP_SOURCE_RATIO · h_old` whenever that specific side (a)
+        // is an ordinary face — the neighbour across it shares this
+        // cell's pre-step wet/dry state, i.e. `z_face` came from the
+        // midpoint rule, never the shoreline `max(z_L, z_R)` rule —
+        // and (b) actually exceeds the cap. `max(z_L, z_R) ≥` this
+        // cell's own bed by construction, so a genuine shoreline
+        // (buildings, coastlines) always has `h_face ≤ h_old` on the
+        // wet side and can never trip the cap; boundary faces
+        // (Transmissive/Wall) carry zero jump by construction and
+        // never trip it either — those C-property tests, and both
+        // domain edges, are untouched by construction, not by tuning
+        // the ratio. The quadratic FORM is preserved unchanged (still
+        // a difference of squares, still exact in the smooth-bed
+        // limit); only a face whose implied depth has run away to many
+        // times the cell's own depth — the signature of a bed jump
+        // dominating a thin film, not a resolved free surface — gets
+        // pulled back before squaring, so its contribution collapses
+        // toward zero (∝ h_old²) instead of growing with the bed jump
+        // squared, independent of `h`.
+        let cap_x = h_old * STEEP_SOURCE_RATIO;
+        let ordinary_left_x = j > 0 && was_dry[(i, j - 1)] == was_dry[(i, j)];
+        let ordinary_right_x = j + 1 < n_cols && was_dry[(i, j)] == was_dry[(i, j + 1)];
+        let h_face_left_capped = if ordinary_left_x && h_face_left.value() > cap_x.value() {
+            cap_x
+        } else {
+            h_face_left
+        };
+        let h_face_right_capped = if ordinary_right_x && h_face_right.value() > cap_x.value() {
+            cap_x
+        } else {
+            h_face_right
+        };
+        let s_hu =
+            (h_face_right_capped.powi(2) - h_face_left_capped.powi(2)) * (0.5 * GRAVITY) / mesh.dx;
 
         let h_face_top = (eta_cell - z_face_y[(i, j)]).max(T::zero());
         let h_face_bottom = (eta_cell - z_face_y[(i + 1, j)]).max(T::zero());
-        let s_hv = (h_face_bottom.powi(2) - h_face_top.powi(2)) * (0.5 * GRAVITY) / mesh.dy;
+        let cap_y = h_old * STEEP_SOURCE_RATIO;
+        let ordinary_top_y = i > 0 && was_dry[(i - 1, j)] == was_dry[(i, j)];
+        let ordinary_bottom_y = i + 1 < n_rows && was_dry[(i, j)] == was_dry[(i + 1, j)];
+        let h_face_top_capped = if ordinary_top_y && h_face_top.value() > cap_y.value() {
+            cap_y
+        } else {
+            h_face_top
+        };
+        let h_face_bottom_capped = if ordinary_bottom_y && h_face_bottom.value() > cap_y.value() {
+            cap_y
+        } else {
+            h_face_bottom
+        };
+        let s_hv = (h_face_bottom_capped.powi(2) - h_face_top_capped.powi(2)) * (0.5 * GRAVITY)
+            / mesh.dy;
 
         if new_h.value() <= H_VEL {
             // Moisture floor. The mass is KEPT: a wetting-front

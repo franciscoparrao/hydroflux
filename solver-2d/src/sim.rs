@@ -245,6 +245,31 @@ impl Simulation {
     }
 }
 
+/// Cheap plausibility check for a simulated depth field, independent
+/// of any `NaN`/`inf` guard. A numerical blow-up on steep terrain can
+/// be entirely finite (see
+/// `docs/bug-report-2026-07-boundary-slope-instability.md` §4 in the
+/// repo root) — depths of thousands of metres that are still normal
+/// floating-point numbers, so a caller checking only for `NaN`/`inf`
+/// sees a "valid" result.
+///
+/// Returns `true` when the maximum depth in `states` exceeds `factor`
+/// times the mesh's own bed relief (`bed.max() - bed.min()`, floored
+/// at 1 m so a near-flat mesh does not make the check degenerate): no
+/// physically sane flood holds more water than some modest multiple of
+/// the terrain's own vertical range. Meant for real-DEM windows with
+/// genuine relief, not flat synthetic test meshes. `factor` is
+/// caller-chosen; 2-5 is a reasonable default for flood applications —
+/// generous enough to allow a closed depression to pond well above its
+/// own rim without flagging every legitimately deep lake.
+pub fn max_depth_exceeds_relief(states: &Array2<Conserved2D>, mesh: &Mesh2D, factor: f64) -> bool {
+    let max_depth = states.iter().map(|s| s.h).fold(0.0_f64, f64::max);
+    let bed_max = mesh.bed.iter().cloned().fold(f64::NEG_INFINITY, f64::max);
+    let bed_min = mesh.bed.iter().cloned().fold(f64::INFINITY, f64::min);
+    let relief = (bed_max - bed_min).max(1.0);
+    max_depth > factor * relief
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,5 +370,27 @@ mod tests {
             Err(SimError::StepBudgetExhausted { steps, .. }) => assert_eq!(steps, 3),
             other => panic!("expected StepBudgetExhausted, got {:?}", other.map(|_| ())),
         }
+    }
+
+    #[test]
+    fn max_depth_exceeds_relief_flags_a_finite_blow_up() {
+        // 97 m of relief (matches the Curacautín reproducer in the bug
+        // report), a plausible 5 m flood, then an implausible one.
+        let bed = Array2::from_shape_fn((4, 4), |(i, _j)| i as f64 * 32.0); // 0..96 m
+        let mesh = Mesh2D::new(bed, 30.0, 30.0, 0.035);
+        let plausible = Array2::from_elem((4, 4), Conserved2D::new(5.0, 0.0, 0.0));
+        let implausible = Array2::from_elem((4, 4), Conserved2D::new(3000.0, 0.0, 0.0));
+        assert!(!max_depth_exceeds_relief(&plausible, &mesh, 3.0));
+        assert!(max_depth_exceeds_relief(&implausible, &mesh, 3.0));
+    }
+
+    #[test]
+    fn max_depth_exceeds_relief_floors_a_near_flat_mesh() {
+        // Flat bed: relief floors at 1 m instead of dividing by ~0.
+        let mesh = Mesh2D::new(Array2::<f64>::zeros((3, 3)), 1.0, 1.0, 0.03);
+        let modest = Array2::from_elem((3, 3), Conserved2D::new(2.0, 0.0, 0.0));
+        let extreme = Array2::from_elem((3, 3), Conserved2D::new(50.0, 0.0, 0.0));
+        assert!(!max_depth_exceeds_relief(&modest, &mesh, 3.0));
+        assert!(max_depth_exceeds_relief(&extreme, &mesh, 3.0));
     }
 }
