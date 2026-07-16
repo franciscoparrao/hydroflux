@@ -1131,75 +1131,64 @@ pub fn forward_euler_step_with<T: Real + MaybeSendSync>(
 
         // Bounded-slope safety valve — see
         // docs/bug-report-2026-07-boundary-slope-instability.md §7.
-        // An EARLIER version of this guard fired whenever `h_face` on
-        // either side exceeded `h_old`, on the (wrong) assumption that
-        // this could only happen at a bed jump much larger than the
-        // depth. That is false in general: on an ORDINARY (non-
-        // shoreline) sloped face, `h_face_downhill = h_old + Δz/2` for
-        // ANY `Δz > 0` — lake-at-rest on a sloped bed legitimately
-        // exceeds `h_old` on the downhill side by design (that
-        // asymmetry is exactly what the well-balanced cancellation
-        // needs). A SECOND earlier version required BOTH faces of the
-        // cell to be interior/ordinary before applying the cap, which
-        // excluded the very cells the bug report's reproducer blows up
-        // first (column adjacent to an open boundary, where one face
-        // is the boundary itself but the OTHER face is an ordinary
-        // interior face with the same pathology).
+        // Two earlier versions are recorded there in detail (§7.6): a
+        // whole-formula linear swap gated on `h_face > h_old` (broke
+        // lake-at-rest — that condition fires on any nonzero slope,
+        // not just a pathological one), and a per-side CAP of
+        // `h_face` inside the SAME quadratic difference-of-squares —
+        // which passed every unit test and the full WP0 benchmark
+        // battery, but nowcast's real-DEM field test (2026-07-14)
+        // found watchlist localities reaching hundreds of metres, far
+        // worse with MORE integration steps for the same window, not
+        // fewer. Root cause of that regression: capping `h_face` to
+        // `STEEP_SOURCE_RATIO · h_old` and then SQUARING it still
+        // leaves the capped contribution `∝ h_old²` — quadratic in
+        // depth, not the linear `∝ h_old` the real bed-slope force
+        // `-g·h·∂z/∂x` requires. A cell that starts gaining depth
+        // (from upstream inflow, not just the local film) sees its
+        // own capped source grow faster than linearly, a genuine
+        // positive-feedback channel that a short synthetic window or
+        // a single-day Huasco run does not have enough integration
+        // time to expose.
         //
-        // The corrected guard caps each SIDE of the quadratic term
-        // independently: `h_face_side` is soft-clamped to at most
-        // `STEEP_SOURCE_RATIO · h_old` whenever that specific side (a)
-        // is an ordinary face — the neighbour across it shares this
-        // cell's pre-step wet/dry state, i.e. `z_face` came from the
-        // midpoint rule, never the shoreline `max(z_L, z_R)` rule —
-        // and (b) actually exceeds the cap. `max(z_L, z_R) ≥` this
-        // cell's own bed by construction, so a genuine shoreline
-        // (buildings, coastlines) always has `h_face ≤ h_old` on the
-        // wet side and can never trip the cap; boundary faces
-        // (Transmissive/Wall) carry zero jump by construction and
-        // never trip it either — those C-property tests, and both
-        // domain edges, are untouched by construction, not by tuning
-        // the ratio. The quadratic FORM is preserved unchanged (still
-        // a difference of squares, still exact in the smooth-bed
-        // limit); only a face whose implied depth has run away to many
-        // times the cell's own depth — the signature of a bed jump
-        // dominating a thin film, not a resolved free surface — gets
-        // pulled back before squaring, so its contribution collapses
-        // toward zero (∝ h_old²) instead of growing with the bed jump
-        // squared, independent of `h`.
-        let cap_x = h_old * STEEP_SOURCE_RATIO;
+        // The corrected guard keeps the per-side, per-face ELIGIBILITY
+        // test from that iteration (an ordinary face — the neighbour
+        // across it shares this cell's pre-step wet/dry state, i.e.
+        // `z_face` came from the midpoint rule, never the shoreline
+        // `max(z_L, z_R)` rule, which structurally bounds `h_face ≤
+        // h_old` there — so genuine shorelines, buildings, coastlines
+        // and domain boundaries can never trigger this at all), but
+        // replaces the FORM used once triggered: instead of capping
+        // one side's `h_face` inside the square, the whole cell's
+        // `s_hu` switches to the linear form `-g·h_old·∂z/∂x`
+        // (`∂z` from the same `z_face` values, no bed extrapolation
+        // needed) — exactly the smooth-bed-limit approximation the
+        // quadratic form itself reduces to, but valid for ANY bed
+        // jump because it is `h_old`-proportional by construction,
+        // not just in the limit where the jump is small.
         let ordinary_left_x = j > 0 && was_dry[(i, j - 1)] == was_dry[(i, j)];
         let ordinary_right_x = j + 1 < n_cols && was_dry[(i, j)] == was_dry[(i, j + 1)];
-        let h_face_left_capped = if ordinary_left_x && h_face_left.value() > cap_x.value() {
-            cap_x
+        let steep_x = (ordinary_left_x && h_face_left.value() > STEEP_SOURCE_RATIO * h_old.value())
+            || (ordinary_right_x
+                && h_face_right.value() > STEEP_SOURCE_RATIO * h_old.value());
+        let s_hu = if steep_x {
+            h_old * (z_face_x[(i, j)] - z_face_x[(i, j + 1)]) * (GRAVITY / mesh.dx)
         } else {
-            h_face_left
+            (h_face_right.powi(2) - h_face_left.powi(2)) * (0.5 * GRAVITY) / mesh.dx
         };
-        let h_face_right_capped = if ordinary_right_x && h_face_right.value() > cap_x.value() {
-            cap_x
-        } else {
-            h_face_right
-        };
-        let s_hu =
-            (h_face_right_capped.powi(2) - h_face_left_capped.powi(2)) * (0.5 * GRAVITY) / mesh.dx;
 
         let h_face_top = (eta_cell - z_face_y[(i, j)]).max(T::zero());
         let h_face_bottom = (eta_cell - z_face_y[(i + 1, j)]).max(T::zero());
-        let cap_y = h_old * STEEP_SOURCE_RATIO;
         let ordinary_top_y = i > 0 && was_dry[(i - 1, j)] == was_dry[(i, j)];
         let ordinary_bottom_y = i + 1 < n_rows && was_dry[(i, j)] == was_dry[(i + 1, j)];
-        let h_face_top_capped = if ordinary_top_y && h_face_top.value() > cap_y.value() {
-            cap_y
+        let steep_y = (ordinary_top_y && h_face_top.value() > STEEP_SOURCE_RATIO * h_old.value())
+            || (ordinary_bottom_y
+                && h_face_bottom.value() > STEEP_SOURCE_RATIO * h_old.value());
+        let s_hv = if steep_y {
+            h_old * (z_face_y[(i, j)] - z_face_y[(i + 1, j)]) * (GRAVITY / mesh.dy)
         } else {
-            h_face_top
+            (h_face_bottom.powi(2) - h_face_top.powi(2)) * (0.5 * GRAVITY) / mesh.dy
         };
-        let h_face_bottom_capped = if ordinary_bottom_y && h_face_bottom.value() > cap_y.value() {
-            cap_y
-        } else {
-            h_face_bottom
-        };
-        let s_hv = (h_face_bottom_capped.powi(2) - h_face_top_capped.powi(2)) * (0.5 * GRAVITY)
-            / mesh.dy;
 
         if new_h.value() <= H_VEL {
             // Moisture floor. The mass is KEPT: a wetting-front

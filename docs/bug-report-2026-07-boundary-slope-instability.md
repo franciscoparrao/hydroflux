@@ -387,3 +387,98 @@ NO está confirmado en la segunda para el régimen más extremo del reproductor 
 "Limitación residual honesta": la meseta de ~36 m en el caso de 70% de pendiente es acotada y
 convergente, pero sigue por encima de lo físicamente esperable para ese forzante). No mezclar
 ambas afirmaciones en ningún texto que alguien pueda citar.
+
+---
+
+## 8. Hallazgo de campo desde nowcast (2026-07-14) — el fix acotado de §7.6 era insuficiente
+
+Con autorización de su usuario, nowcast corrió un experimento de plausibilidad física sobre las
+13 localidades de su watchlist, con criterios pre-registrados antes de ver resultados (agua no
+puede promediar más alto que el terreno seco; profundidad máxima no puede exceder el 50% del
+relieve local de la ventana). **11 de 12 localidades evaluadas fallan**, y las de mayor gatillo
+climático fallan peor: Tomé (gatillo 0.97) llega a 10.594 m, Santa Bárbara (gatillo 0.92) a
+**830 m**.
+
+Dato crítico que explica por qué esto es mucho peor que su verificación anterior de Curacautín
+(~25 m con `--max-steps 500` fijado a mano): el wrapper de producción usa el default del binario
+(20.000 pasos), no el límite manual de su chequeo previo. Con más pasos disponibles para la misma
+ventana de tiempo, Curacautín solo pasó de 25 m a **297 m**.
+
+### 8.1 Causa: el cap de §7.6 seguía escalando como `h_old²`, no `h_old`
+
+nowcast señaló correctamente el defecto citando el propio §7.4 de este reporte ("se dispara una
+vez por paso aceptado"): el cap de la iteración 3 (§7.6) limitaba la RAZÓN `h_face/h_old ≤ 500`,
+pero seguía **elevando ese valor capado al cuadrado** dentro de la resta de cuadrados
+(`s_hu = (h_face_right_capped² − h_face_left_capped²)·g/2/dx`). Como el cap mismo es
+`500·h_old`, la contribución capada queda `∝ (500·h_old)² = 250.000·h_old²` — **cuadrática en la
+profundidad**, no lineal como exige la física real (`-g·h·∂z/∂x`). Una celda que empieza a ganar
+profundidad (por avenida de aguas arriba, no solo por la lámina local) ve su propia fuente capada
+crecer más rápido que linealmente — un canal de retroalimentación positiva genuino que ni un
+reproductor sintético corto ni una corrida de Huasco de 1 día tienen tiempo de integración
+suficiente para exponer.
+
+**Verificación propia de esta hipótesis (2026-07-14)**: se extendió el reproductor sintético
+(`solver-2d/examples/debug_boundary_slope_instability.rs`, función `run_long_trend`) a 36.000 s
+(100× la ventana original) con el fix de la iteración 3 (cap cuadrático) todavía activo. Resultado
+**inconcluso, no confirmatorio**: el caso B (pendiente 70%) llega a un pico de 35.8 m en t≈360 s y
+luego **decae monótonamente** hasta 0.778 m en t=36.000 s — no reproduce el crecimiento sin
+límite que nowcast encontró en terreno real. La rampa sintética sellada (4 lados `Transmissive`,
+lluvia difusa uniforme) drena el pulso espurio inicial en vez de sostenerlo; algo en la geometría
+real de las localidades de la watchlist (canales convergentes, terreno no monotónico, forzante
+distinto) sostiene o amplifica el mecanismo de un modo que esta rampa simple no captura. Esto NO
+descarta el defecto — la matemática del `h_old²` es real independientemente de si este reproductor
+en particular lo expone — pero significa que **la validación de este defecto específico depende
+de datos de nowcast que esta sesión no tiene**, no puede cerrarse solo con evidencia de hydroflux.
+
+### 8.2 Iteración 4 (aplicada) — forma lineal completa, misma elegibilidad por cara que la iteración 3
+
+En vez de capar `h_face` dentro del cuadrado, cuando la cara dispara el gate (misma condición
+"cara ordinaria, no shoreline, no frontera, razón > `STEEP_SOURCE_RATIO`" de la iteración 3, que
+ya pasaba las 7 pruebas de C-property) se reemplaza el `s_hu`/`s_hv` **completo de la celda** por
+la forma lineal `-g·h_old·∂z/∂x` (usando los mismos valores de `z_face`, sin necesitar
+extrapolación de bed) — la misma forma de la iteración 1, pero con la elegibilidad correcta de la
+iteración 3 en vez de su gate roto (`h_face > h_old`, que disparaba en cualquier pendiente no
+nula).
+
+`solver-2d/src/update.rs`, `forward_euler_step_with`:
+
+```rust
+let steep_x = (ordinary_left_x && h_face_left.value() > STEEP_SOURCE_RATIO * h_old.value())
+    || (ordinary_right_x && h_face_right.value() > STEEP_SOURCE_RATIO * h_old.value());
+let s_hu = if steep_x {
+    h_old * (z_face_x[(i, j)] - z_face_x[(i, j + 1)]) * (GRAVITY / mesh.dx)
+} else {
+    (h_face_right.powi(2) - h_face_left.powi(2)) * (0.5 * GRAVITY) / mesh.dx
+};
+// análogo para s_hv en y
+```
+
+### 8.3 Validación de la iteración 4 (2026-07-14/16)
+
+| Verificación | Resultado |
+|---|---|
+| Tests locales (`--lib`, 127) | 0 fallos, incluidas las 7 pruebas C-property |
+| Batería completa (305+, workspace solver-2d) | 0 fallos |
+| Reproductor caso B, pico en t=360s | **11.460 m** (antes: 35.793 m con cap cuadrático, 3265 m sin fix) — mejora ~3× sobre la iteración 3 |
+| Reproductor caso B, sonda larga t=36.000s | decae a 0.768 m (igual de bien comportado que la iteración 3 en este reproductor) |
+| Huasco `--days 1` uniforme | h_max 4.340 m (base 4.356, Δ −0.37%), mass +0.46%, outflow −0.13%, n_wet +3 — dentro de tolerancia |
+| Huasco `--days 1` landcover | h_max 4.348 m (base 4.332, Δ +0.37%), mass ~0%, outflow ~0%, n_wet +1 — dentro de tolerancia |
+| Huasco `--days 12` (cubre el día pico 11), iteración 4 | h_max 4.30-4.60 m en los 12 días, mass final 3.000e5 m³, outflow medio 28.88 m³/s — sigue el hidrograma, sin crecimiento acumulado |
+| Huasco `--days 12`, iteración 3 (comparación directa, mismo commit base) | h_max 4.32-4.59 m, mass final 2.999e5 m³, outflow 28.88 m³/s — **prácticamente idéntico a la iteración 4** |
+
+**Resultado de la comparación de 12 días (2026-07-16)**: iteración 3 (el cap cuadrático, el que
+seguía en `main`) e iteración 4 (la forma lineal corregida) dan resultados casi indistinguibles
+en Huasco a lo largo de 288 horas simuladas — ninguna de las dos diverge, ninguna crece con más
+tiempo de integración. Esto confirma que **Huasco no es un caso adversarial para este defecto**,
+con ninguna de las dos versiones: el terreno real de esa cuenca no combina pendiente y lámina
+fina de la forma que dispara el mecanismo. Ni el reproductor sintético (§8.1) ni Huasco (aquí)
+logran reproducir el crecimiento catastrófico que nowcast encontró en Tomé/Santa Bárbara.
+
+**Estado final**: iteración 4 es una mejora matemática real (elimina el escalado `h²` identificado,
+sin regresiones en nada medible desde hydroflux — 305+ tests, 6 benchmarks WP0 sintéticos, y ahora
+2 configuraciones de Huasco de distinta duración) y se integra como tal. Pero **el caso específico
+de nowcast (localidades de la watchlist) sigue sin poder cerrarse solo desde hydroflux**: ni la
+rampa sintética ni Huasco reproducen su magnitud de falla, con ninguna de las dos iteraciones.
+Pedido explícito y sin resolver a nowcast: compartir la configuración exacta de una localidad que
+falla (DEM, forzante, duración), o volver a correr su experimento de plausibilidad de 13
+localidades contra este commit — es la única prueba adversarial que puede cerrar esto con certeza.
