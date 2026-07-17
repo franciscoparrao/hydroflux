@@ -23,6 +23,49 @@ fn ramp_mesh(steep: bool) -> Mesh2D {
     Mesh2D::new(bed, 30.0, 30.0, 0.035)
 }
 
+/// Parameterised ramp: `dx` cell size, `dz_per_cell` bed jump per cell
+/// (so `dz_per_cell / dx` is the local slope magnitude). Probes the
+/// bed-slope source with terrain far steeper than the original 67%
+/// reproducer — see
+/// docs/bug-report-2026-07-boundary-slope-instability.md §9 (nowcast's
+/// Santa Bárbara re-test: 90 m DEM pixels, real precordillera relief)
+/// and §10 (the reconstructed-source fix these probes validate).
+fn ramp_mesh_scaled(dx: f64, dz_per_cell: f64) -> Mesh2D {
+    let (nr, nc) = (20, 6);
+    let bed = Array2::from_shape_fn((nr, nc), |(_i, j)| (nc - 1 - j) as f64 * dz_per_cell);
+    Mesh2D::new(bed, dx, dx, 0.035)
+}
+
+fn run_scaled(label: &str, dx: f64, dz_per_cell: f64, rain_mm_per_day: f64, duration_s: f64, cfl: f64, max_steps: usize) {
+    let mesh = ramp_mesh_scaled(dx, dz_per_cell);
+    let slope_pct = 100.0 * dz_per_cell / dx;
+    let rain_rate_m_s = rain_mm_per_day * 1.0e-3 / 86_400.0;
+    let init = Array2::from_elem((mesh.n_rows(), mesh.n_cols()), Conserved2D::DRY);
+    let config = SimulationConfig {
+        cfl,
+        boundaries: Boundaries2D::TRANSMISSIVE,
+        ..Default::default()
+    };
+    let mut sim = Simulation::new(mesh, init, config).unwrap();
+    let mut truncated = false;
+    while sim.time() < duration_s {
+        if sim.steps() >= max_steps {
+            truncated = true;
+            break;
+        }
+        let dt = sim.step(duration_s - sim.time()).unwrap();
+        apply_rain(sim.states_mut(), rain_rate_m_s, dt);
+    }
+    let max_depth = sim.states().iter().map(|s| s.h).fold(0.0_f64, f64::max);
+    println!(
+        "{label}: dx={dx}m slope={slope_pct:.0}% rain={rain_mm_per_day}mm/d dur={duration_s}s steps={} t={:.3} max_depth={:.3} m truncated={}",
+        sim.steps(),
+        sim.time(),
+        max_depth,
+        truncated
+    );
+}
+
 fn run(label: &str, steep: bool, cfl: f64) {
     let mesh = ramp_mesh(steep);
     let rain_rate_m_s = 68.0 * 1.0e-3 / 86_400.0; // 68 mm/day
@@ -102,4 +145,13 @@ fn main() {
 
     println!("\n--- long-duration trend probe (case B, 100x the original window) ---");
     run_long_trend("B-long", true, 0.4, 36_000.0, 2_000_000);
+
+    println!("\n--- Santa Barbara-style stress probe (90 m pixels, extreme local relief) ---");
+    // Mirrors nowcast's exact reproducer parameters (rain 32.6 mm/day,
+    // duration 900 s, cfl 0.4, max-steps 20000) at increasing slope
+    // magnitude, up to a deeply pathological near-vertical ramp.
+    run_scaled("SB-100pct", 90.0, 90.0, 32.6, 900.0, 0.4, 20_000);
+    run_scaled("SB-200pct", 90.0, 180.0, 32.6, 900.0, 0.4, 20_000);
+    run_scaled("SB-300pct", 90.0, 270.0, 32.6, 900.0, 0.4, 20_000);
+    run_scaled("SB-1000pct", 90.0, 900.0, 32.6, 900.0, 0.4, 20_000);
 }

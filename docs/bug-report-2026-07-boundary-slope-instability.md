@@ -377,8 +377,8 @@ ese repo desde acá.
 - [ ] Decidir si este fix acotado se integra al commit congelado de WP0 (repitiendo WP0
       formalmente) o se mantiene como rama separada hasta que el fix de fondo esté listo —
       decisión del usuario, no técnica.
-- [ ] El fix de fondo (§7.6, "hacer que la fuente use el mismo estado MUSCL que el flujo") sigue
-      pendiente, en su propia sesión, sin apuro — según lo acordado.
+- [x] El fix de fondo (§7.6, "hacer que la fuente use el mismo estado MUSCL que el flujo") —
+      **aterrizado el 2026-07-16, ver §10**. Reemplaza todas las iteraciones de parche acotado.
 
 **Nota de precisión para cualquier resumen o texto de paper** (pedido explícito del usuario,
 2026-07-13): "ya no diverge" y "es físicamente correcto" son afirmaciones distintas. Este fix
@@ -482,3 +482,137 @@ rampa sintética ni Huasco reproducen su magnitud de falla, con ninguna de las d
 Pedido explícito y sin resolver a nowcast: compartir la configuración exacta de una localidad que
 falla (DEM, forzante, duración), o volver a correr su experimento de plausibilidad de 13
 localidades contra este commit — es la única prueba adversarial que puede cerrar esto con certeza.
+
+---
+
+## 9. Re-test de campo de nowcast contra la iteración 4 (2026-07-16) — insuficiente; iteración 5 probada y abandonada
+
+nowcast volvió a correr su experimento de plausibilidad (13 localidades de la watchlist + 4 casos
+ICON) contra el commit `2db5ea4` (iteración 4, forma lineal). Dos hallazgos:
+
+### 9.1 La forma lineal no tiene tope en `Δz`
+
+Curacautín mejoró (296.7 m → 48.2 m, ahora plausible), pero **Santa Bárbara empeoró 14×**
+(829.8 m → 11 857.8 m). El mecanismo es el anticipado por la comparación de formas en el comentario
+de la iteración 4: la forma capada-cuadrática de la iteración 3 saturaba una vez alcanzado el cap
+(acotada en `Δz` aunque mal escalada en `h²`), mientras que la lineal `−g·h·Δz/dx` crece sin
+límite con `Δz`. En terreno real con píxeles de 90 m y relieve local fuerte, `h·Δz` se dispara sin
+importar cuán chico sea `h`.
+
+### 9.2 Segundo bug independiente: casos ICON con fuente de cabecera, bit-idénticos
+
+Los 4 casos ICON (`headwater_source.used=true`, inyección de caudal de cabecera) dieron resultado
+**bit-idéntico antes y después** de la iteración 4 — el fix nunca se activa en ese régimen. La
+falla ahí es otra (probablemente el balance instantáneo mm/día→m³/s de la fuente puntual de
+cabecera, no la fuente de pendiente). Queda como ítem separado, fuera del alcance de este reporte.
+
+### 9.3 Iteración 5 (cap absoluto en `Δz`) — probada en working tree, nunca commiteada
+
+Se probó capar el `Δz` de la forma lineal a `MAX_SLOPE_RATIO = 2.0` veces `dx` (pendiente 200%,
+propiedad del terreno, independiente de `h_old` para no reintroducir el escalado `h²`). El
+reproductor sintético con los parámetros exactos de Santa Bárbara (`dx = 90 m`, lluvia
+32.6 mm/día, 900 s, `run_scaled` en el ejemplo) la refutó: **incluso con pendiente 100% — por
+debajo del cap, que ni siquiera se activa — da `max_depth = 252 m`**. El problema no es el exceso
+sobre el cap: la forma lineal sin capar ya es demasiado grande a esa escala de `Δz` absoluto,
+porque sigue siendo un parche sobre una fuente inconsistente con el flujo (el gate cambia la
+FORMA de la fuente pero el flujo sigue viendo sus propios estados reconstruidos — la cancelación
+flujo↔fuente queda rota cada vez que el gate dispara, y el mecanismo de §7.3 la convierte en masa).
+
+**Decisión (2026-07-16)**: abandonar la línea de parches acotados — 5 iteraciones, cada una
+resuelta por un caso adversarial y rota por el siguiente — y hacer el fix de fondo diferido desde
+§7.6. Ver §10.
+
+## 10. Fix de fondo (2026-07-16) — fuente consistente con el estado MUSCL reconstruido
+
+### 10.1 Formulación
+
+La causa raíz de §7.2 es un **desajuste de estados**: el flujo evalúa la presión sobre los estados
+MUSCL reconstruidos en cara (`η` extrapolado por pendiente limitada → `h* ≈ h_old` en lámina fina
+sobre pendiente), mientras la fuente explícita usaba el `η` de centro de celda contra los mismos
+`z_face` (→ `h_face` dominado por `Δz`, fuerza espuria independiente de la profundidad). Todos los
+parches de §7.6/§8.2/§9.3 acotaban la magnitud del desajuste; el fix de fondo lo elimina: la
+fuente se evalúa **sobre los mismos estados reconstruidos que consumió el flujo** (la fuente
+centrada de segundo orden de Audusse et al. 2004; Liang & Marche 2009):
+
+```text
+η_face  = η_cell ± slope_η · Δ/2     (caras interiores; las de frontera
+                                      mantienen η_cell, igual que el flujo,
+                                      que ahí pasa el estado crudo)
+h_face  = max(η_face − z_face, 0)     (== el h* del flujo)
+z_eff   = η_face − h_face             (bed efectivo consciente del clamp)
+S       = (g/2) · (h_L + h_R) · (z_eff_L − z_eff_R) / Δ
+```
+
+`solver-2d/src/update.rs`, `forward_euler_step_with`. Desaparecen `STEEP_SOURCE_RATIO`,
+`MAX_SLOPE_RATIO` y todos los gates `steep_x`/`steep_y` — no queda ningún umbral que calibrar
+porque no queda inconsistencia que acotar.
+
+### 10.2 Propiedades (verificables algebraicamente)
+
+- **Pendientes cero** (lake-at-rest, buffers de frente seco/húmedo, donde `slope_η = 0`):
+  `z_eff_L − z_eff_R = h_R − h_L`, así que la fuente es **algebraicamente idéntica** a la resta de
+  cuadrados anterior `(g/2)(h_R² − h_L²)/Δ` — incluidas las caras de shoreline con clamp activo,
+  gracias a `z_eff` (el lado clampeado aporta `z_eff = η_cell`, que es exactamente lo que cancela
+  el flujo de presión unilateral en la orilla de una isla emergida). C-property preservada por
+  construcción, no por tolerancia.
+- **Lámina fina sobre bed empinado con pendientes activas**: `η` sigue al bed → `h_face ≈ h_old`
+  en ambas caras → `S = −g·h_old·∂z/∂x` — lineal en `h`, se anula cuando `h → 0`, que es la física
+  que la formulación anterior violaba. Y como el flujo reconstruye los mismos estados, su
+  divergencia es ≈0 en ese régimen: no queda residuo espurio que el corrector de SSP-RK2 pueda
+  convertir en masa (§7.3).
+- **Flujo uniforme Manning sobre pendiente** (MacDonald): `h_L = h_R = h` → `S = g·h·S₀`, igual
+  que antes (misma precisión de estado estacionario).
+
+### 10.3 Validación (2026-07-16)
+
+**Batería completa**: `cargo test --release -p hydroflux-solver-2d` — 0 fallos en todas las
+suites (lib 127 + integración, incluidas las 7 pruebas de C-property/lake-at-rest, UK EA Test 4 y
+Test 6, convergencia, valle largo).
+
+**Reproductor sintético** (`debug_boundary_slope_instability`), comparado contra cada iteración:
+
+| Caso | Original (sin fix) | It. 3 (cap cuadrático) | It. 4 (lineal) | It. 5 (cap `Δz`) | Fix de fondo |
+|---|---|---|---|---|---|
+| A control (1%, CFL 0.4) | 7.45 m | 0.071 m | — | — | **0.005 m** |
+| B (70%, CFL 0.4) | 32 981 m | 35.8 m | 11.5 m | — | **0.132 m** |
+| C (70%, CFL 0.1) | 72 664 m | 1.57 m | — | — | **0.021 m** |
+| D (70%, CFL 0.05) | 34 805 m | 0.64 m | — | — | **0.006 m** |
+| B-long (36 000 s) | divergía | pico 35.8 → 0.78 m | 0.77 m | — | **meseta 0.147 m** |
+| SB sintético 100% (dx=90 m) | — | — | — | 252 m | **0.411 m** |
+| SB 200% | — | — | — | — | **0.509 m** |
+| SB 300% | — | — | — | — | **0.236 m** |
+| SB 1000% (patológico) | — | — | — | — | **0.971 m** |
+
+Tres propiedades cualitativas recuperadas, más allá de las magnitudes:
+
+1. **CFL más conservador ahora mejora** (B→C→D: 0.132 → 0.021 → 0.006 m) — la patología
+   contraintuitiva de §1 (CFL menor → peor) desapareció, porque ya no hay error por paso que se
+   acumule una vez por par predictor/corrector.
+2. **Sub-métrico incluso a pendiente 1000%** — no hay régimen de `Δz` donde la fuente vuelva a
+   desacoplarse del flujo; no hay cap que saturar ni gate que disparar.
+3. **El caso control A también mejoró 3 órdenes de magnitud** (7.45 → 0.005 m): con lámina de
+   ~1e-4 m incluso el 1% de pendiente tenía `Δz/h ≈ 3000` — el "control" original ya estaba
+   contaminado por el mismo mecanismo, solo que en magnitud tolerable. La nota de §2 ("7.45 m es
+   alto pero no absurdo") queda corregida por este hallazgo.
+
+**Huasco (DEM real, `--days 1`, mismo comando WP0)** — comparación contra el baseline WP0
+congelado (sin fix) y las iteraciones intermedias:
+
+| Métrica | Base WP0 | It. 3 | It. 4 | Fix de fondo | Δ vs base |
+|---|---|---|---|---|---|
+| h_max uniforme [m] | 4.356 | 4.370 | 4.340 | 4.392 | +0.83% |
+| mass final uniforme [m³] | 2.197e5 | 2.205e5 | — | 2.201e5 | +0.2% |
+| n_wet uniforme | 279 | 278 | — | 277 | −2 celdas |
+| outflow medio uniforme [m³/s] | 15.57 | 15.56 | — | 15.56 | −0.06% |
+| h_max landcover [m] | 4.332 | 4.371 | 4.348 | 4.355 | +0.53% |
+| mass final landcover [m³] | 2.689e5 | 2.689e5 | — | 2.692e5 | +0.1% |
+| n_wet landcover | 285 | 287 | — | 286 | +1 celda |
+| outflow medio landcover [m³/s] | 15.00 | 15.00 | — | 14.99 | ~0% |
+
+Todos los deltas caben dentro de la banda que WP0 ya aceptó como "leve y explicable" (cambios de
+0.03–0.04 m en h_max, ±1–3 celdas en n_wet — §7.7).
+
+**Estado final del reporte**: el defecto de la fuente de pendiente queda cerrado de raíz por §10.
+Quedan abiertos, como ítems separados: el re-test adversarial de nowcast (13 localidades + 4 ICON)
+contra este commit — la única prueba de campo que puede confirmar el cierre en terreno real — y el
+bug independiente de los casos ICON con fuente de cabecera (§9.2), que este fix no toca.

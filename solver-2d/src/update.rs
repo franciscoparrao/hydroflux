@@ -38,14 +38,24 @@
 //! the Audusse hydrostatic correction vanish (the Audusse term
 //! `(g/2)(h² − h*²)` is exactly zero when `z_L = z_R = z_face`). The
 //! bed-slope source then moves out of the face flux and into an
-//! explicit cell-centered term `S = −g · h · ∇z` evaluated with
-//! central differences on the bed (one-sided at the boundaries). The
-//! flux divergence and the explicit source cancel exactly for the
-//! lake-at-rest configuration (C-property), and the net contribution
-//! reduces to the analytical bed-slope force for non-trivial flows
-//! over a smooth bed — eliminating the `O(dx · S₀ / h_n)` steady-state
-//! bias that earlier η-MUSCL iterations had without bed
-//! reconstruction.
+//! explicit cell-centered term evaluated on the SAME MUSCL-
+//! reconstructed face states the flux consumed (the Audusse et al.
+//! 2004 second-order centered source): `S = (g/2)(h_L + h_R)
+//! (z_eff_L − z_eff_R)/Δ` with `h_face = max(η_face − z_face, 0)`
+//! from the slope-extrapolated `η` and `z_eff = η_face − h_face`.
+//! The flux divergence and the explicit source cancel exactly for the
+//! lake-at-rest configuration (C-property — with zero η-slopes the
+//! source is algebraically the difference-of-squares
+//! `(g/2)(h_R² − h_L²)/Δ`, including clamped shoreline faces), and
+//! the net contribution reduces to the analytical bed-slope force
+//! `−g·h·∂z/∂x` for non-trivial flows — linear in `h`, vanishing as
+//! `h → 0` even when the bed jump within a cell dwarfs the water
+//! depth (thin rain films on steep real terrain; see
+//! docs/bug-report-2026-07-boundary-slope-instability.md §10) —
+//! eliminating both the `O(dx · S₀ / h_n)` steady-state bias that
+//! earlier η-MUSCL iterations had without bed reconstruction and the
+//! depth-independent spurious momentum source that the previous
+//! cell-centered-η formulation produced on steep terrain.
 //!
 //! # Audusse in 2D
 //!
@@ -90,32 +100,6 @@ use crate::riemann::{hllc_flux_x, hllc_flux_y};
 use crate::state::Conserved2DG;
 use crate::{GRAVITY, H_DRY, H_VEL};
 use ndarray::{Array2, Zip};
-
-/// Ratio threshold for the explicit bed-slope source's bounded-slope
-/// safety valve (see the comment at its use site in
-/// [`forward_euler_step_with`], and
-/// docs/bug-report-2026-07-boundary-slope-instability.md §7). An
-/// ordinary (non-shoreline) face's `h_face` exceeding `h_old` by more
-/// than this multiple only happens when the neighbouring bed sits far
-/// enough below this cell's own bed that the quadratic source form
-/// scales with the bed jump rather than the depth.
-///
-/// A ratio of 5 looked generous against the flat/uniformly-sloped
-/// fixtures (worst case ~1.03), but `lake_at_rest_with_emerged_island_
-/// is_preserved` broke that intuition: on a smooth Gaussian shoreline,
-/// `h -> 0` continuously approaching the shore while the local bed
-/// gradient does NOT vanish, so an ordinary (non-shoreline-rule) wet
-/// cell one ring outside the actual wet/dry boundary can legitimately
-/// see a ratio around 6 -- "thin water near a real shoreline", not
-/// "thin film on steep terrain far from any shoreline", and the two
-/// are indistinguishable by ratio alone at that scale. Calibrated
-/// instead well above the worst ratio empirically observed across the
-/// full lake-at-rest suite (~6) and still ~100x below the pathological
-/// ratio in the bug report's reproducer (> 10^4): the gap between
-/// "smooth benchmark bed, however close to a shoreline" and "thin film
-/// on steep terrain" is still several orders of magnitude, just not as
-/// many as first assumed.
-const STEEP_SOURCE_RATIO: f64 = 500.0;
 
 /// Maximum signal speeds `(s_x, s_y)` across the state field, where
 /// `s_x = max(|u| + c)` and `s_y = max(|v| + c)`. Returns `(0, 0)` for
@@ -1119,76 +1103,81 @@ pub fn forward_euler_step_with<T: Real + MaybeSendSync>(
         let dhv = (fx_right.y_momentum - fx_left.y_momentum) * dt_dx
             + (fy_bottom.y_momentum - fy_top.y_momentum) * dt_dy;
 
-        // Explicit bed-slope source — see module doc. Algebraic
-        // form `S = (g/2) · (h_R_at_face² − h_L_at_face²)/Δx`
-        // that cancels the pressure-flux divergence exactly for
-        // lake-at-rest on any bed. `h_face` from cell's own `η`.
+        // Explicit bed-slope source, evaluated on the SAME MUSCL-
+        // reconstructed face states the flux consumed (Audusse et al.
+        // 2004 second-order centered source; Liang & Marche 2009).
+        //
+        //   η_face  = η_cell ± slope_η · Δ/2        (interior faces;
+        //             boundary faces keep η_cell, matching the flux,
+        //             which passes the raw cell state there)
+        //   h_face  = max(η_face − z_face, 0)        (== the flux's h*)
+        //   z_eff   = η_face − h_face                (clamp-aware bed)
+        //   S       = (g/2) · (h_L + h_R) · (z_eff_L − z_eff_R) / Δ
+        //
+        // Why this form:
+        //
+        // - With zero slopes (lake-at-rest, wet/dry front buffers) it
+        //   is ALGEBRAICALLY IDENTICAL to the difference-of-squares
+        //   `(g/2)(h_R² − h_L²)/Δ`: `z_eff_L − z_eff_R = h_R − h_L`
+        //   when `η_L = η_R = η_cell`, including the clamped shoreline
+        //   case thanks to `z_eff` (a clamped side contributes
+        //   `z_eff = η_cell`, which is exactly what makes the source
+        //   cancel the one-sided pressure flux at an emerged island's
+        //   shore). C-property is therefore preserved by construction.
+        //
+        // - With active slopes on a thin film over a steep bed it
+        //   evaluates to `−g·h·∂z/∂x` with `h_face ≈ h_old` on both
+        //   sides — linear in depth, vanishing as `h → 0`, exactly the
+        //   physical bed-slope force. The previous formulation used the
+        //   UNRECONSTRUCTED cell η against the face beds, so its
+        //   `h_face` was dominated by `Δz` rather than `h` whenever
+        //   `Δz ≫ h` — a spurious depth-independent momentum source
+        //   (docs/bug-report-2026-07-boundary-slope-instability.md
+        //   §7.2) that the flux side, which reconstructs, did not
+        //   balance. Five bounded patches over that mismatch (§7.6,
+        //   §8.2, §9 — ratio gates, per-side caps, linear fallbacks,
+        //   Δz caps) each fixed one adversarial case and broke on the
+        //   next; making the source consistent with the flux removes
+        //   the mismatch instead of bounding it, with no tunable
+        //   threshold left behind.
         let h_old = cell.h;
         let eta_cell = h_old + mesh.bed[(i, j)];
 
-        let h_face_left = (eta_cell - z_face_x[(i, j)]).max(T::zero());
-        let h_face_right = (eta_cell - z_face_x[(i, j + 1)]).max(T::zero());
-
-        // Bounded-slope safety valve — see
-        // docs/bug-report-2026-07-boundary-slope-instability.md §7.
-        // Two earlier versions are recorded there in detail (§7.6): a
-        // whole-formula linear swap gated on `h_face > h_old` (broke
-        // lake-at-rest — that condition fires on any nonzero slope,
-        // not just a pathological one), and a per-side CAP of
-        // `h_face` inside the SAME quadratic difference-of-squares —
-        // which passed every unit test and the full WP0 benchmark
-        // battery, but nowcast's real-DEM field test (2026-07-14)
-        // found watchlist localities reaching hundreds of metres, far
-        // worse with MORE integration steps for the same window, not
-        // fewer. Root cause of that regression: capping `h_face` to
-        // `STEEP_SOURCE_RATIO · h_old` and then SQUARING it still
-        // leaves the capped contribution `∝ h_old²` — quadratic in
-        // depth, not the linear `∝ h_old` the real bed-slope force
-        // `-g·h·∂z/∂x` requires. A cell that starts gaining depth
-        // (from upstream inflow, not just the local film) sees its
-        // own capped source grow faster than linearly, a genuine
-        // positive-feedback channel that a short synthetic window or
-        // a single-day Huasco run does not have enough integration
-        // time to expose.
-        //
-        // The corrected guard keeps the per-side, per-face ELIGIBILITY
-        // test from that iteration (an ordinary face — the neighbour
-        // across it shares this cell's pre-step wet/dry state, i.e.
-        // `z_face` came from the midpoint rule, never the shoreline
-        // `max(z_L, z_R)` rule, which structurally bounds `h_face ≤
-        // h_old` there — so genuine shorelines, buildings, coastlines
-        // and domain boundaries can never trigger this at all), but
-        // replaces the FORM used once triggered: instead of capping
-        // one side's `h_face` inside the square, the whole cell's
-        // `s_hu` switches to the linear form `-g·h_old·∂z/∂x`
-        // (`∂z` from the same `z_face` values, no bed extrapolation
-        // needed) — exactly the smooth-bed-limit approximation the
-        // quadratic form itself reduces to, but valid for ANY bed
-        // jump because it is `h_old`-proportional by construction,
-        // not just in the limit where the jump is small.
-        let ordinary_left_x = j > 0 && was_dry[(i, j - 1)] == was_dry[(i, j)];
-        let ordinary_right_x = j + 1 < n_cols && was_dry[(i, j)] == was_dry[(i, j + 1)];
-        let steep_x = (ordinary_left_x && h_face_left.value() > STEEP_SOURCE_RATIO * h_old.value())
-            || (ordinary_right_x
-                && h_face_right.value() > STEEP_SOURCE_RATIO * h_old.value());
-        let s_hu = if steep_x {
-            h_old * (z_face_x[(i, j)] - z_face_x[(i, j + 1)]) * (GRAVITY / mesh.dx)
+        let slope_eta_x = slopes_x[(i, j)].eta;
+        let eta_left = if j > 0 {
+            eta_cell - slope_eta_x * (0.5 * mesh.dx)
         } else {
-            (h_face_right.powi(2) - h_face_left.powi(2)) * (0.5 * GRAVITY) / mesh.dx
+            eta_cell
         };
-
-        let h_face_top = (eta_cell - z_face_y[(i, j)]).max(T::zero());
-        let h_face_bottom = (eta_cell - z_face_y[(i + 1, j)]).max(T::zero());
-        let ordinary_top_y = i > 0 && was_dry[(i - 1, j)] == was_dry[(i, j)];
-        let ordinary_bottom_y = i + 1 < n_rows && was_dry[(i, j)] == was_dry[(i + 1, j)];
-        let steep_y = (ordinary_top_y && h_face_top.value() > STEEP_SOURCE_RATIO * h_old.value())
-            || (ordinary_bottom_y
-                && h_face_bottom.value() > STEEP_SOURCE_RATIO * h_old.value());
-        let s_hv = if steep_y {
-            h_old * (z_face_y[(i, j)] - z_face_y[(i + 1, j)]) * (GRAVITY / mesh.dy)
+        let eta_right = if j + 1 < n_cols {
+            eta_cell + slope_eta_x * (0.5 * mesh.dx)
         } else {
-            (h_face_bottom.powi(2) - h_face_top.powi(2)) * (0.5 * GRAVITY) / mesh.dy
+            eta_cell
         };
+        let h_face_left = (eta_left - z_face_x[(i, j)]).max(T::zero());
+        let h_face_right = (eta_right - z_face_x[(i, j + 1)]).max(T::zero());
+        let z_eff_left = eta_left - h_face_left;
+        let z_eff_right = eta_right - h_face_right;
+        let s_hu =
+            (h_face_left + h_face_right) * (z_eff_left - z_eff_right) * (0.5 * GRAVITY) / mesh.dx;
+
+        let slope_eta_y = slopes_y[(i, j)].eta;
+        let eta_top = if i > 0 {
+            eta_cell - slope_eta_y * (0.5 * mesh.dy)
+        } else {
+            eta_cell
+        };
+        let eta_bottom = if i + 1 < n_rows {
+            eta_cell + slope_eta_y * (0.5 * mesh.dy)
+        } else {
+            eta_cell
+        };
+        let h_face_top = (eta_top - z_face_y[(i, j)]).max(T::zero());
+        let h_face_bottom = (eta_bottom - z_face_y[(i + 1, j)]).max(T::zero());
+        let z_eff_top = eta_top - h_face_top;
+        let z_eff_bottom = eta_bottom - h_face_bottom;
+        let s_hv =
+            (h_face_top + h_face_bottom) * (z_eff_top - z_eff_bottom) * (0.5 * GRAVITY) / mesh.dy;
 
         if new_h.value() <= H_VEL {
             // Moisture floor. The mass is KEPT: a wetting-front
