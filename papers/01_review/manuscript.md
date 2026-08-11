@@ -1099,7 +1099,7 @@ regression of the §3 criteria; the numerical core forbids unsafe code
 (`#![forbid(unsafe_code)]`). Build and verify:
 
 ```bash
-cargo test --release -p hydroflux-solver-2d   # verification suite
+cargo test --release --workspace             # 307 tests, 0 failures
 cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover -- --days 1
 cargo run --release -p hydroflux-solver-2d --example huasco_manning_sweep   # Table 3
 cargo run --release -p hydroflux-solver-2d --example m1_forward_scaling     # §2.5 scaling
