@@ -9,19 +9,23 @@
 % 1. NUMÉRICO — SHALLOW WATER EQUATIONS
 % =============================================================================
 
+% [nota interna, no se imprime]
+% Referencia canónica para esquemas FV en shallow water. Toro test cases (5
+% problemas 1D) son benchmark estándar. Sin DOI: CrossRef devuelve
+% 10.1007/978-3-662-03915-1 con year=1999 (1ª edición). El DOI Springer
+% correcto para la 3ª edición se verifica antes de submit.
 @book{Toro2009,
   author    = {Toro, Eleuterio F.},
   title     = {Riemann Solvers and Numerical Methods for Fluid Dynamics},
   edition   = {3rd},
   publisher = {Springer},
   year      = {2009},
-  note      = {Referencia canónica para esquemas FV en shallow water.
-               Toro test cases (5 problemas 1D) son benchmark estándar.
-               Sin DOI: CrossRef devuelve 10.1007/978-3-662-03915-1 con
-               year=1999 (1ª edición). El DOI Springer correcto para la
-               3ª edición se verifica antes de submit.}
+  doi       = {10.1007/b79761}
 }
 
+% [nota interna, no se imprime]
+% Tratamiento del término fuente para well-balanced schemes (preservar
+% lake-at-rest). Cita obligada en methods paper.
 @article{Bermudez1994,
   author  = {Berm\'udez, Alfredo and V\'azquez, M.E.},
   title   = {Upwind methods for hyperbolic conservation laws with source terms},
@@ -30,11 +34,12 @@
   number  = {8},
   pages   = {1049--1071},
   year    = {1994},
-  doi     = {10.1016/0045-7930(94)90004-3},
-  note    = {Tratamiento del término fuente para well-balanced schemes
-             (preservar lake-at-rest). Cita obligada en methods paper.}
+  doi     = {10.1016/0045-7930(94)90004-3}
 }
 
+% [nota interna, no se imprime]
+% Soluciones analíticas para flujo en canal con fricción. Benchmark estándar
+% para validar steady-state 1D.
 @article{MacDonald1997,
   author  = {MacDonald, Ian and Baines, Mark and Nichols, Nancy and Samuels, Peter},
   title   = {Analytic Benchmark Solutions for Open-Channel Flows},
@@ -43,20 +48,22 @@
   number  = {11},
   pages   = {1041--1045},
   year    = {1997},
-  doi     = {10.1061/(asce)0733-9429(1997)123:11(1041)},
-  note    = {Soluciones analíticas para flujo en canal con fricción.
-             Benchmark estándar para validar steady-state 1D.}
+  doi     = {10.1061/(asce)0733-9429(1997)123:11(1041)}
 }
 
+% [nota interna, no se imprime]
+% Solución analítica del dam break en canal seco/húmedo. Test 1 para validar
+% Riemann solvers.
 @article{Stoker1957,
   author  = {Stoker, J.J.},
   title   = {Water Waves: The Mathematical Theory with Applications},
   journal = {Interscience Publishers},
-  year    = {1957},
-  note    = {Solución analítica del dam break en canal seco/húmedo.
-             Test 1 para validar Riemann solvers.}
+  year    = {1957}
 }
 
+% [nota interna, no se imprime]
+% Riemann solver lineralizado de Roe. Base de TELEMAC, Iber, SRH-2D y
+% múltiples otros solvers FV. Referencia obligada para esquema 1D.
 @article{Roe1981,
   author  = {Roe, P.L.},
   title   = {Approximate Riemann solvers, parameter vectors, and difference schemes},
@@ -65,10 +72,12 @@
   number  = {2},
   pages   = {357--372},
   year    = {1981},
-  note    = {Riemann solver lineralizado de Roe. Base de TELEMAC, Iber, SRH-2D y
-             múltiples otros solvers FV. Referencia obligada para esquema 1D.}
+  doi     = {10.1016/0021-9991(81)90128-5}
 }
 
+% [nota interna, no se imprime]
+% Paper original del esquema HLLC. Mejora HLL preservando contacto. Decisión
+% Q3 2026 entre HLL/Roe/HLLC para solver-1d.
 @article{Toro1994,
   author  = {Toro, E.F. and Spruce, M. and Speares, W.},
   title   = {Restoration of the contact surface in the {HLL}-{R}iemann solver},
@@ -76,11 +85,12 @@
   volume  = {4},
   pages   = {25--34},
   year    = {1994},
-  doi     = {10.1007/BF01414629},
-  note    = {Paper original del esquema HLLC. Mejora HLL preservando contacto.
-             Decisión Q3 2026 entre HLL/Roe/HLLC para solver-1d.}
+  doi     = {10.1007/BF01414629}
 }
 
+% [nota interna, no se imprime]
+% Hydrostatic reconstruction — el truco para que well-balanced funcione con
+% topografía discontinua. Imprescindible para el solver 2D.
 @article{Audusse2004,
   author  = {Audusse, E. and Bouchut, F. and Bristeau, M.-O. and Klein, R. and Perthame, B.},
   title   = {A fast and stable well-balanced scheme with hydrostatic reconstruction
@@ -90,11 +100,11 @@
   number  = {6},
   pages   = {2050--2065},
   year    = {2004},
-  doi     = {10.1137/S1064827503431090},
-  note    = {Hydrostatic reconstruction — el truco para que well-balanced funcione
-             con topografía discontinua. Imprescindible para el solver 2D.}
+  doi     = {10.1137/S1064827503431090}
 }
 
+% [nota interna, no se imprime]
+% Esquema central-upwind, base de ANUGA y otros. Alternativa Riemann-free.
 @article{KurganovPetrova2007,
   author  = {Kurganov, A. and Petrova, G.},
   title   = {A second-order well-balanced positivity preserving central-upwind scheme
@@ -104,10 +114,13 @@
   number  = {1},
   pages   = {133--160},
   year    = {2007},
-  doi     = {10.4310/cms.2007.v5.n1.a6},
-  note    = {Esquema central-upwind, base de ANUGA y otros. Alternativa Riemann-free.}
+  doi     = {10.4310/cms.2007.v5.n1.a6}
 }
 
+% [nota interna, no se imprime]
+% Estimación de wave speeds para HLL Riemann solver: S_L = min(u_L - c_L, u_R
+% - c_R), S_R = max(u_L+c_L, u_R+c_R). Convención usada en hydroflux-solver-1d
+% (§4.2 del review).
 @article{Davis1988,
   author  = {Davis, S.F.},
   title   = {Simplified Second-Order {G}odunov-Type Methods},
@@ -116,16 +129,15 @@
   number  = {3},
   pages   = {445--473},
   year    = {1988},
-  doi     = {10.1137/0909030},
-  note    = {Estimación de wave speeds para HLL Riemann solver:
-             S_L = min(u_L - c_L, u_R - c_R), S_R = max(u_L+c_L, u_R+c_R).
-             Convención usada en hydroflux-solver-1d (§4.2 del review).}
+  doi     = {10.1137/0909030}
 }
 
 % =============================================================================
 % 2. FLOOD MODELING — SOLVERS
 % =============================================================================
 
+% [nota interna, no se imprime]
+% Paper original de LISFLOOD-FP. Inertial approximation.
 @article{BatesDeRoo2000,
   author  = {Bates, P.D. and De Roo, A.P.J.},
   title   = {A simple raster-based model for flood inundation simulation},
@@ -134,8 +146,7 @@
   number  = {1-2},
   pages   = {54--77},
   year    = {2000},
-  doi     = {10.1016/S0022-1694(00)00278-X},
-  note    = {Paper original de LISFLOOD-FP. Inertial approximation.}
+  doi     = {10.1016/S0022-1694(00)00278-X}
 }
 
 @article{Neal2012,
@@ -149,17 +160,22 @@
   doi     = {10.1029/2012WR012514}
 }
 
+% [nota interna, no se imprime]
+% Report SC120002. UK EA benchmark suite (10 casos: 1,2,3,4,5,6A,6B,7,8A,8B).
+% Estándar para validar solvers 2D. Test 4 y Test 8A reproducidos
+% cuantitativamente sobre geometría oficial (WP3 2026-07-03) contra las series
+% LISFLOOD-FP redistribuidas por Shaw2021/Sharifian2023.
 @techreport{NeelzPender2013,
   author      = {N\'eelz, S. and Pender, G.},
   title       = {Benchmarking the Latest Generation of 2D Hydraulic Modelling Packages},
   institution = {UK Environment Agency},
-  year        = {2013},
-  note        = {Report SC120002. UK EA benchmark suite (10 casos: 1,2,3,4,5,6A,6B,7,8A,8B).
-                 Estándar para validar solvers 2D. Test 4 y Test 8A reproducidos
-                 cuantitativamente sobre geometría oficial (WP3 2026-07-03) contra
-                 las series LISFLOOD-FP redistribuidas por Shaw2021/Sharifian2023.}
+  year        = {2013}
 }
 
+% [nota interna, no se imprime]
+% Fuente de las series de referencia LISFLOOD-FP para UK EA Test 4 (Zenodo
+% 10.5281/zenodo.4066824, CC-BY-4.0), usadas en la reproducción cuantitativa
+% de WP3 (2026-07-03).
 @article{Shaw2021,
   author  = {Shaw, James and Kesserwani, Georges and Neal, Jeffrey and Bates, Paul
              and Sharifian, Mohammad Kazem},
@@ -170,12 +186,14 @@
   number  = {6},
   pages   = {3577--3602},
   year    = {2021},
-  doi     = {10.5194/gmd-14-3577-2021},
-  note    = {Fuente de las series de referencia LISFLOOD-FP para UK EA Test 4
-             (Zenodo 10.5281/zenodo.4066824, CC-BY-4.0), usadas en la
-             reproducción cuantitativa de WP3 (2026-07-03).}
+  doi     = {10.5194/gmd-14-3577-2021}
 }
 
+% [nota interna, no se imprime]
+% Fuente de los inputs oficiales de UK EA Test 8A (Glasgow, Zenodo
+% 10.5281/zenodo.6907286, CC-BY-4.0), usados en la reproducción de WP3
+% (2026-07-03). No redistribuye serie de referencia numérica para Test 8A --
+% comparación cualitativa contra SC120002 §4.9.3.
 @article{Sharifian2023,
   author  = {Sharifian, Mohammad Kazem and Kesserwani, Georges and Chowdhury,
              Alovya Ahmed and Neal, Jeffrey and Bates, Paul},
@@ -186,13 +204,13 @@
   number  = {9},
   pages   = {2391--2413},
   year    = {2023},
-  doi     = {10.5194/gmd-16-2391-2023},
-  note    = {Fuente de los inputs oficiales de UK EA Test 8A (Glasgow, Zenodo
-             10.5281/zenodo.6907286, CC-BY-4.0), usados en la reproducción de
-             WP3 (2026-07-03). No redistribuye serie de referencia numérica
-             para Test 8A -- comparación cualitativa contra SC120002 §4.9.3.}
+  doi     = {10.5194/gmd-16-2391-2023}
 }
 
+% [nota interna, no se imprime]
+% Verificado CrossRef (2026-07-09, WP4). GPU/HPC shallow-water solver de
+% referencia -- Caviedes-Voulli\`eme está en la lista de reviewers sugeridos
+% del cover letter EMS.
 @article{CaviedesVoullieme2023SERGHEI,
   author  = {Caviedes-Voulli\`eme, Daniel and Morales-Hern\'andez, Mario
              and Norman, Matthew R. and \"Ozgen-Xian, Ilhan},
@@ -204,12 +222,12 @@
   number  = {3},
   pages   = {977--1008},
   year    = {2023},
-  doi     = {10.5194/gmd-16-977-2023},
-  note    = {Verificado CrossRef (2026-07-09, WP4). GPU/HPC shallow-water
-             solver de referencia -- Caviedes-Voulli\`eme está en la lista
-             de reviewers sugeridos del cover letter EMS.}
+  doi     = {10.5194/gmd-16-977-2023}
 }
 
+% [nota interna, no se imprime]
+% Verificado CrossRef (2026-07-09, WP4). Publicado en EMS -- el mismo venue
+% objetivo de este manuscrito.
 @article{MoralesHernandez2021TRITON,
   author  = {Morales-Hern\'andez, M. and Sharif, Md B. and Kalyanapu, A.
              and Ghafoor, S.K. and Dullo, T.T. and Gangrade, S.
@@ -220,35 +238,40 @@
   volume  = {141},
   pages   = {105034},
   year    = {2021},
-  doi     = {10.1016/j.envsoft.2021.105034},
-  note    = {Verificado CrossRef (2026-07-09, WP4). Publicado en EMS --
-             el mismo venue objetivo de este manuscrito.}
+  doi     = {10.1016/j.envsoft.2021.105034}
 }
 
+% [nota interna, no se imprime]
+% Libro base de TELEMAC. Referencia FE en hidráulica fluvial.
 @book{Hervouet2007,
   author    = {Hervouet, Jean-Michel},
   title     = {Hydrodynamics of Free Surface Flows: Modelling with the Finite Element Method},
   publisher = {Wiley},
-  year      = {2007},
-  note      = {Libro base de TELEMAC. Referencia FE en hidráulica fluvial.}
+  year      = {2007}
 }
 
+% [nota interna, no se imprime]
+% Documentación ANUGA. Solver 2D unstructured Python/C.
 @article{Roberts2015,
   author  = {Roberts, Stephen and Nielsen, Ole and Gray, Duncan and Sexton, Jane and Davies, Gareth},
   title   = {ANUGA User Manual},
   journal = {Geoscience Australia},
-  year    = {2015},
-  note    = {Documentación ANUGA. Solver 2D unstructured Python/C.}
+  year    = {2015}
 }
 
+% [nota interna, no se imprime]
+% Manual de referencia técnica de HEC-RAS.
 @misc{Brunner2020,
   author       = {Brunner, Gary W.},
   title        = {{HEC-RAS, River Analysis System Hydraulic Reference Manual}},
   organization = {US Army Corps of Engineers, Hydrologic Engineering Center},
   year         = {2020},
-  note         = {Manual de referencia técnica de HEC-RAS.}
+  note = {Hydraulic reference manual, HEC-RAS 6.0}
 }
 
+% [nota interna, no se imprime]
+% Formulación inercial de LISFLOOD-FP — descarta el término convectivo. Cita
+% clave en gap final para señalar limitación de flujo transcrítico.
 @article{Bates2010,
   author  = {Bates, P.D. and Horritt, M.S. and Fewtrell, T.J.},
   title   = {A simple inertial formulation of the shallow water equations for
@@ -258,11 +281,11 @@
   number  = {1-2},
   pages   = {33--45},
   year    = {2010},
-  doi     = {10.1016/j.jhydrol.2010.03.027},
-  note    = {Formulación inercial de LISFLOOD-FP — descarta el término convectivo.
-             Cita clave en gap final para señalar limitación de flujo transcrítico.}
+  doi     = {10.1016/j.jhydrol.2010.03.027}
 }
 
+% [nota interna, no se imprime]
+% Paper de presentación de Iber. Referencia oficial del solver español.
 @article{Blade2014,
   author  = {Blad\'e, E. and Cea, L. and Corestein, G. and Escolano, E. and Puertas, J.
              and V\'azquez-Cend\'on, M.E. and Dolz, J. and Coll, A.},
@@ -272,10 +295,11 @@
   volume  = {30},
   number  = {1},
   pages   = {1--10},
-  year    = {2014},
-  note    = {Paper de presentación de Iber. Referencia oficial del solver español.}
+  year    = {2014}
 }
 
+% [nota interna, no se imprime]
+% Paper técnico de SRH-2D (USBR). Implicit time stepping en mesh híbrida.
 @article{Lai2010,
   author  = {Lai, Yong G.},
   title   = {Two-dimensional depth-averaged flow modeling with an unstructured hybrid mesh},
@@ -284,10 +308,11 @@
   number  = {1},
   pages   = {12--23},
   year    = {2010},
-  doi     = {10.1061/(asce)hy.1943-7900.0000134},
-  note    = {Paper técnico de SRH-2D (USBR). Implicit time stepping en mesh híbrida.}
+  doi     = {10.1061/(asce)hy.1943-7900.0000134}
 }
 
+% [nota interna, no se imprime]
+% Paper canónico de GeoClaw. AMR + augmented Riemann solver well-balanced.
 @article{LeVeque2011,
   author  = {LeVeque, R.J. and George, D.L. and Berger, M.J.},
   title   = {Tsunami modelling with adaptively refined finite volume methods},
@@ -295,10 +320,12 @@
   volume  = {20},
   pages   = {211--289},
   year    = {2011},
-  doi     = {10.1017/S0962492911000043},
-  note    = {Paper canónico de GeoClaw. AMR + augmented Riemann solver well-balanced.}
+  doi     = {10.1017/S0962492911000043}
 }
 
+% [nota interna, no se imprime]
+% Paper técnico de Delft3D-FLOW y morfología. Referencia core del solver
+% Deltares.
 @article{Lesser2004,
   author  = {Lesser, G.R. and Roelvink, J.A. and van Kester, J.A.T.M. and Stelling, G.S.},
   title   = {Development and validation of a three-dimensional morphological model},
@@ -307,8 +334,7 @@
   number  = {8-9},
   pages   = {883--915},
   year    = {2004},
-  doi     = {10.1016/j.coastaleng.2004.07.014},
-  note    = {Paper técnico de Delft3D-FLOW y morfología. Referencia core del solver Deltares.}
+  doi     = {10.1016/j.coastaleng.2004.07.014}
 }
 
 @manual{Vetsch2020,
@@ -319,14 +345,16 @@
                    System Manuals}},
   organization = {Laboratory of Hydraulics, Hydrology and Glaciology (VAW), ETH Z\"urich},
   year         = {2020},
-  note         = {Manual de referencia técnica de BASEMENT v3.x.
-                  PLACEHOLDER — verificar versión exacta y lista canónica de autores.}
+  note         = {Technical reference manual, BASEMENT v3.x}
 }
 
 % =============================================================================
 % 3. COUPLED HAZARDS — LANDSLIDE PROPAGATION
 % =============================================================================
 
+% [nota interna, no se imprime]
+% Acoplamiento físico lluvia → estabilidad → trigger. Base teórica para el
+% coupling Years 4-6.
 @article{Iverson2000,
   author  = {Iverson, Richard M.},
   title   = {Landslide triggering by rain infiltration},
@@ -335,20 +363,21 @@
   number  = {7},
   pages   = {1897--1910},
   year    = {2000},
-  doi     = {10.1029/2000WR900090},
-  note    = {Acoplamiento físico lluvia → estabilidad → trigger. Base teórica
-             para el coupling Years 4-6.}
+  doi     = {10.1029/2000WR900090}
 }
 
+% [nota interna, no se imprime]
+% Clasificación canónica de remociones en masa.
 @article{Hungr2005,
   author  = {Hungr, Oldrich},
   title   = {Classification and terminology},
   journal = {Debris-Flow Hazards and Related Phenomena},
   pages   = {9--23},
-  year    = {2005},
-  note    = {Clasificación canónica de remociones en masa.}
+  year    = {2005}
 }
 
+% [nota interna, no se imprime]
+% DAN3D, modelo de propagación. Referencia para coupling.
 @article{HungrMcDougall2009,
   author  = {Hungr, O. and McDougall, S.},
   title   = {Two numerical models for landslide dynamic analysis},
@@ -357,10 +386,12 @@
   number  = {5},
   pages   = {978--992},
   year    = {2009},
-  doi     = {10.1016/j.cageo.2007.12.003},
-  note    = {DAN3D, modelo de propagación. Referencia para coupling.}
+  doi     = {10.1016/j.cageo.2007.12.003}
 }
 
+% [nota interna, no se imprime]
+% Paper técnico de RAMMS (WSL/SLF). El módulo DEBRIS-FLOW comparte engine.
+% Referencia para el lado "propagación granular" del coupling.
 @article{Christen2010,
   author  = {Christen, M. and Kowalski, J. and Bartelt, P.},
   title   = {{RAMMS}: Numerical simulation of dense snow avalanches in
@@ -370,11 +401,13 @@
   number  = {1-2},
   pages   = {1--14},
   year    = {2010},
-  doi     = {10.1016/j.coldregions.2010.04.005},
-  note    = {Paper técnico de RAMMS (WSL/SLF). El módulo DEBRIS-FLOW comparte engine.
-             Referencia para el lado "propagación granular" del coupling.}
+  doi     = {10.1016/j.coldregions.2010.04.005}
 }
 
+% [nota interna, no se imprime]
+% Modelo open-source de propagación de mass flows en GRASS GIS. Alternativa
+% abierta a RAMMS, citada en el gap final como ejemplo del pipeline file-based
+% actual.
 @article{Mergili2017,
   author  = {Mergili, M. and Fischer, J.-T. and Krenn, J. and Pudasaini, S.P.},
   title   = {{r.avaflow} v1, an advanced open-source computational framework for
@@ -384,12 +417,12 @@
   number  = {2},
   pages   = {553--569},
   year    = {2017},
-  doi     = {10.5194/gmd-10-553-2017},
-  note    = {Modelo open-source de propagación de mass flows en GRASS GIS.
-             Alternativa abierta a RAMMS, citada en el gap final como ejemplo
-             del pipeline file-based actual.}
+  doi     = {10.5194/gmd-10-553-2017}
 }
 
+% [nota interna, no se imprime]
+% SHALSTAB — modelo de susceptibilidad físicamente basado. Primer eslabón del
+% pipeline lluvia → falla → propagación → inundación.
 @article{Montgomery1994,
   author  = {Montgomery, D.R. and Dietrich, W.E.},
   title   = {A physically based model for the topographic control on shallow landsliding},
@@ -398,19 +431,18 @@
   number  = {4},
   pages   = {1153--1171},
   year    = {1994},
-  doi     = {10.1029/93WR02979},
-  note    = {SHALSTAB — modelo de susceptibilidad físicamente basado. Primer eslabón
-             del pipeline lluvia → falla → propagación → inundación.}
+  doi     = {10.1029/93WR02979}
 }
 
+% [nota interna, no se imprime]
+% SINMAP — alternativa probabilística a SHALSTAB. Eslabón susceptibilidad del
+% pipeline coupling actual.
 @techreport{Pack1998,
   author      = {Pack, R.T. and Tarboton, D.G. and Goodwin, C.N.},
   title       = {{Terrain Stability Mapping with SINMAP, Technical Description and
                   Users Guide for Version 1.00}},
   institution = {Terratech Consulting Ltd., Salmon Arm, BC, Canada},
-  year        = {1998},
-  note        = {SINMAP — alternativa probabilística a SHALSTAB. Eslabón susceptibilidad
-                 del pipeline coupling actual.}
+  year        = {1998}
 }
 
 % =============================================================================
@@ -422,6 +454,9 @@
 % - Recent NeurIPS / ICML workshops on Climate / Geoscience differentiable models
 % - Andreadis et al. — verificar cita exacta de differentiable distributed hydrology
 
+% [nota interna, no se imprime]
+% Paper seminal de differentiable parameter learning aplicado a modelos
+% hidrológicos distribuidos. Cita transversal en el gap final.
 @article{Tsai2021,
   author  = {Tsai, W.-P. and Feng, D. and Pan, M. and Beck, H. and Lawson, K.
              and Yang, Y. and Liu, J. and Shen, C.},
@@ -431,11 +466,12 @@
   volume  = {12},
   number  = {5988},
   year    = {2021},
-  doi     = {10.1038/s41467-021-26107-z},
-  note    = {Paper seminal de differentiable parameter learning aplicado a modelos
-             hidrológicos distribuidos. Cita transversal en el gap final.}
+  doi     = {10.1038/s41467-021-26107-z}
 }
 
+% [nota interna, no se imprime]
+% Differentiable PB hydrology. Demuestra que el approach diferenciable alcanza
+% accuracy state-of-the-art en streamflow. Citar en review paper.
 @article{Feng2022,
   author  = {Feng, D. and Liu, J. and Lawson, K.},
   title   = {Differentiable, learnable, regionalized process-based models with
@@ -445,11 +481,12 @@
   volume  = {58},
   number  = {10},
   year    = {2022},
-  doi     = {10.1029/2022WR032404},
-  note    = {Differentiable PB hydrology. Demuestra que el approach diferenciable
-             alcanza accuracy state-of-the-art en streamflow. Citar en review paper.}
+  doi     = {10.1029/2022WR032404}
 }
 
+% [nota interna, no se imprime]
+% Review de differentiable modeling en geosciences. Marco conceptual del wedge
+% "diferenciable" de hydroflux. Cita obligada en sección 3 del review.
 @article{Shen2023,
   author  = {Shen, C. and Appling, A.P. and Gentine, P. and Bandai, T. and Gupta, H.
              and Tartakovsky, A. and Baity-Jesi, M. and Fenicia, F. and Kifer, D.
@@ -465,15 +502,17 @@
   number  = {8},
   pages   = {552--567},
   year    = {2023},
-  doi     = {10.1038/s43017-023-00450-9},
-  note    = {Review de differentiable modeling en geosciences. Marco conceptual del
-             wedge "diferenciable" de hydroflux. Cita obligada en sección 3 del review.}
+  doi     = {10.1038/s43017-023-00450-9}
 }
 
 % =============================================================================
 % 5. SCIENTIFIC COMPUTING ECOSYSTEM (FAIR, AD, Rust)
 % =============================================================================
 
+% [nota interna, no se imprime]
+% Principios FAIR (Findable, Accessible, Interoperable, Reusable). Citado en
+% §1.2 y §3.1 del review paper. Verificar lista completa de autores con
+% verify-refs antes de submit.
 @article{WilkinsonFAIR2016,
   author  = {Wilkinson, Mark D. and Dumontier, Michel and Aalbersberg, IJsbrand Jan
              and Appleton, Gabrielle and Axton, Myles and Baak, Arie and Blomberg,
@@ -485,12 +524,13 @@
   volume  = {3},
   pages   = {160018},
   year    = {2016},
-  doi     = {10.1038/sdata.2016.18},
-  note    = {Principios FAIR (Findable, Accessible, Interoperable, Reusable).
-             Citado en §1.2 y §3.1 del review paper. Verificar lista completa
-             de autores con verify-refs antes de submit.}
+  doi     = {10.1038/sdata.2016.18}
 }
 
+% [nota interna, no se imprime]
+% Textbook canónico de autodifferentiation. Cubre forward/reverse mode,
+% complejidad, checkpointing (Griewank-Walther revolve). Citado en §5 del
+% review paper como referencia primaria para memory-recomputation trade-offs.
 @book{Griewank2008,
   author    = {Griewank, Andreas and Walther, Andrea},
   title     = {Evaluating Derivatives: Principles and Techniques of Algorithmic
@@ -500,30 +540,39 @@
   year      = {2008},
   series    = {Other Titles in Applied Mathematics},
   isbn      = {978-0-89871-659-7},
-  doi       = {10.1137/1.9780898717761},
-  note      = {Textbook canónico de autodifferentiation. Cubre forward/reverse
-               mode, complejidad, checkpointing (Griewank-Walther revolve).
-               Citado en §5 del review paper como referencia primaria para
-               memory-recomputation trade-offs.}
+  doi       = {10.1137/1.9780898717761}
 }
 
-@misc{SurtgisRef,
-  author       = {Parra, Francisco},
-  title        = {{SurtGIS}: A high-performance geospatial analysis library in {R}ust},
-  version      = {0.8.0},
-  year         = {2026},
-  publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.XXXXXXX},
-  url          = {https://github.com/franciscoparrao/surtgis},
-  note         = {PLACEHOLDER — actualizar DOI Zenodo y version al freeze del
-                  release acompañante a hydroflux v0.1. Sibling package del que
-                  hydroflux usa I/O raster (§4.2).}
+% Companion paper del primer autor, PUBLICADO en el mismo venue objetivo.
+% Verificado en CrossRef 2026-08-07: EMS vol. 204, art. 107102, Elsevier.
+% Reemplaza la entrada @misc con DOI de Zenodo placeholder (nunca existio).
+@article{SurtgisRef,
+  author  = {Parra, Francisco},
+  title   = {{SurtGIS}: A high-performance raster geospatial analysis library
+             in {R}ust with {WebAssembly} and {Python} support},
+  journal = {Environmental Modelling \& Software},
+  volume  = {204},
+  pages   = {107102},
+  year    = {2026},
+  issn    = {1364-8152},
+  doi     = {10.1016/j.envsoft.2026.107102}
 }
 
 % =============================================================================
 % 6. CHILE — DATOS Y CONTEXTO
 % =============================================================================
 
+% [nota interna, no se imprime]
+% Evento de inundación catastrófica marzo 2015 en Atacama (norte Chile).
+% Análisis hidrometeorológico, transporte de sedimento, impactos. Caso citado
+% en §1.2 del review como ejemplo de cascade rainfall→landslide→debris
+% flow→inundation. Autorías verificadas con verify-refs/CrossRef (2026-05-18):
+% Castro, Lina (no Luis); Otárola con acento; Cristian/Gironás corregidos. OJO
+% (2026-07-03, WP5): este evento es MARZO 2015, DISTINTO del evento 2017-02/03
+% simulado en §4 (Santa Juana, pico 2017-03-02, 38.9 m³/s) -- confirmado no
+% ser tampoco el evento de mayo 2017 (Atacama+Coquimbo). En §4 se cita solo
+% como contexto de RÉGIMEN episódico semiárido, no como documentación del
+% evento simulado.
 @article{Wilcox2016AtacamaFlash,
   author  = {Wilcox, Andrew C. and Escauriaza, Cristian and Agredano, Roberto
              and Mignot, Emmanuel and Zuazo, Vicente and Ot\'arola, Sebasti\'an
@@ -535,21 +584,14 @@
   number  = {15},
   pages   = {8035--8043},
   year    = {2016},
-  doi     = {10.1002/2016GL069751},
-  note    = {Evento de inundación catastrófica marzo 2015 en Atacama (norte
-             Chile). Análisis hidrometeorológico, transporte de sedimento,
-             impactos. Caso citado en §1.2 del review como ejemplo de cascade
-             rainfall→landslide→debris flow→inundation.
-             Autorías verificadas con verify-refs/CrossRef (2026-05-18):
-             Castro, Lina (no Luis); Otárola con acento; Cristian/Gironás
-             corregidos.
-             OJO (2026-07-03, WP5): este evento es MARZO 2015, DISTINTO del
-             evento 2017-02/03 simulado en §4 (Santa Juana, pico 2017-03-02,
-             38.9 m³/s) -- confirmado no ser tampoco el evento de mayo 2017
-             (Atacama+Coquimbo). En §4 se cita solo como contexto de RÉGIMEN
-             episódico semiárido, no como documentación del evento simulado.}
+  doi     = {10.1002/2016GL069751}
 }
 
+% [nota interna, no se imprime]
+% Verificado CrossRef (2026-07-03, WP5). Sobre el evento de marzo 2015 en el
+% Huasco (mismo evento de Wilcox2016AtacamaFlash, no el de 2017 simulado en
+% §4) -- citado en §4 solo como contexto de régimen episódico semiárido de la
+% cuenca, no como documentación del evento específico simulado.
 @article{Cabre2020HuascoENSO,
   author  = {Cabr\'e, Albert and Aguilar, Germ\'an and Mather, Anne E.
              and Fredes, V\'ictor and Riquelme, Rodrigo},
@@ -560,14 +602,14 @@
   number  = {5},
   pages   = {679--699},
   year    = {2020},
-  doi     = {10.1177/0309133319898994},
-  note    = {Verificado CrossRef (2026-07-03, WP5). Sobre el evento de marzo
-             2015 en el Huasco (mismo evento de Wilcox2016AtacamaFlash, no el
-             de 2017 simulado en §4) -- citado en §4 solo como contexto de
-             régimen episódico semiárido de la cuenca, no como documentación
-             del evento específico simulado.}
+  doi     = {10.1177/0309133319898994}
 }
 
+% [nota interna, no se imprime]
+% Inventario de landslides co-sísmicos del terremoto Maule 2010 (Mw 8.8). Más
+% de 1000 features documentados. Citado en §1.2 del review como ejemplo de
+% cascade trigger. Autorías verificadas con verify-refs/CrossRef (2026-05-18):
+% Piñero-Feliciangeli, Laura (no Lorena); Poblete, Fernando (no Felipe).
 @article{Serey2019MauleInventory,
   author  = {Serey, Alejandra and Pi\~nero-Feliciangeli, Laura and
              Sep\'ulveda, Sergio A. and Poblete, Fernando and Petley,
@@ -580,13 +622,7 @@
   number  = {6},
   pages   = {1153--1165},
   year    = {2019},
-  doi     = {10.1007/s10346-019-01150-6},
-  note    = {Inventario de landslides co-sísmicos del terremoto Maule 2010
-             (Mw 8.8). Más de 1000 features documentados. Citado en §1.2 del
-             review como ejemplo de cascade trigger.
-             Autorías verificadas con verify-refs/CrossRef (2026-05-18):
-             Piñero-Feliciangeli, Laura (no Lorena); Poblete, Fernando
-             (no Felipe).}
+  doi     = {10.1007/s10346-019-01150-6}
 }
 
 % =============================================================================
@@ -594,6 +630,10 @@
 % Verificadas con verify-refs/CrossRef 2026-05-29 salvo nota.
 % =============================================================================
 
+% [nota interna, no se imprime]
+% Flux rescaling para wetting/drying + well-balanced source con bed
+% reconstruction. Core del esquema solver-2d (§2.2). DOI verificado CrossRef
+% 2026-05-29.
 @article{LiangMarche2009,
   author  = {Liang, Qiuhua and Marche, Fabien},
   title   = {Numerical resolution of well-balanced shallow water equations with
@@ -603,12 +643,12 @@
   number  = {6},
   pages   = {873--884},
   year    = {2009},
-  doi     = {10.1016/j.advwatres.2009.02.010},
-  note    = {Flux rescaling para wetting/drying + well-balanced source con bed
-             reconstruction. Core del esquema solver-2d (§2.2). DOI verificado
-             CrossRef 2026-05-29.}
+  doi     = {10.1016/j.advwatres.2009.02.010}
 }
 
+% [nota interna, no se imprime]
+% Soluciones analíticas 2D (planar oscillation en paraboloid). Benchmark §3.2.
+% DOI verificado CrossRef 2026-05-29.
 @article{Thacker1981,
   author  = {Thacker, William Carlisle},
   title   = {Some exact solutions to the nonlinear shallow-water wave equations},
@@ -616,24 +656,26 @@
   volume  = {107},
   pages   = {499--508},
   year    = {1981},
-  doi     = {10.1017/S0022112081001882},
-  note    = {Soluciones analíticas 2D (planar oscillation en paraboloid).
-             Benchmark §3.2. DOI verificado CrossRef 2026-05-29.}
+  doi     = {10.1017/S0022112081001882}
 }
 
+% [nota interna, no se imprime]
+% Tablas de Manning n por tipo de canal/cobertura. Referencia clásica
+% universal; sin DOI (libro 1959). Usado para el lookup landcover→n (§4.2).
+% verify-refs (2026-05-29) matchea una reedición 2006 (DOI
+% 10.1016/b978-0-7506-6857-6.x5000-0); se mantiene la cita canónica al
+% original 1959.
 @book{Chow1959,
   author    = {Chow, Ven Te},
   title     = {Open-Channel Hydraulics},
   publisher = {McGraw-Hill},
   address   = {New York},
-  year      = {1959},
-  note      = {Tablas de Manning n por tipo de canal/cobertura. Referencia
-               clásica universal; sin DOI (libro 1959). Usado para el lookup
-               landcover→n (§4.2). verify-refs (2026-05-29) matchea una
-               reedición 2006 (DOI 10.1016/b978-0-7506-6857-6.x5000-0); se
-               mantiene la cita canónica al original 1959.}
+  year      = {1959}
 }
 
+% [nota interna, no se imprime]
+% Simulador multi-hazard GPU (flood + landslide + debris flow). DOI verificado
+% CrossRef 2026-05-29. Reemplaza la clave provisional Xia2024.
 @article{Xia2025,
   author  = {Xia, Xilin and Ming, Xiaodong},
   title   = {{SynxFlow}: A {GPU}-accelerated {Python} package for multi-hazard
@@ -643,12 +685,13 @@
   number  = {110},
   pages   = {7586},
   year    = {2025},
-  doi     = {10.21105/joss.07586},
-  note    = {Simulador multi-hazard GPU (flood + landslide + debris flow).
-             DOI verificado CrossRef 2026-05-29. Reemplaza la clave provisional
-             Xia2024.}
+  doi     = {10.21105/joss.07586}
 }
 
+% [nota interna, no se imprime]
+% Differentiable CFD en JAX. DOI verificado CrossRef 2026-05-29 (año de
+% publicación 2023, online-first 2022). NB: una "JAX-Fluids 2.0 (2025)" NO se
+% encontró en OpenAlex; sólo existe esta versión.
 @article{Bezgin2023,
   author  = {Bezgin, Deniz A. and Buhendwa, Aaron B. and Adams, Nikolaus A.},
   title   = {{JAX-Fluids}: A fully-differentiable high-order computational fluid
@@ -657,31 +700,28 @@
   volume  = {282},
   pages   = {108527},
   year    = {2023},
-  doi     = {10.1016/j.cpc.2022.108527},
-  note    = {Differentiable CFD en JAX. DOI verificado CrossRef 2026-05-29
-             (año de publicación 2023, online-first 2022). NB: una "JAX-Fluids
-             2.0 (2025)" NO se encontró en OpenAlex; sólo existe esta versión.}
+  doi     = {10.1016/j.cpc.2022.108527}
 }
 
+% [nota interna, no se imprime]
+% Producto landcover global 10 m (11 clases). Fuente del campo Manning n(x,y)
+% en §4.2. DOI Zenodo/DataCite (NO indexado en CrossRef); verificar contra
+% Zenodo antes de submit.
 @misc{ESAWorldCover2021,
   author       = {Zanaga, Daniele and Van De Kerchove, Ruben and Daems, Dirk
                   and others},
   title        = {{ESA WorldCover} 10 m 2021 v200},
   year         = {2022},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.7254221},
-  note         = {Producto landcover global 10 m (11 clases). Fuente del campo
-                  Manning n(x,y) en §4.2. DOI Zenodo/DataCite (NO indexado en
-                  CrossRef); verificar contra Zenodo antes de submit.}
+  doi          = {10.5281/zenodo.7254221}
 }
 
 @unpublished{ParraPaper02,
   author = {Parra, Francisco},
   title  = {Differentiable hydraulic geometry: bridging the cross-event
             generalisation gap in 1D shallow-water flood routing},
-  note   = {Companion 1D differentiable-calibration paper (in preparation,
-            hydroflux line). Cross-reference; actualizar a cita formal cuando
-            esté submitted/published.},
+% TODO pre-submission: actualizar a cita formal cuando este submitted/published.
+  note   = {Companion 1D differentiable-calibration paper, in preparation},
   year   = {2026}
 }
 
@@ -785,4 +825,24 @@
   year      = {2020},
   note      = {arXiv:2010.01709},
   doi       = {10.48550/arXiv.2010.01709}
+}
+
+% --- Basin infrastructure / study-area description ---
+% Verified 2026-08-07 by reading the source PDF directly (not an
+% abstract or a search snippet): the report segments the Río Huasco at
+% "ENTRADA EMBALSE SANTA JUANA" and "SALIDA EMBALSE SANTA JUANA"
+% (segment 0382-HU-20), and describes the Huasco en Santa Juana gauge
+% as sitting "unos 15 km aguas abajo de Huasco en Algodones, a 575 m
+% s.n.m.". Agency technical report — no DOI, so CrossRef/OpenAlex
+% return nothing by design; provenance is the institutional URL.
+@techreport{DGA2004Huasco,
+  author      = {{Dirección General de Aguas}},
+  title       = {Diagnóstico y clasificación de los cursos y cuerpos de
+                 agua según objetivos de calidad: Cuenca del Río Huasco},
+  institution = {Ministerio de Obras Públicas, Gobierno de Chile},
+  year        = {2004},
+  month       = {12},
+  address     = {Santiago, Chile},
+  url         = {https://mma.gob.cl/wp-content/uploads/2017/12/Huasco.pdf},
+  urldate     = {2026-08-07}
 }

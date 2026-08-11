@@ -39,7 +39,7 @@ RMSE and peak bias in metres; arrival time = simulated time to exceed
 | 5  | 400.0 | 1000.0 | 0.1800 | 0.0006 | +0.0001 | +59.8 s |
 | 6  | 300.0 | 1300.0 | 0.1755 | 0.0006 | +0.0002 | +0.0 s  |
 
-RMSE is 0.2–1.4 % of peak depth at every point; peak bias is within
+RMSE is 0.3–1.2 % of peak depth at every point; peak bias is within
 ±1.4 % everywhere. Arrival-time offsets (0–60 s) are an order of
 magnitude below the "~5 min" spread the SC120002 report itself
 documents *between different industry models* on this test (§4.5.4) —

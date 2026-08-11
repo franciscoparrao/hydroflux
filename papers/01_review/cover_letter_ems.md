@@ -32,14 +32,18 @@ The manuscript fits the journal's Aims & Scope on three explicit axes:
    repository.
 
 2. **Real-world environmental application illustrating the methodology.**
-   The solver is applied to an observed high-flow event (peak
-   38.9 m³/s, March 2017) on the Río Huasco at Santa Juana — a
-   semiarid Andean reach with a 92-year DGA record — on a 30 m DEM,
-   using a spatially variable Manning field
-   derived from ESA WorldCover land cover. The result is reported
-   honestly as a one-day-peak sensitivity demonstration (not a
-   calibrated hindcast); the calibration companion is in preparation as
-   a separate submission (see §5).
+   The solver is applied to a semiarid Andean reach of the Río Huasco
+   on a 30 m DEM, using a spatially variable Manning field derived
+   from ESA WorldCover land cover. The upstream boundary condition is
+   the measured 2017 operated release of the Santa Juana reservoir
+   (peak 38.9 m³/s, March 2017, DGA gauge 03820003). We state that
+   provenance explicitly in §4.1 rather than presenting the series as
+   a natural flood: a gauged regulated release is the cleaner forcing for a
+   friction-sensitivity experiment, because it removes rainfall,
+   routing, and rating-curve uncertainty from the comparison. The
+   result is reported honestly as a one-day-peak sensitivity
+   demonstration (not a calibrated hindcast); the calibration companion
+   is in preparation as a separate submission (see §5).
 
 3. **A generalizable software-engineering insight beyond the specific
    application.** The solver is *generic over the numeric type* through
@@ -69,11 +73,14 @@ foundation, (ii) a full verification hierarchy reproducible from the
 public repository, and (iii) the differentiability pattern as a
 forward-looking software-engineering contribution.
 
-**Companion submission already at EMS.** The GeoTIFF I/O backbone used
-by hydroflux (`surtgis`) is currently under Major Revision at
-*Environmental Modelling & Software* (separate manuscript). The two
-submissions are independent in claims and reviewable in isolation;
-they form a coherent open-source stack, which we note for the editor's
+**Companion paper already published in EMS.** The GeoTIFF I/O backbone
+used by hydroflux (`surtgis`) is described in Parra (2026),
+*Environmental Modelling & Software* 204, 107102
+(doi:10.1016/j.envsoft.2026.107102). The present manuscript is
+independent in its claims and reviewable in isolation — it contributes
+the shallow-water solver, its verification hierarchy, and the
+differentiability pattern, none of which the companion covers — but the
+two form a coherent open-source stack, which we note for the editor's
 awareness.
 
 **Open source, licence, and reproducibility.** The solver is released
@@ -124,7 +131,7 @@ Sincerely,
 
 Francisco Parra
 Postdoctoral researcher, Universidad de Santiago de Chile
-francisco.parra.o@usach.cl  ·  ORCID: 0009-0008-4961-304X
+francisco.parra.o@usach.cl  ·  ORCID: 0009-0006-0435-1854
 
 on behalf of co-authors V. Gil-Costa (UNSL–CONICET, Argentina),
 C. Bonacic (USACH) and M. Marín (USACH)
