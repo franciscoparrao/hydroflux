@@ -32,20 +32,18 @@ keywords: [shallow water equations, finite volume, well-balanced,
 # Abstract
 
 Two-dimensional shallow-water solvers underpin flood hazard mapping,
-but none of the established open-source kernels ships with automatic
-differentiation. We present *hydroflux*, a finite-volume solver written
+but no open-source kernel ships with automatic differentiation. We present *hydroflux*, a finite-volume solver written
 in Rust and generic over its numeric type, so the identical code
 evaluates in `f64` for production and in forward-mode dual numbers for
-gradients. It is well-balanced and mass-conservative across wetting and
-drying. Verification covers analytical solutions and two Environment
-Agency benchmarks reproduced on official geometry, matching the
-published reference series to 0.3–1.2 % RMSE, plus a matched comparison
-against ANUGA. Gradients cost 2.0× the primal per parameter, placing
-the forward-mode break-even at two parameters; over a simulated day the
+gradients. It is well-balanced and mass-conservative at wet/dry fronts. Verification covers analytical solutions and two Environment Agency
+benchmarks on official geometry, matching published series to
+0.3–1.2 % RMSE. Gradients cost 2.0× the primal per parameter, so the
+forward-mode break-even sits at two; over a simulated day the
 tangent grows 1.8 % per step while the primal stays stable, bounding
 gradient use to short assimilation windows rather than long transient
-hindcasts. Applied to a semiarid Andean reach at 30 m, the solver
-matches an independently developed GPU solver to 0.021 m RMSE.
+hindcasts. Applied at 30 m to a semiarid Andean reach driven by a
+gauged reservoir release — a sensitivity demonstration, not a hindcast
+— the solver matches an independent GPU solver to 0.021 m RMSE.
 
 # Key Points
 
