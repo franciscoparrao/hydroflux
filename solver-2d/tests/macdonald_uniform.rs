@@ -138,7 +138,7 @@ fn uniform_flow_x_aligned_is_preserved() {
     // Tolerance 2% was set when η-MUSCL alone left a residual
     // O(dx·S₀/h_n) bias on this steady-state problem. With bed
     // reconstruction (Liang & Marche 2009) + flux rescaling, the
-    // measured drift drops to ~0.03% (h) and ~0.18% (hu) on this
+    // measured drift is 0.073% (h) and 0.18% (hu) on this
     // mesh — a 45× improvement on h. The tolerance is left at 2%
     // as a loose regression guard; substantial drift would indicate
     // a regression in the well-balanced source or flux rescaling. The interior
@@ -282,4 +282,59 @@ fn perturbation_from_normal_depth_relaxes_back() {
         initial_perturbation,
         final_perturbation
     );
+}
+
+/// Informational: print the measured steady-state drift so the §3.4
+/// number in the manuscript comes from a run rather than from a code
+/// comment. The assertions above are loose regression guards (2 %);
+/// this reports what the scheme actually achieves.
+///
+/// Run:
+/// ```text
+/// cargo test --release -p hydroflux-solver-2d --test macdonald_uniform \
+///     -- --ignored --nocapture report_steady_state_drift
+/// ```
+#[test]
+#[ignore = "informational report, not a pass/fail criterion"]
+fn report_steady_state_drift() {
+    let q = 1.0;
+    let slope = 0.01;
+    let manning = 0.03;
+    let h_n = manning_normal_depth(q, slope, manning);
+
+    let n_rows = 5;
+    let n_cols = 50;
+    let dx = 1.0;
+    let mesh = x_sloped_mesh(n_rows, n_cols, dx, slope, manning);
+    let states = Array2::from_elem((n_rows, n_cols), Conserved2D::new(h_n, q, 0.0));
+    let bcs = Boundaries2D {
+        west: Boundary::Discharge { q },
+        east: Boundary::Depth { h: h_n },
+        north: Boundary::Wall,
+        south: Boundary::Wall,
+    };
+
+    let u = q / h_n;
+    let c = (G * h_n).sqrt();
+    let t_end = 2.0 * (n_cols as f64 * dx) / (u + c);
+    let (final_states, _) = run_until(states, &mesh, bcs, t_end, 0.4);
+
+    let mut max_dh = 0.0_f64;
+    let mut max_dhu = 0.0_f64;
+    let mut max_dhv = 0.0_f64;
+    for s in &final_states {
+        max_dh = max_dh.max((s.h - h_n).abs());
+        max_dhu = max_dhu.max((s.hu - q).abs());
+        max_dhv = max_dhv.max(s.hv.abs());
+    }
+
+    println!("=== MacDonald uniform flow — steady-state drift report ===");
+    println!(
+        "Mesh: {n_rows}×{n_cols}, dx = {dx:.2} m, S0 = {slope}, n = {manning}"
+    );
+    println!("Normal depth h_n = {h_n:.6} m, unit discharge q = {q} m²/s");
+    println!("  max |Δh| / h_n  = {:.4} %", 100.0 * max_dh / h_n);
+    println!("  max |Δhu| / q   = {:.4} %", 100.0 * max_dhu / q);
+    println!("  max |hv| / q    = {:.4} %", 100.0 * max_dhv / q);
+    println!("==========================================================");
 }
