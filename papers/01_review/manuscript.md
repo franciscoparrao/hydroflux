@@ -569,12 +569,16 @@ shallow-water solvers [@LiangMarche2009].
 
 To position the solver against a mature open-source 2D shallow-water
 reference, we ran the Stoker dam-break in ANUGA [@Roberts2015] — its
-default DE0 flow algorithm on the `rectangular_cross` triangulation —
-at the same effective resolution ($\Delta x = 1$ m, matched to a
+default DE0 flow algorithm on the `rectangular_cross` triangulation,
+built on the central-upwind scheme of Kurganov and Petrova
+[@KurganovPetrova2007] — at the same effective resolution ($\Delta x = 1$ m, matched to a
 100-cell hydroflux re-run) and the same physical setup (flat bed,
 walls on the long sides, transmissive ends, $h_L = 1$ m,
-$t_end = 4$ s). Both solvers reproduce
-the Ritter rarefaction solution closely (Figure 6). On the analytical
+$t_end = 4$ s). The two schemes are of different families — a Riemann-solver
+discretisation here against a Riemann-free central-upwind one there —
+which is what makes agreement between them informative rather than
+circular. Both reproduce the Ritter rarefaction solution closely
+(Figure 6). On the analytical
 rarefaction fan $x ∈ [37.5, 75.1]$ m, the relative error norms are
 L1 4.1 %, L2 3.6 %, L∞ 5.3 % $h_L$ for hydroflux and L1 2.6 %, L2 2.7 %,
 L∞ 4.4 % $h_L$ for ANUGA — ANUGA edges out hydroflux by a factor of
