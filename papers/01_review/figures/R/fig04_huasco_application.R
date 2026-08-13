@@ -14,8 +14,8 @@
 # Inputs (solver-2d example outputs):
 #   examples/huasco_2d_phase2/output/huasco_subset_dem.tif
 #   examples/huasco_2d_phase2/output/huasco_subset_landcover.tif
-#   examples/huasco_2d_phase2/output/huasco_2d_depth_day_01.tif
-#   examples/huasco_2d_phase2/output/huasco_2d_depth_day_01_landcover.tif
+#   examples/huasco_2d_phase2/output/huasco_2d_depth_day_11.tif
+#   examples/huasco_2d_phase2/output/huasco_2d_depth_day_11_landcover.tif
 #
 # Output: papers/01_review/figures/out/fig04_huasco_application.{pdf,png}
 #
@@ -34,8 +34,8 @@ setup_paper_theme(journal = "elsevier")
 base <- here::here("examples/huasco_2d_phase2/output")
 dem <- rast(file.path(base, "huasco_subset_dem.tif")); crs(dem) <- "EPSG:32719"
 lc  <- rast(file.path(base, "huasco_subset_landcover.tif")); crs(lc) <- "EPSG:32719"
-d_u <- rast(file.path(base, "huasco_2d_depth_day_01.tif")); crs(d_u) <- "EPSG:32719"
-d_l <- rast(file.path(base, "huasco_2d_depth_day_01_landcover.tif")); crs(d_l) <- "EPSG:32719"
+d_u <- rast(file.path(base, "huasco_2d_depth_day_11.tif")); crs(d_u) <- "EPSG:32719"
+d_l <- rast(file.path(base, "huasco_2d_depth_day_11_landcover.tif")); crs(d_l) <- "EPSG:32719"
 
 # ESA WorldCover → Manning n (matches esa_worldcover_to_manning).
 esa_to_n <- function(x) {

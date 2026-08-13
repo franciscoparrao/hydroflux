@@ -35,20 +35,19 @@ Two-dimensional shallow-water solvers underpin flood hazard mapping,
 but none ships with automatic differentiation. We present *hydroflux*, a finite-volume solver in Rust generic over its
 numeric type, so the identical code evaluates in `f64` for production
 and in forward-mode dual numbers for gradients. It is well-balanced and mass-conservative at wet/dry fronts.
-Verification covers analytical solutions and two Environment Agency
+Verification spans analytical solutions and two Environment Agency
 benchmarks on official geometry, matching published series to 0.3–1.2 %
 RMSE. Gradients cost 2.0× the primal per parameter, putting the forward-mode
-break-even at two; over a simulated day the tangent grows 1.9 % per
-step while the primal stays stable, bounding gradient use to short
-assimilation windows rather than long hindcasts. Applied at 30 m to a semiarid Andean reach driven by a gauged reservoir
-release — a sensitivity demonstration, not a hindcast — the solver matches an independent GPU solver to 0.021 m RMSE, a
+break-even at two; over a simulated day the tangent grows 1.9 % per step while the primal
+stays stable, bounding gradients to short assimilation windows. Applied at 30 m to a semiarid Andean reach driven by a gauged reservoir
+release at its peak — a sensitivity demonstration, not a hindcast — the solver matches an independent GPU solver to 0.021 m RMSE, a
 residual insensitive to the time step.
 
 # Key Points
 
 1. A 2D shallow-water finite-volume solver written generic over the numeric type evaluates the identical code in `f64` and in forward-mode dual numbers, making the entire forward model differentiable by construction without a separate adjoint implementation.
 2. The well-balanced HLLC/Audusse scheme preserves lake-at-rest to machine precision on arbitrary beds and passes a hierarchy of analytical (Thacker, Stoker, MacDonald) and community (UK EA: 6 synthetic stand-ins, plus Tests 4 and 8A reproduced on the official EA/LISFLOOD-FP geometry) benchmarks, conserving mass to $3.53\cdot 10^{-15}$ on the closed-domain Thacker oscillation, whose wet/dry shoreline moves continuously; on the real-terrain application it closes mass to $9.8\cdot 10^{-15}$ with an active source and matches an independently developed GPU solver to 0.021 m RMSE.
-3. Applied to a Río Huasco reach driven by a regulated 2017 reservoir release, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field; in a one-day-peak sensitivity demonstration (not a validated hindcast) the riparian vegetation it places in the channel ($n \approx  0.10$) retains ~22 % more water in the reach than a single uniform value.
+3. Applied to a Río Huasco reach driven by a regulated 2017 reservoir release, the solver ingests a 30 m DEM and an ESA WorldCover land-cover map directly, producing a spatially variable Manning field; at the peak of the routed release, and as a sensitivity demonstration rather than a validated hindcast, the riparian vegetation it places in the channel ($n \approx  0.10$) retains ~29 % more water in the reach than a single uniform value.
 
 # Plain Language Summary
 
@@ -763,19 +762,60 @@ influence with a one-at-a-time sweep (§4.4) rather than assert it.
 
 ## 4.3 Results
 
-Over a one-day peak simulation, the spatially variable Manning field
-changes the inundation relative to a single calibrated $n = 0.04$: the
-mean channel depth increases by 0.19 m, the final wet volume retained
-in the reach grows by 22 % ($2.69\cdot 10^{5}$ vs $2.20\cdot 10^{5}$ m³), the mean
-outflow drops 4 % (15.0 vs 15.6 m³/s), and the wetted-cell count rises
-from 277 to 286. The mechanism is physical: the riparian vegetation
-that the land cover places exactly in the channel ($n \approx  0.10$, four
-times the uniform value) slows the flow, deepens it locally, and
-retains more water in the reach — an effect a single domain-averaged
-roughness cannot represent. The peak depth is marginally lower (4.36
-vs 4.39 m) because the slowed flow spreads laterally rather than
-building to the channel peak. Mass is conserved throughout (net storage
-change consistent with cumulative inflow minus outflow).
+We route the release from the start of the window to its peak on day 11
+(38.9 m³/s) and compare the spatially variable Manning field against a
+single calibrated $n = 0.04$. At the peak the variable field raises the
+mean channel depth by 0.33 m and retains 29 % more water in the reach
+($3.92\cdot 10^{5}$ vs $3.03\cdot 10^{5}$ m³), with the wetted-cell count
+277 → 302 against 295 for the uniform field. The mechanism is physical:
+the riparian vegetation that the land cover places in the channel
+($n \approx  0.10$, four times the uniform value) slows the flow, deepens
+it, and holds more water in the reach — an effect a single
+domain-averaged roughness cannot represent. Mass is conserved
+throughout.
+
+Two aspects of that comparison depend on discharge, and we report both
+rather than the more flattering one. The effect on storage strengthens
+as the event builds: the same comparison run at the day-one baseline of
+17.5 m³/s gives +22 % rather than +29 %, and a mean channel deepening
+of 0.19 m rather than 0.33 m. The effect on through-flow does the
+opposite and nearly vanishes: mean outflow differs by 4 % at baseline
+(15.0 vs 15.6 m³/s) but by 0.4 % at the peak (27.9 vs 28.0 m³/s),
+because after eleven days of routing both configurations are close to
+steady state and the roughness field redistributes storage rather than
+throughput. The sign of the peak-depth difference also flips — the
+variable field gives the marginally lower maximum at baseline (4.36 vs
+4.39 m) and the marginally higher one at the peak (4.57 vs 4.55 m) —
+so we draw no conclusion from a difference of two centimetres in a
+single cell.
+
+The reach is laterally confined, and it is worth stating what that
+means for a two-dimensional solver rather than leaving a reader to
+infer it. The wetted sheet is two cells wide at the median, which
+invites the reading that a one-dimensional routing would serve equally
+well. The measurements say otherwise about the cause and agree about
+the consequence. The confinement is topographic, not a matter of the
+reach being under-forced: across the rows that carry water, the valley
+floor — cells within 2 m of the thalweg — is itself two cells wide at
+the median, and the water occupies essentially all of it. Where the
+valley opens to 300 m the inundation opens to 300 m with it. Nor would
+a larger event change this: between the baseline and the peak the
+discharge rises by a factor of 2.2 and the stored volume by 46 %, while
+the wetted area rises 6 %, an empirical scaling of area with $Q^{0.07}$
+under which even the 107 m³/s maximum of the 92-year record — 2.8 times
+the 2017 peak — would not materially widen the flow.
+
+What the solver is therefore doing here is tracking a valley floor
+whose width varies from 60 to 300 m along the reach, which is
+information a one-dimensional model would need supplied as surveyed
+cross-sections. That is a genuine use of the second dimension, but a
+modest one, and at 30 m resolution a 60 m valley floor is two cells,
+which is marginal for a finite-volume scheme. The benchmarks of §3
+carry the harder two-dimensional cases — Test 8A is an urban
+configuration with rainfall and surcharge at 2 m resolution, and the
+radial dam-break tests isotropy directly. This application demonstrates
+the GIS-native input pipeline and the roughness question, not
+two-dimensional hydrodynamics at their most demanding.
 
 This application is a demonstration of capability, not a calibrated
 hindcast: the absolute depths depend on the warm-start and the
@@ -788,15 +828,19 @@ that a continental-scale, multi-basin programme requires.
 
 ## 4.4 Sensitivity to the roughness lookup
 
-The +22 % figure rests on a literature lookup, so we sweep the three
+The storage result rests on a literature lookup, so we sweep the three
 land-cover classes that occupy the channel and its banks one at a time
 over the range each carries in the standard compilations, holding the
 other two at the §4.2 baseline and comparing every configuration
-against the same uniform $n = 0.04$ reference.
+against the same uniform $n = 0.04$ reference. The sweep is run at the
+day-one baseline discharge of 17.5 m³/s, where the reference comparison
+gives +22 % rather than the +29 % of the peak; it is the *robustness of
+the direction* that transfers between discharges, not the magnitude,
+and §4.3 has already shown the magnitude to be discharge-dependent.
 
-**Table 3. One-at-a-time sensitivity of the §4.3 result to the
-land-cover → Manning lookup.** Baseline is tree 0.100, shrub 0.060,
-bare 0.025.
+**Table 3. One-at-a-time sensitivity of the roughness lookup, at the
+day-one baseline discharge.** Baseline lookup is tree 0.100, shrub
+0.060, bare 0.025; the reference is the uniform $n = 0.04$ field.
 
 | Swept class | $n$ | Retained volume | Mean outflow | $\overline{\Delta h}$ channel |
 |---|---|---|---|---|
@@ -1008,9 +1052,9 @@ MacDonald) and community (UK EA: 6 synthetic stand-ins, plus Tests 4
 and 8A on the official EA/LISFLOOD-FP geometry) benchmarks. It ingests standard
 public GIS products directly and, applied to a Río Huasco reach forced
 by a regulated 2017 reservoir release, demonstrates a land-cover-derived
-spatially variable Manning field that, in a one-day-peak sensitivity
-test (not a validated hindcast), retains ~22 % more water in the reach
-than a single uniform roughness — a direction that survives every
+spatially variable Manning field that, as a sensitivity test rather
+than a validated hindcast, retains ~29 % more water in the reach at the
+peak of the routed release than a single uniform roughness — a direction that survives every
 configuration of a roughness sweep, corners of the parameter box
 included. On the same terrain the solver reproduces the depth field of
 an independently developed GPU community solver to 0.021 m RMSE. The contribution is a verified, open
@@ -1065,7 +1109,7 @@ yet arrived. Generated by `fig03_uk_ea_t6.R` from the
 `gen_verification_data` example output.
 
 **Figure 4** (`fig04_huasco_application.pdf`). Río Huasco reach under
-the regulated 2017 release, 200 × 67-cell 30 m subset (UTM 19S), one-day peak. Five
+the regulated 2017 release, 200 × 67-cell 30 m subset (UTM 19S), at the day-11 peak. Five
 panels sharing the reach extent: (a) ESA WorldCover 2021 land cover —
 riparian tree and shrub vegetation tracks the thalweg within bare
 Atacama hillslopes; (b) the derived Manning field $n(x, y)$ mapping
@@ -1074,11 +1118,11 @@ inundation depth with a single uniform $n = 0.04$; (d) inundation
 depth with the variable $n(x, y)$; (e) the difference $\Delta h = (d) - (c)$,
 hill-shaded base, divergent scale. Panels (c)–(e) share a hillshade
 underlay. The positive Δh (warm) concentrated in the channel shows the
-riparian roughness deepening and retaining the flow — the +0.19 m mean
-channel deepening and +22 % retained volume reported in §4.3. Generated
+riparian roughness deepening and retaining the flow — the +0.33 m mean
+channel deepening and +29 % retained volume reported in §4.3. Generated
 by `fig04_huasco_application.R`, which reuses the solver-2d example
 rasters (`huasco_subset_{dem,landcover}.tif`,
-`huasco_2d_depth_day_01{,_landcover}.tif`).
+`huasco_2d_depth_day_11{,_landcover}.tif`).
 
 **Figure 5** (`fig05_convergence.pdf`). Mesh-refinement convergence on
 the Thacker oscillation (§3.7). (a) Relative L1 (circles) and L2
