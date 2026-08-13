@@ -15,7 +15,7 @@
 
 library(ggplot2)
 source(here::here("examples/huasco_2d_phase2/figures/R/theme_paper.R"))
-setup_paper_theme(journal = "elsevier")
+fontfam <- setup_paper_theme(journal = "elsevier")
 
 # --- Geometry (to scale) ------------------------------------------
 xLc <- 0; xRc <- 2; xf <- 1            # cell centres + face position
@@ -103,31 +103,35 @@ p <- ggplot() +
   annotate("text", x = xf - 0.42, y = 2.52, label = "x-face", size = 2.5,
            colour = "grey20", hjust = 1) +
   # Free-surface labels, raised clear of the surface lines.
-  annotate("text", x = xL0 + 0.30, y = etaL + 0.16, label = "eta[L]",
-           parse = TRUE, size = 2.9, colour = col_eta) +
-  annotate("text", x = xR1 - 0.30, y = etaR + 0.16, label = "eta[R]",
-           parse = TRUE, size = 2.9, colour = col_eta) +
+  annotate("text", x = xL0 + 0.30, y = etaL + 0.16, label = "\u03b7",
+           family = fontfam, size = 2.9, colour = col_eta, hjust = 1) +
+  annotate("text", x = xL0 + 0.31, y = etaL + 0.09, label = "L",
+           family = fontfam, size = 2.0, colour = col_eta, hjust = 0) +
+  annotate("text", x = xR1 - 0.34, y = etaR + 0.16, label = "\u03b7",
+           family = fontfam, size = 2.9, colour = col_eta, hjust = 1) +
+  annotate("text", x = xR1 - 0.33, y = etaR + 0.09, label = "R",
+           family = fontfam, size = 2.0, colour = col_eta, hjust = 0) +
   # Actual depths at cell centres.
   annotate("text", x = xLc - 0.16, y = (zL + etaL) / 2, label = "h[L]",
-           parse = TRUE, size = 2.8, colour = col_eta, hjust = 1) +
+           parse = TRUE, family = fontfam, size = 2.8, colour = col_eta, hjust = 1) +
   annotate("text", x = xRc + 0.16, y = (zR + etaR) / 2, label = "h[R]",
-           parse = TRUE, size = 2.8, colour = col_eta, hjust = 0) +
+           parse = TRUE, family = fontfam, size = 2.8, colour = col_eta, hjust = 0) +
   # Reconstructed depths, labels in the UPPER water column (clear of
   # the flux arrow at y = 1.18).
   annotate("text", x = xf - 0.27, y = 1.85, label = "h[L]^'*'",
-           parse = TRUE, size = 2.8, colour = col_recon, hjust = 1) +
+           parse = TRUE, family = fontfam, size = 2.8, colour = col_recon, hjust = 1) +
   annotate("text", x = xf + 0.27, y = 1.60, label = "h[R]^'*'",
-           parse = TRUE, size = 2.8, colour = col_recon, hjust = 0) +
-  annotate("text", x = 0.55, y = zmax + 0.11, label = "z[max]",
-           parse = TRUE, size = 2.6, colour = col_recon, hjust = 1) +
+           parse = TRUE, family = fontfam, size = 2.8, colour = col_recon, hjust = 0) +
+  annotate("text", x = 0.24, y = zmax - 0.14, label = "z[max]",
+           parse = TRUE, family = fontfam, size = 2.6, colour = col_recon, hjust = 0) +
   annotate("text", x = xf + 0.16, y = zface - 0.04, label = "z[face]",
-           parse = TRUE, size = 2.5, colour = "grey15", hjust = 0) +
+           parse = TRUE, family = fontfam, size = 2.5, colour = "grey15", hjust = 0) +
   annotate("text", x = xL0 + 0.30, y = zL / 2, label = "z[L]",
-           parse = TRUE, size = 2.6, colour = "grey20") +
+           parse = TRUE, family = fontfam, size = 2.6, colour = "grey20") +
   annotate("text", x = xR1 - 0.30, y = zR / 2 + 0.28, label = "z[R]",
-           parse = TRUE, size = 2.6, colour = "grey95") +
+           parse = TRUE, family = fontfam, size = 2.6, colour = "grey95") +
   # HLLC flux label below its arrow.
-  annotate("text", x = xf, y = 1.04, label = "F (HLLC)", size = 2.5,
+  annotate("text", x = xf + 0.50, y = 1.18, label = "F (HLLC)", hjust = 0, size = 2.5,
            colour = col_flux) +
   annotate("text", x = xLc, y = 0.40, label = "bed-slope source", size = 2.2,
            colour = col_src) +

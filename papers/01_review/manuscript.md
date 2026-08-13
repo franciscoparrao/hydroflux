@@ -815,13 +815,19 @@ area, but hillslope rather than channel — moves it not at all, because
 the flow stays confined to the channel at this discharge. The three
 classes were not swept over ranges of equal relative width, so we also
 normalise: expressed as an elasticity (fractional change in retained
-volume per fractional change in $n$), the tree class returns 0.261,
-the shrub class 0.022 and the bare class 0.001. The ranking is not an
-artefact of how wide each range was chosen — tree dominates by an
-order of magnitude over shrub and by two over bare. The tree
-elasticity is also almost identical in both directions (0.260
-decreasing, 0.261 increasing), so over this range the response is
-close to a power law in $n$ rather than a local linearisation.
+volume per fractional change in $n$), the tree class returns
+$\approx 0.26$ and the shrub class $\approx 0.02$, while the bare class
+falls below what this sweep resolves — both bare configurations return
+the same retained volume to the precision of Table 3. These are
+two-point differences across the swept ranges, so the figures carry
+only the precision that repetition justifies: the tree value is quoted
+to two digits because the two independent directions agree to two
+digits (0.26 decreasing, 0.26 increasing), which also indicates the
+response over this range is closer to a power law in $n$ than to a
+local linearisation, whereas the shrub value is quoted to one. What the
+sweep establishes is the *ranking* — an order of magnitude from tree to
+shrub and a further order to bare — and that ordering is not an
+artefact of the ranges having been chosen with unequal relative width.
 The corners also bound the interaction the one-at-a-time rows cannot
 see: moving shrub and bare to their minima on top of tree's minimum
 shifts the result by only 0.8 percentage points (+9.5 % to +8.7 %), so
