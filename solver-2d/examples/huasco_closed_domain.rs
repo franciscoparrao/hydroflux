@@ -54,6 +54,20 @@ fn manning_normal_depth(q_m3s: f64, n: f64, slope: f64, cell_width_m: f64) -> f6
 }
 
 fn main() {
+    // `--cfl X` exists to separate two things the cross-validation of §4.5
+    // would otherwise conflate: how much of the disagreement with an
+    // independent solver is the spatial scheme, and how much is our choice
+    // of time step. Both codes converge as the CFL number falls, so if the
+    // residual shrinks with CFL it is temporal discretisation; if it
+    // plateaus, it is the scheme.
+    let cfl = {
+        let a: Vec<String> = std::env::args().collect();
+        a.iter().position(|x| x == "--cfl")
+            .and_then(|i| a.get(i + 1))
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(CFL)
+    };
+
     let (mesh, transform) =
         mesh_from_geotiff_with_landcover(SUBSET_DEM, SUBSET_LC, esa_worldcover_to_manning)
             .expect("failed to load DEM + landcover");
@@ -76,7 +90,7 @@ fn main() {
 
     let cell_area = mesh.dx * mesh.dy;
     let initial_mass: f64 = states.iter().map(|s| s.h * cell_area).sum();
-    println!("Closed-domain Huasco, day 1 (all boundaries Wall)");
+    println!("Closed-domain Huasco, day 1 (all boundaries Wall), CFL = {cfl}");
     println!("  warm start h_n = {h_warm:.3} m, initial volume {initial_mass:.4e} m³");
 
     // `--no-inflow` gives the cleanest possible scheme-to-scheme
@@ -89,6 +103,7 @@ fn main() {
     // delivered volume by ~8 %, which would otherwise contaminate the
     // comparison.
     let no_inflow = std::env::args().any(|a| a == "--no-inflow");
+
     let q = if no_inflow { 0.0 } else { Q_DAY1 };
     let sources = vec![PointSource {
         row: INFLOW_ROW,
@@ -99,7 +114,7 @@ fn main() {
     let mut t = 0.0;
     let mut steps = 0usize;
     while t < SECONDS_PER_DAY {
-        let dt = cfl_time_step_with_bcs(&states, &mesh, bcs, CFL).min(SECONDS_PER_DAY - t);
+        let dt = cfl_time_step_with_bcs(&states, &mesh, bcs, cfl).min(SECONDS_PER_DAY - t);
         ssprk2_step(&mut states, &mesh, bcs, dt);
         manning_friction_step(&mut states, &mesh, dt, 1.0e-9);
         apply_point_sources(&mut states, &sources, dt, mesh.dx, mesh.dy);
@@ -123,10 +138,11 @@ fn main() {
     );
     println!("  h_max {h_max:.4} m, wet cells (h > 0.01) {n_wet}");
 
+    let tag = format!("{:.0}", cfl * 100.0);
     let name = if no_inflow {
-        "huasco_closed_noflow_landcover.tif"
+        format!("huasco_closed_noflow_cfl{tag}.tif")
     } else {
-        "huasco_closed_day_01_landcover.tif"
+        format!("huasco_closed_day_01_cfl{tag}.tif")
     };
     let out = PathBuf::from(OUTPUT_DIR).join(name);
     write_depth_geotiff(&out, &states, transform, Some(-9999.0)).expect("write depth");

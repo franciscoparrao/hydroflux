@@ -32,18 +32,17 @@ keywords: [shallow water equations, finite volume, well-balanced,
 # Abstract
 
 Two-dimensional shallow-water solvers underpin flood hazard mapping,
-but no open-source kernel ships with automatic differentiation. We present *hydroflux*, a finite-volume solver written
-in Rust and generic over its numeric type, so the identical code
-evaluates in `f64` for production and in forward-mode dual numbers for
-gradients. It is well-balanced and mass-conservative at wet/dry fronts. Verification covers analytical solutions and two Environment Agency
-benchmarks on official geometry, matching published series to
-0.3–1.2 % RMSE. Gradients cost 2.0× the primal per parameter, so the
-forward-mode break-even sits at two; over a simulated day the
-tangent grows 1.8 % per step while the primal stays stable, bounding
-gradient use to short assimilation windows rather than long transient
-hindcasts. Applied at 30 m to a semiarid Andean reach driven by a
-gauged reservoir release — a sensitivity demonstration, not a hindcast
-— the solver matches an independent GPU solver to 0.021 m RMSE.
+but none ships with automatic differentiation. We present *hydroflux*, a finite-volume solver in Rust generic over its
+numeric type, so the identical code evaluates in `f64` for production
+and in forward-mode dual numbers for gradients. It is well-balanced and mass-conservative at wet/dry fronts.
+Verification covers analytical solutions and two Environment Agency
+benchmarks on official geometry, matching published series to 0.3–1.2 %
+RMSE. Gradients cost 2.0× the primal per parameter, putting the forward-mode
+break-even at two; over a simulated day the tangent grows 1.9 % per
+step while the primal stays stable, bounding gradient use to short
+assimilation windows rather than long hindcasts. Applied at 30 m to a semiarid Andean reach driven by a gauged reservoir
+release — a sensitivity demonstration, not a hindcast — the solver matches an independent GPU solver to 0.021 m RMSE, a
+residual insensitive to the time step.
 
 # Key Points
 
@@ -313,8 +312,12 @@ we state it because the locking suite above does not reveal it. Those
 tests integrate O(100) steps on smooth synthetic problems. Repeating
 the same seeded evaluation on the §4 configuration — a sealed 30 m
 reach with a moving shoreline, ~78 000 steps for one simulated day —
-the tangent grows exponentially at 1.8 % per step (0.0078 decades per
-step, measured), while the primal remains entirely stable: peak depth
+the tangent grows exponentially at 1.85 % per step — a log-linear fit
+over 51 sampled steps gives $0.0080 \pm 0.0002$ decades per step
+(1$\sigma$), 95 % interval 1.78–1.93 % per step, $R^{2} = 0.98$, and the
+quality of that fit is itself the evidence that the growth is
+exponential rather than merely large — while the primal remains
+entirely stable: peak depth
 drifts from 2.40 m to 2.94 m and the wet-cell count from 219 to 220
 over the same interval. The consequence is stark. Over 100 steps the
 amplification is a factor of six and invisible; over a full day it is
@@ -392,6 +395,20 @@ from exact steady states through analytical transients to the
 community benchmark suite. Table 1 summarises the quantitative results;
 all are computed by the solver's automated test suite and reproduced by
 the $report_*$ informational tests.
+
+A word on what the uncertainties in this paper are, since the three
+classes of number reported here are not alike. The verification metrics
+of Table 1 carry no run-to-run uncertainty at all: the solver contains
+no stochastic element and no parallel reduction whose order can vary, so
+repeated invocations return bit-identical values, which we confirmed by
+running the Thacker report three times. Their uncertainty is entirely
+discretisation, and §3.7 characterises it directly by refining the mesh.
+The performance figures of §3.9 are the opposite case — machine-
+dependent and subject to run-to-run scatter, which is why they are
+reported with the hardware stated and, where measured on a different
+machine from the rest, flagged as such. The third class, the
+inter-model comparison of §4.5, has an uncertainty that neither of these
+covers, and §4.5 quantifies it.
 
 **Table 1. Verification results.**
 
@@ -899,7 +916,33 @@ reach at 30 m, over 86 400 s:
 | Total stored volume | −0.022 % |
 
 Two independent solvers agree to 2 cm RMSE, with a bias of 0.2 mm on
-depths of order 3 m, on real 30 m terrain. For reference, the same
+depths of order 3 m, on real 30 m terrain.
+
+A single pair of runs cannot say whether that 2 cm is a genuine
+scheme-level difference or an artefact of the time step each code
+happened to use, so we vary ours. Repeating the comparison at CFL 0.4,
+0.3 and 0.2 — 78 000, 104 000 and 156 000 steps for the same simulated
+day — moves the RMSE from 0.0210 to 0.0208 to 0.0206 m, a spread of
+1.9 % across a doubling of the step count. The bias moves from
++0.0002 to +0.0003 m and the peak depth from 3.071 to 3.070 m; the
+wet-mask CSI goes from 0.950 to 0.945, which is one cell changing
+classification out of the 199 the mask contains and is therefore the
+metric's granularity rather than a trend.
+Expressed as a scaling, the residual falls with the CFL number at an
+apparent order of 0.03: it does not scale with $\Delta t$.
+
+That is the useful form of the answer. Had the disagreement been our
+temporal discretisation, the apparent order would sit between one and
+two and the residual would fall visibly under refinement; instead it
+extrapolates to roughly 0.020 m rather than to zero as $\Delta t \to 0$.
+The 2 cm is therefore a scheme-level difference between the two codes —
+which is what the comparison is meant to measure — and not a
+consequence of having run at a loose CFL number. Mass closure is
+unaffected across the three: $4\cdot 10^{-15}$, $1.2\cdot 10^{-14}$ and
+$6\cdot 10^{-15}$ relative. We vary only our own time step here; the
+other code's discretisation settings are held at their defaults, so
+this bounds our contribution to the residual rather than decomposing it
+fully. For reference, the same
 comparison run with the mismatched inflow gives an RMSE of 0.46 m and a
 bias of +0.31 m: 99.9 % of the apparent disagreement was the injection
 mechanism rather than the discretisation.
@@ -1112,7 +1155,7 @@ cargo run --release -p hydroflux-solver-2d --example huasco_2d_event_landcover -
 cargo run --release -p hydroflux-solver-2d --example huasco_manning_sweep   # Table 3
 cargo run --release -p hydroflux-solver-2d --example m1_forward_scaling     # §2.5 scaling
 cargo run --release -p hydroflux-solver-2d --example export_huasco_inputs   # §4.5 hand-off
-cargo run --release -p hydroflux-solver-2d --example huasco_closed_domain -- --no-inflow
+cargo run --release -p hydroflux-solver-2d --example huasco_closed_domain -- --no-inflow --cfl 0.4
 ```
 
 DGA streamflow data are public via the CR2 archive

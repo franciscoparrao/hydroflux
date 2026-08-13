@@ -246,14 +246,18 @@ state it because the locking suite above does not reveal it. Those tests
 integrate O(100) steps on smooth synthetic problems. Repeating the same
 seeded evaluation on the §4 configuration --- a sealed 30 m reach with a
 moving shoreline, $\sim$78 000 steps for one simulated day ---
-the tangent grows exponentially at 1.8 \% per step (0.0078 decades per
-step, measured), while the primal remains entirely stable: peak depth
-drifts from 2.40 m to 2.94 m and the wet-cell count from 219 to 220 over
-the same interval. The consequence is stark. Over 100 steps the
-amplification is a factor of six and invisible; over a full day it is
-\(10^{606}\), and the gradient overflows. A Gauss-Newton calibration of
-the §4.4 roughness target on this horizon therefore returns a
-meaningless step, which is what we observe.
+the tangent grows exponentially at 1.85 \% per step --- a log-linear fit
+over 51 sampled steps gives \(0.0080 \pm 0.0002\) decades per step
+(1\(\sigma\)), 95 \% interval 1.78--1.93 \% per step, \(R^{2} = 0.98\),
+and the quality of that fit is itself the evidence that the growth is
+exponential rather than merely large --- while the primal remains
+entirely stable: peak depth drifts from 2.40 m to 2.94 m and the
+wet-cell count from 219 to 220 over the same interval. The consequence
+is stark. Over 100 steps the amplification is a factor of six and
+invisible; over a full day it is \(10^{606}\), and the gradient
+overflows. A Gauss-Newton calibration of the §4.4 roughness target on
+this horizon therefore returns a meaningless step, which is what we
+observe.
 
 This is a property of the linearisation, not of the differentiation
 mode: an adjoint of the same trajectory inherits the same instability,
@@ -326,6 +330,20 @@ from exact steady states through analytical transients to the community
 benchmark suite. Table 1 summarises the quantitative results; all are
 computed by the solver's automated test suite and reproduced by the
 \(report_*\) informational tests.
+
+A word on what the uncertainties in this paper are, since the three
+classes of number reported here are not alike. The verification metrics
+of Table 1 carry no run-to-run uncertainty at all: the solver contains
+no stochastic element and no parallel reduction whose order can vary, so
+repeated invocations return bit-identical values, which we confirmed by
+running the Thacker report three times. Their uncertainty is entirely
+discretisation, and §3.7 characterises it directly by refining the mesh.
+The performance figures of §3.9 are the opposite case --- machine-
+dependent and subject to run-to-run scatter, which is why they are
+reported with the hardware stated and, where measured on a different
+machine from the rest, flagged as such. The third class, the inter-model
+comparison of §4.5, has an uncertainty that neither of these covers, and
+§4.5 quantifies it.
 
 \textbf{Table 1. Verification results.}
 
@@ -926,10 +944,36 @@ Total stored volume & −0.022 \% \\
 \end{longtable}
 
 Two independent solvers agree to 2 cm RMSE, with a bias of 0.2 mm on
-depths of order 3 m, on real 30 m terrain. For reference, the same
-comparison run with the mismatched inflow gives an RMSE of 0.46 m and a
-bias of +0.31 m: 99.9 \% of the apparent disagreement was the injection
-mechanism rather than the discretisation.
+depths of order 3 m, on real 30 m terrain.
+
+A single pair of runs cannot say whether that 2 cm is a genuine
+scheme-level difference or an artefact of the time step each code
+happened to use, so we vary ours. Repeating the comparison at CFL 0.4,
+0.3 and 0.2 --- 78 000, 104 000 and 156 000 steps for the same simulated
+day --- moves the RMSE from 0.0210 to 0.0208 to 0.0206 m, a spread of
+1.9 \% across a doubling of the step count. The bias moves from +0.0002
+to +0.0003 m and the peak depth from 3.071 to 3.070 m; the wet-mask CSI
+goes from 0.950 to 0.945, which is one cell changing classification out
+of the 199 the mask contains and is therefore the metric's granularity
+rather than a trend. Expressed as a scaling, the residual falls with the
+CFL number at an apparent order of 0.03: it does not scale with
+\(\Delta t\).
+
+That is the useful form of the answer. Had the disagreement been our
+temporal discretisation, the apparent order would sit between one and
+two and the residual would fall visibly under refinement; instead it
+extrapolates to roughly 0.020 m rather than to zero as
+\(\Delta t \to 0\). The 2 cm is therefore a scheme-level difference
+between the two codes --- which is what the comparison is meant to
+measure --- and not a consequence of having run at a loose CFL number.
+Mass closure is unaffected across the three: \(4\cdot 10^{-15}\),
+\(1.2\cdot 10^{-14}\) and \(6\cdot 10^{-15}\) relative. We vary only our
+own time step here; the other code's discretisation settings are held at
+their defaults, so this bounds our contribution to the residual rather
+than decomposing it fully. For reference, the same comparison run with
+the mismatched inflow gives an RMSE of 0.46 m and a bias of +0.31 m:
+99.9 \% of the apparent disagreement was the injection mechanism rather
+than the discretisation.
 
 Mass behaviour is worth stating separately, because the sealed
 configuration makes it exact rather than approximate. With the domain
