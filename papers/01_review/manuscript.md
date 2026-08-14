@@ -1176,7 +1176,7 @@ All authors read and approved the final manuscript.
 # Open Research
 
 All code is released open-source at <https://github.com/franciscoparrao/hydroflux>
-(commit `2fb4f1b`), dual-licensed MIT OR Apache-2.0. The
+(commit `b96202c`), dual-licensed MIT OR Apache-2.0. The
 $solver-2d$ crate contains the finite-volume solver ($state$, $flux$,
 $riemann$, $geometry$, `boundary`, $update$, $source$, $io$ modules)
 and its verification suite (the $report_*$ ignored tests print the §3
@@ -1211,6 +1211,23 @@ DGA streamflow data are public via the CR2 archive
 (<https://www.cr2.cl/>). The DEM is SRTM 30 m (USGS) pit-filled with
 the SurtGIS pipeline [@SurtgisRef]; the land cover is ESA WorldCover
 2021 v200 [@ESAWorldCover2021].
+
+# Data availability
+
+All code, all benchmark configurations and every input required to
+reproduce the figures and tables are public at the repository and
+pinned commit given in Open Research, under a dual MIT OR Apache-2.0
+licence. The Huasco subset rasters (DEM, flow accumulation, land cover)
+and the reference depth field used for the §4.5 cross-validation ship
+with the repository, so no separate download is needed; the script that
+regenerates the subsets from the public SRTM and ESA WorldCover sources
+is included. The third-party inputs are cited at their own DOIs: the
+UK Environment Agency benchmark geometry as redistributed by
+[@Shaw2021] and [@Sharifian2023], and ESA WorldCover
+[@ESAWorldCover2021]. The Río Huasco discharge record is public through
+the CR2 archive (<https://www.cr2.cl/>), station 03820003. An archived
+snapshot of the repository with its own DOI will be deposited at
+acceptance and cited here in proof.
 
 # Acknowledgements
 
