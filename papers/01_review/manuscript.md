@@ -324,9 +324,23 @@ $10^{606}$, and the gradient overflows. A Gauss-Newton calibration of
 the §4.4 roughness target on this horizon therefore returns a
 meaningless step, which is what we observe.
 
-This is a property of the linearisation, not of the differentiation
-mode: an adjoint of the same trajectory inherits the same instability,
-so reverse-mode AD would not repair it. What it bounds is the class of
+We also tested the obvious suspect. The primal is stable while the
+tangent is not, which invites the explanation that the wetting and
+drying threshold is to blame — each cell crossing it injects a
+discontinuity the primal absorbs and the derivative does not. Counting
+those crossings alongside the growth rate shows they contribute without
+accounting for it: growth correlates with the number of crossings per
+interval at $r = 0.45$, and the quartile of intervals with the most
+crossings grows at 2.6 % per step against 1.0 % for the quartile with
+the fewest — but that 1.0 % floor persists in intervals where the
+shoreline barely moves. Roughly a fifth of the variance is attributable
+to the threshold; the rest is not.
+
+This matters for what can be done about it. The instability is a
+property of the linearisation rather than of the wet/dry treatment or
+of the differentiation mode: smoothing the threshold would reduce the
+rate but not remove the exponential, and an adjoint of the same
+trajectory inherits it, so reverse-mode AD would not repair it. What it bounds is the class of
 inverse problem this solver currently supports — short assimilation
 windows, or steady and near-steady targets, where the tangent stays
 bounded — and not long transient hindcasts. Methods that address
@@ -363,12 +377,30 @@ $2.07\times$ the `f64` primal per parameter (per-parameter ratios
 $2.0\times$ single-seed overhead reported above. Reverse-mode AD
 recovers the whole gradient in one sweep at a cost independent of $P$,
 conventionally 3–5× the primal, which puts the break-even at
-$P^{*} \approx 2$ (1.5–2.4 across that band). Forward mode is therefore
+$P^{*} \approx 2$ (1.4–2.3 across that band).
+
+A vector-mode dual carrying $N$ derivative components through a single
+pass removes the redundancy in those $P$ passes — the same square
+roots, powers and mesh traversal recomputed each time — and the solver
+accepts it unchanged, since `DualN<N>` satisfies the same `Real`
+contract. Measured on the same problem, it lowers the per-parameter
+cost from 2.13× the primal to 0.88×, a factor of 2.4, and moves the
+break-even to $P^{*} \approx 4$. The gain is smaller than the
+arithmetic alone predicts, and the reason is instructive: the
+derivative components make the state proportionally larger, so at
+$N = 16$ the working set on a $64^{2}$ grid reaches 1.6 MB and the
+computation becomes bandwidth-bound rather than arithmetic-bound. On a
+kernel small enough to stay resident in cache the same implementation
+shows a per-component cost an order of magnitude lower, which is a
+useful caution against benchmarking AD machinery on arithmetic alone.
+Vector mode is therefore worth having — gradients over a handful of
+parameters cost half what they did — without changing the conclusion
+that forward mode suits low-dimensional targets. Forward mode is therefore
 the right tool only for the low-dimensional targets this paper
 exercises — and §4.4 shows the roughness problem here *is*
 low-dimensional, with a single land-cover class carrying almost all of
-the sensitivity. It is not the right tool for a per-cell roughness
-field, and we do not claim otherwise; reverse-mode is identified as
+the sensitivity. Neither mode is the right tool for a per-cell roughness field, and we
+do not claim otherwise; reverse-mode is identified as
 future work (§5). The counterpoint that does favour forward mode is
 memory: it stores no tape, so its footprint is independent of the
 number of time steps, whereas an adjoint must checkpoint or replay a
@@ -1180,7 +1212,7 @@ All code is released open-source at <https://github.com/franciscoparrao/hydroflu
 $solver-2d$ crate contains the finite-volume solver ($state$, $flux$,
 $riemann$, $geometry$, `boundary`, $update$, $source$, $io$ modules)
 and its verification suite (the $report_*$ ignored tests print the §3
-metrics; the workspace runs 307 automated tests at the pinned commit,
+metrics; the workspace runs 313 automated tests at the pinned commit,
 0 failures). The Huasco application is
 reproduced by the `huasco_2d_event` and `huasco_2d_event_landcover`
 examples. The repository is self-contained: its single

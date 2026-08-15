@@ -33,7 +33,7 @@ use std::io::Write;
 use std::path::Path;
 use std::time::Instant;
 
-use hydroflux_autograd::{Dual, Real};
+use hydroflux_autograd::{Dual, DualN, Real};
 use ndarray::Array2;
 
 use hydroflux_solver_2d::{
@@ -159,6 +159,39 @@ fn main() {
             "non-finite gradient component at P = {p}"
         );
     }
+
+    // Same gradient, one pass. The generic step accepts DualN<N>
+    // because it satisfies Real, so nothing in the solver changes.
+    println!("\n  vector mode — the whole gradient in a single pass:");
+    println!("  {:>8}  {:>10}  {:>14}  {:>16}", "P", "wall [s]", "cost / primal", "per-param cost");
+    let mut vec_rows: Vec<(usize, f64, f64)> = Vec::new();
+    macro_rules! bench_vec {
+        ($n:literal) => {{
+            let t0 = Instant::now();
+            let manning = Array2::from_shape_fn((N_ROWS, N_COLS), |(_, j)| {
+                DualN::<$n>::seeded(N_BASE, zone_of(j, $n))
+            });
+            let out = forward_pass::<DualN<$n>>(manning);
+            let wall = t0.elapsed().as_secs_f64();
+            assert!(out.dval.iter().all(|g| g.is_finite()));
+            let ratio = wall / t_primal;
+            let per = (ratio - 1.0) / $n as f64;
+            println!("  {:>8}  {wall:>10.3}  {ratio:>14.2}×  {per:>15.2}×", $n);
+            vec_rows.push(($n, ratio, per));
+        }};
+    }
+    bench_vec!(2);
+    bench_vec!(4);
+    bench_vec!(8);
+    bench_vec!(16);
+
+    let r_vec = vec_rows.iter().map(|r| r.2).sum::<f64>() / vec_rows.len() as f64;
+    println!("\n  per-parameter cost, vector mode = {r_vec:.3}× primal");
+    println!(
+        "  break-even vs reverse-mode: P* = {:.0} (k = 3×)  …  {:.0} (k = 5×)",
+        (REVERSE_BAND[0] - 1.0) / r_vec,
+        (REVERSE_BAND[1] - 1.0) / r_vec
+    );
 
     // Fit the per-parameter constant `r` as the mean of the measured
     // per-parameter costs — with a scalar Dual the relation is linear

@@ -15,7 +15,7 @@
 
 use std::ops::{Add, Div, Mul, Neg, Sub};
 
-use crate::Dual;
+use crate::{Dual, DualN};
 
 /// Scalar type supporting the arithmetic the SWE primitives need.
 pub trait Real:
@@ -145,6 +145,52 @@ impl Real for Dual {
     }
     fn powt(self, exponent: Dual) -> Dual {
         Dual::powd(self, exponent)
+    }
+}
+
+impl<const N: usize> Default for DualN<N> {
+    fn default() -> Self {
+        DualN::constant(0.0)
+    }
+}
+
+/// The vector-mode dual satisfies the same contract as the scalar one,
+/// so the solver's `T: Real` code paths accept it unchanged: the same
+/// generic step that runs in `f64` for production and in `Dual` for a
+/// single derivative runs in `DualN<N>` for `N` derivatives at once.
+impl<const N: usize> Real for DualN<N> {
+    fn zero() -> Self {
+        DualN::constant(0.0)
+    }
+    fn one() -> Self {
+        DualN::constant(1.0)
+    }
+    fn from_f64(x: f64) -> Self {
+        DualN::constant(x)
+    }
+    fn value(self) -> f64 {
+        self.val
+    }
+    fn sqrt(self) -> Self {
+        DualN::sqrt(self)
+    }
+    fn abs(self) -> Self {
+        DualN::abs(self)
+    }
+    fn max(self, other: Self) -> Self {
+        DualN::max(self, other)
+    }
+    fn min(self, other: Self) -> Self {
+        DualN::min(self, other)
+    }
+    fn powi(self, n: i32) -> Self {
+        DualN::powi(self, n)
+    }
+    fn powf(self, n: f64) -> Self {
+        DualN::powf(self, n)
+    }
+    fn powt(self, exponent: Self) -> Self {
+        DualN::powd(self, exponent)
     }
 }
 

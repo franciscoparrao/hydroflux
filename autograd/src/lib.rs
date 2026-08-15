@@ -31,10 +31,12 @@
 
 pub mod compound_swe1d;
 mod dual;
+mod dual_n;
 pub mod physics;
 pub mod power_law_swe1d;
 mod real;
 pub mod swe1d;
 
 pub use dual::Dual;
+pub use dual_n::DualN;
 pub use real::Real;

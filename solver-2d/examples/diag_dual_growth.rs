@@ -40,6 +40,7 @@ const SUBSET_DEM: &str = "examples/huasco_2d_phase2/data/huasco_subset_dem.tif";
 const SUBSET_ACC: &str = "examples/huasco_2d_phase2/data/huasco_subset_acc.tif";
 const SUBSET_LC: &str = "examples/huasco_2d_phase2/data/huasco_subset_landcover.tif";
 const OUT_CSV: &str = "papers/01_review/figures/data/m_dual_growth.csv";
+const OUT_CSV_WET: &str = "papers/01_review/figures/data/m_dual_growth_allwet.csv";
 
 const ACC_THRESHOLD: f64 = 1_000_000.0;
 const H_WARM: f64 = 0.457;
@@ -82,28 +83,51 @@ fn main() {
     let manning = Array2::from_shape_fn((nr, nc), |(i, j)| manning_for(codes[(i, j)], n_tree));
     let mesh = Mesh2DG::<Dual>::with_manning_field(bed, dx, dy, manning);
 
+    // `--all-wet` floods the whole domain to a depth that submerges the
+    // terrain, so no cell crosses the wet/dry threshold during the run.
+    // The primal is stable in both configurations; if the tangent is
+    // stable only here, the growth is the wet/dry treatment rather than
+    // the scheme, which is a far more specific finding and points at a
+    // fix.
+    let all_wet = std::env::args().any(|a| a == "--all-wet");
+    let z_top = dem.iter().cloned().fold(f64::MIN, f64::max);
     let mut states = Array2::from_shape_fn((nr, nc), |(i, j)| {
-        if acc[(i, j)] > ACC_THRESHOLD {
-            Conserved2DG::<Dual>::new_generic(Dual::constant(H_WARM), Dual::zero(), Dual::zero())
+        let h = if all_wet {
+            z_top - dem[(i, j)] + 2.0
+        } else if acc[(i, j)] > ACC_THRESHOLD {
+            H_WARM
         } else {
-            Conserved2DG::<Dual>::new_generic(Dual::zero(), Dual::zero(), Dual::zero())
-        }
+            0.0
+        };
+        Conserved2DG::<Dual>::new_generic(Dual::constant(h), Dual::zero(), Dual::zero())
     });
+    if all_wet {
+        println!("all-wet configuration: no cell crosses the dry threshold");
+    }
 
     let bcs = Boundaries2D::WALLS;
-    let mut f = File::create(OUT_CSV).expect("csv");
-    writeln!(f, "step,t_seconds,max_abs_dval,max_h,n_wet").unwrap();
+    let mut f = File::create(if all_wet { OUT_CSV_WET } else { OUT_CSV }).expect("csv");
+    writeln!(f, "step,t_seconds,max_abs_dval,max_h,n_wet,flips").unwrap();
 
     println!("{:>8}  {:>10}  {:>14}  {:>8}  {:>6}", "step", "t [s]", "max |dh/dn|", "max h", "n_wet");
 
     let mut t_sim = 0.0;
     let mut step = 0usize;
+    // Wet/dry flips since the last report. If the tangent grows in step
+    // with these rather than with elapsed time, the amplification comes
+    // from the threshold treatment and not from the scheme itself.
+    let mut flips: usize = 0;
+    let mut was_wet: Vec<bool> = states.iter().map(|s| s.h.val > 1.0e-3).collect();
     while t_sim < T_END {
         let dt = cfl_time_step_with_bcs(&states, &mesh, bcs, CFL).min(T_END - t_sim);
         ssprk2_step(&mut states, &mesh, bcs, dt);
         manning_friction_step(&mut states, &mesh, dt, 1.0e-9);
         t_sim += dt;
         step += 1;
+        for (k, st) in states.iter().enumerate() {
+            let w = st.h.val > 1.0e-3;
+            if w != was_wet[k] { flips += 1; was_wet[k] = w; }
+        }
 
         if step % REPORT_EVERY == 0 || step == 1 {
             let mut max_d = 0.0_f64;
@@ -121,7 +145,8 @@ fn main() {
                 }
             }
             println!("{step:>8}  {t_sim:>10.1}  {max_d:>14.4e}  {max_h:>8.4}  {n_wet:>6}");
-            writeln!(f, "{step},{t_sim:.3},{max_d:.6e},{max_h:.6},{n_wet}").unwrap();
+            writeln!(f, "{step},{t_sim:.3},{max_d:.6e},{max_h:.6},{n_wet},{flips}").unwrap();
+            flips = 0;
             if !max_d.is_finite() || max_d > 1.0e100 {
                 println!("\nAborting: |dh/dn| exceeded 1e100 — the tangent has diverged.");
                 break;
