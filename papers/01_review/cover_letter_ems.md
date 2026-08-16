@@ -73,6 +73,26 @@ foundation, (ii) a full verification hierarchy reproducible from the
 public repository, and (iii) the differentiability pattern as a
 forward-looking software-engineering contribution.
 
+**Two results that generalise beyond the solver.** We would draw the
+editor's attention to these in particular, since EMS asks that insight
+be of interest to those studying other systems. First, the tangent
+linear model of a shallow-water scheme with moving wet/dry fronts
+diverges exponentially — 1.85 % per step, measured — while the primal
+solution remains stable, which bounds gradient-based inference to short
+assimilation windows regardless of parameter count. Because the bound
+belongs to the linearisation rather than to the differentiation mode,
+an adjoint inherits it; we think this is worth stating plainly for a
+community increasingly planning differentiable geophysical models on
+the assumption that reverse-mode AD removes the obstacles. Second, in
+cross-validating against an independent GPU solver we found that the
+two codes, given the same boundary hydrograph, delivered volumes
+differing by 8.4 % — one injecting a volumetric source, the other
+converting discharge to boundary velocities — and that this alone
+accounted for 99.9 % of an apparent disagreement between the depth
+fields. Any intercomparison that does not isolate it is measuring
+boundary treatment rather than numerics. Neither result is specific to
+this solver or to flood modelling.
+
 **Companion paper already published in EMS.** The GeoTIFF I/O backbone
 used by hydroflux (`surtgis`) is described in Parra (2026),
 *Environmental Modelling & Software* 204, 107102

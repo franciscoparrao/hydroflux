@@ -65,25 +65,27 @@ and CONICET},%
             country={Argentina}}
 
 \begin{abstract}
-Two-dimensional shallow-water solvers underpin flood hazard mapping,
-but no open-source kernel ships with automatic differentiation. We present \emph{hydroflux}, a finite-volume solver written
-in Rust and generic over its numeric type, so the identical code
-evaluates in \texttt{f64} for production and in forward-mode dual numbers for
-gradients. It is well-balanced and mass-conservative at wet/dry fronts. Verification covers analytical solutions and two Environment Agency
-benchmarks on official geometry, matching published series to
-0.3--1.2 \% RMSE. Gradients cost 2.0$\times$ the primal per parameter, so the
-forward-mode break-even sits at two; over a simulated day the
-tangent grows 1.8 \% per step while the primal stays stable, bounding
-gradient use to short assimilation windows rather than long transient
-hindcasts. Applied at 30 m to a semiarid Andean reach driven by a
-gauged reservoir release --- a sensitivity demonstration, not a hindcast
---- the solver matches an independent GPU solver to 0.021 m RMSE.
+No production shallow-water flood solver ships with automatic
+differentiation. We present \emph{hydroflux},
+a finite-volume solver in Rust generic over its numeric type, so the
+identical code evaluates in \texttt{f64} for production and in forward-mode
+dual numbers for gradients. It is well-balanced and mass-conservative at wet/dry fronts, matches
+published series on two official Environment Agency benchmarks to
+0.3--1.2 \% RMSE, and reproduces an independent GPU solver to 0.021 m
+RMSE on a semiarid Andean reach.
+Building it produced two results that generalise past it. Over a
+simulated day the tangent linear model grows 1.85 \% per step while the
+primal stays stable, confining gradients to short assimilation windows;
+the bound belongs to the linearisation, so an adjoint inherits it. And
+two solvers given the same boundary hydrograph delivered volumes
+differing by 8.4 \%, which accounted for almost all of an apparent
+disagreement between their depth fields. Solver and tests are open.
 \end{abstract}
 
 \begin{highlights}
 \item A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
 \item Gradients verified layer-by-layer against finite differences; overhead 2.01$\times$.
-\item HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
+\item The tangent diverges at 1.85 \%/step while the primal is stable; adjoints inherit it.
 \item Verified on Thacker, Stoker, MacDonald and two official UK EA tests.
 \item Cross-validated vs ANUGA and vs SynxFlow on real terrain: 0.021 m RMSE, CSI 0.950.
 \end{highlights}

@@ -77,6 +77,26 @@ Río Huasco reach under a regulated 2017 release, with land-cover-derived
 roughness (§4), the roadmap toward coupling, GPU acceleration, and
 native autodifferentiation (§5), and conclusions (§6).
 
+Building and verifying the artifact produced two results that outlast
+it, and we report them as results rather than as footnotes to ours,
+because both constrain what anyone attempting the same thing can expect.
+The first concerns the reach of forward-mode differentiation in this
+class of model: over a long integration the tangent linear model of a
+shallow-water scheme with moving wet/dry fronts grows exponentially ---
+1.85 \% per step here --- while the primal solution remains entirely
+stable, so gradients support short assimilation windows and near-steady
+targets but not long transient hindcasts. That is a property of the
+linearisation, so an adjoint inherits it and reverse-mode AD does not
+repair it; and while the wet/dry threshold contributes, it accounts for
+only about a fifth of the growth. The second concerns model
+intercomparison: two solvers instructed to impose the same upstream
+discharge delivered volumes differing by 8.4 \%, because one injects a
+volumetric source and the other converts the discharge to boundary
+velocities. That difference alone accounted for 99.9 \% of an apparent
+disagreement between the two depth fields, and any intercomparison that
+does not isolate it is measuring the boundary treatment rather than the
+schemes.
+
 \section{Numerical methods}
 
 \subsection{Governing equations}
@@ -1120,9 +1140,25 @@ $\sim$29 \% more water in the reach at the peak of the routed
 release than a single uniform roughness --- a direction that survives
 every configuration of a roughness sweep, corners of the parameter box
 included. On the same terrain the solver reproduces the depth field of
-an independently developed GPU community solver to 0.021 m RMSE. The
-contribution is a verified, open artifact --- the
-differentiable-by-design 2D foundation of a multi-year programme toward
-coupled, GPU-native, continental-scale hazard simulation --- released
-for the community to build on.
+an independently developed GPU community solver to 0.021 m RMSE.
+
+Two results generalise past the artifact. Forward-mode gradients through
+this class of model are bounded not by parameter count alone but by
+integration horizon: the tangent linear model grows at 1.85 \% per step
+while the primal stays stable, which confines gradient-based inference
+to short assimilation windows and near-steady targets. The bound is a
+property of the linearisation, so reverse-mode AD relaxes the parameter
+constraint without relaxing this one --- a distinction worth drawing for
+anyone planning differentiable geophysical models on the expectation
+that an adjoint solves the problem. And intercomparison between solvers
+is sensitive to how each realises a boundary discharge: two codes given
+the same hydrograph delivered volumes differing by 8.4 \%, which
+accounted for almost all of an apparent 0.46 m disagreement that fell to
+0.021 m once isolated. Neither result is specific to this solver or to
+flood modelling.
+
+The artifact itself --- verified, open, and differentiable by design
+within the limits measured here --- is offered as the 2D foundation of a
+multi-year programme toward coupled, GPU-native, continental-scale
+hazard simulation.
 

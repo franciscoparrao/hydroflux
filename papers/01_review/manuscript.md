@@ -25,23 +25,27 @@ keywords: [shallow water equations, finite volume, well-balanced,
 
 - A 2D shallow-water solver in Rust, generic over the numeric type for f64 + AD.
 - Gradients verified layer-by-layer against finite differences; overhead 2.01×.
-- HLLC + Audusse + MUSCL + SSP-RK2; well-balanced, mass-conservative wet/dry.
+- The tangent diverges at 1.85 %/step while the primal is stable; adjoints inherit it.
 - Verified on Thacker, Stoker, MacDonald and two official UK EA tests.
 - Cross-validated vs ANUGA and vs SynxFlow on real terrain: 0.021 m RMSE, CSI 0.950.
 
 # Abstract
 
-Two-dimensional shallow-water solvers underpin flood hazard mapping,
-but none ships with automatic differentiation. We present *hydroflux*, a finite-volume solver in Rust generic over its
-numeric type, so the identical code evaluates in `f64` for production
-and in forward-mode dual numbers for gradients. It is well-balanced and mass-conservative at wet/dry fronts.
-Verification spans analytical solutions and two Environment Agency
-benchmarks on official geometry, matching published series to 0.3–1.2 %
-RMSE. Gradients cost 2.0× the primal per parameter, putting the forward-mode
-break-even at two; over a simulated day the tangent grows 1.9 % per step while the primal
-stays stable, bounding gradients to short assimilation windows. Applied at 30 m to a semiarid Andean reach driven by a gauged reservoir
-release at its peak — a sensitivity demonstration, not a hindcast — the solver matches an independent GPU solver to 0.021 m RMSE, a
-residual insensitive to the time step.
+No production shallow-water flood solver ships with automatic
+differentiation. We present *hydroflux*,
+a finite-volume solver in Rust generic over its numeric type, so the
+identical code evaluates in `f64` for production and in forward-mode
+dual numbers for gradients. It is well-balanced and mass-conservative at wet/dry fronts, matches
+published series on two official Environment Agency benchmarks to
+0.3–1.2 % RMSE, and reproduces an independent GPU solver to 0.021 m
+RMSE on a semiarid Andean reach.
+Building it produced two results that generalise past it. Over a
+simulated day the tangent linear model grows 1.85 % per step while the
+primal stays stable, confining gradients to short assimilation windows;
+the bound belongs to the linearisation, so an adjoint inherits it. And
+two solvers given the same boundary hydrograph delivered volumes
+differing by 8.4 %, which accounted for almost all of an apparent
+disagreement between their depth fields. Solver and tests are open.
 
 # Key Points
 
@@ -152,6 +156,26 @@ Río Huasco reach under a regulated 2017 release, with land-cover-derived
 roughness (§4), the
 roadmap toward coupling, GPU acceleration, and native autodifferentiation
 (§5), and conclusions (§6).
+
+Building and verifying the artifact produced two results that outlast
+it, and we report them as results rather than as footnotes to ours,
+because both constrain what anyone attempting the same thing can
+expect. The first concerns the reach of forward-mode differentiation
+in this class of model: over a long integration the tangent linear
+model of a shallow-water scheme with moving wet/dry fronts grows
+exponentially — 1.85 % per step here — while the primal solution
+remains entirely stable, so gradients support short assimilation
+windows and near-steady targets but not long transient hindcasts. That
+is a property of the linearisation, so an adjoint inherits it and
+reverse-mode AD does not repair it; and while the wet/dry threshold
+contributes, it accounts for only about a fifth of the growth. The
+second concerns model intercomparison: two solvers instructed to
+impose the same upstream discharge delivered volumes differing by
+8.4 %, because one injects a volumetric source and the other converts
+the discharge to boundary velocities. That difference alone accounted
+for 99.9 % of an apparent disagreement between the two depth fields,
+and any intercomparison that does not isolate it is measuring the
+boundary treatment rather than the schemes.
 
 # 2. Numerical methods
 
@@ -1089,10 +1113,27 @@ than a validated hindcast, retains ~29 % more water in the reach at the
 peak of the routed release than a single uniform roughness — a direction that survives every
 configuration of a roughness sweep, corners of the parameter box
 included. On the same terrain the solver reproduces the depth field of
-an independently developed GPU community solver to 0.021 m RMSE. The contribution is a verified, open
-artifact — the differentiable-by-design 2D foundation of a multi-year
-programme toward coupled, GPU-native, continental-scale hazard
-simulation — released for the community to build on.
+an independently developed GPU community solver to 0.021 m RMSE.
+
+Two results generalise past the artifact. Forward-mode gradients
+through this class of model are bounded not by parameter count alone
+but by integration horizon: the tangent linear model grows at 1.85 %
+per step while the primal stays stable, which confines gradient-based
+inference to short assimilation windows and near-steady targets. The
+bound is a property of the linearisation, so reverse-mode AD relaxes
+the parameter constraint without relaxing this one — a distinction
+worth drawing for anyone planning differentiable geophysical models on
+the expectation that an adjoint solves the problem. And intercomparison
+between solvers is sensitive to how each realises a boundary discharge:
+two codes given the same hydrograph delivered volumes differing by
+8.4 %, which accounted for almost all of an apparent 0.46 m
+disagreement that fell to 0.021 m once isolated. Neither result is
+specific to this solver or to flood modelling.
+
+The artifact itself — verified, open, and differentiable by design
+within the limits measured here — is offered as the 2D foundation of a
+multi-year programme toward coupled, GPU-native, continental-scale
+hazard simulation.
 
 # Figures (placeholders; see figures/out/)
 
@@ -1208,7 +1249,7 @@ All authors read and approved the final manuscript.
 # Open Research
 
 All code is released open-source at <https://github.com/franciscoparrao/hydroflux>
-(commit `b96202c`), dual-licensed MIT OR Apache-2.0. The
+(commit `ca0062e`), dual-licensed MIT OR Apache-2.0. The
 $solver-2d$ crate contains the finite-volume solver ($state$, $flux$,
 $riemann$, $geometry$, `boundary`, $update$, $source$, $io$ modules)
 and its verification suite (the $report_*$ ignored tests print the §3
