@@ -77,3 +77,7 @@ tmp/
 
 # ANUGA binary outputs (regenerable from m2_anuga_wallclock.py + anuga_stoker_compare.py)
 *.sww
+
+# Submission package: regenerated from the manuscript by preflight +
+# the latex build. The PDFs are build products; SUBMISSION.md is not.
+papers/*/submission/*.pdf
