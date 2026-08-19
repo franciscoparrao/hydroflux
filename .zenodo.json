@@ -1,0 +1,55 @@
+{
+  "title": "hydroflux: a well-balanced, differentiable-by-design 2D shallow-water solver in Rust",
+  "description": "Two-dimensional shallow-water finite-volume solver written in Rust and generic over its numeric type, so the identical code path evaluates in f64 for production and in forward-mode dual numbers for gradient extraction. The scheme couples an HLLC Riemann solver, Audusse hydrostatic reconstruction for well-balancedness, MUSCL slope-limited reconstruction, an SSP Runge-Kutta integrator, a point-implicit Manning step, and Liang-Marche flux rescaling for mass-conservative wetting and drying. This archive is the version associated with the manuscript submitted to Environmental Modelling &amp; Software: it contains the solver, its verification suite (analytical benchmarks plus two official UK Environment Agency configurations reproduced on the redistributed EA/LISFLOOD-FP geometry), the automatic-differentiation crate including both scalar and vector-mode dual numbers, the Rio Huasco application and its bundled 30 m input rasters, and the scripts that regenerate every figure and table in the paper.",
+  "creators": [
+    {
+      "name": "Parra Ortiz, Francisco",
+      "affiliation": "Departamento de Ingenieria Informatica, Universidad de Santiago de Chile (USACH), Santiago, Chile",
+      "orcid": "0009-0006-0435-1854"
+    },
+    {
+      "name": "Gil-Costa, Veronica",
+      "affiliation": "Universidad Nacional de San Luis (UNSL) and CONICET, San Luis, Argentina",
+      "orcid": "0000-0003-4637-9725"
+    },
+    {
+      "name": "Bonacic, Carolina",
+      "affiliation": "Departamento de Ingenieria Informatica, Universidad de Santiago de Chile (USACH), Santiago, Chile",
+      "orcid": "0000-0002-8076-6537"
+    },
+    {
+      "name": "Marin, Mauricio",
+      "affiliation": "Departamento de Ingenieria Informatica, Universidad de Santiago de Chile (USACH), Santiago, Chile",
+      "orcid": "0000-0003-0662-7149"
+    }
+  ],
+  "keywords": [
+    "shallow water equations",
+    "finite volume",
+    "well-balanced",
+    "automatic differentiation",
+    "flood modelling",
+    "Rust",
+    "wetting and drying",
+    "HLLC"
+  ],
+  "license": "MIT",
+  "upload_type": "software",
+  "access_right": "open",
+  "language": "eng",
+  "version": "v0.1.0",
+  "communities": [],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/franciscoparrao/hydroflux",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    },
+    {
+      "identifier": "10.1016/j.envsoft.2026.107102",
+      "relation": "isSupplementedBy",
+      "scheme": "doi"
+    }
+  ],
+  "notes": "TODO before publishing: once the Environmental Modelling & Software manuscript has a DOI, add it to related_identifiers with relation isSupplementTo."
+}

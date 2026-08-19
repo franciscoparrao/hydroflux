@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+title: "hydroflux: a well-balanced, differentiable-by-design 2D shallow-water solver in Rust"
+message: "If you use this software, please cite the manuscript below."
+type: software
+authors:
+  - given-names: Francisco
+    family-names: Parra
+    affiliation: "Departamento de Ingeniería Informática, Universidad de Santiago de Chile, Santiago, Chile"
+    email: francisco.parra.o@usach.cl
+    orcid: "https://orcid.org/0009-0006-0435-1854"
+  - given-names: Verónica
+    family-names: Gil-Costa
+    affiliation: "Universidad Nacional de San Luis (UNSL) and CONICET, San Luis, Argentina"
+    orcid: "https://orcid.org/0000-0003-4637-9725"
+  - given-names: Carolina
+    family-names: Bonacic
+    affiliation: "Departamento de Ingeniería Informática, Universidad de Santiago de Chile, Santiago, Chile"
+    orcid: "https://orcid.org/0000-0002-8076-6537"
+  - given-names: Mauricio
+    family-names: Marín
+    affiliation: "Departamento de Ingeniería Informática, Universidad de Santiago de Chile, Santiago, Chile"
+    orcid: "https://orcid.org/0000-0003-0662-7149"
+repository-code: "https://github.com/franciscoparrao/hydroflux"
+license: MIT
+version: v0.1.0
+keywords:
+  - shallow water equations
+  - finite volume
+  - well-balanced
+  - automatic differentiation
+  - flood modelling
+  - Rust
+# preferred-citation: add once the Environmental Modelling & Software
+# manuscript is accepted and has a DOI. Until then the software itself
+# is the citable object.
