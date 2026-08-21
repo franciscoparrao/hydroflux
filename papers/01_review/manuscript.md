@@ -1285,6 +1285,11 @@ DGA streamflow data are public via the CR2 archive
 the SurtGIS pipeline [@SurtgisRef]; the land cover is ESA WorldCover
 2021 v200 [@ESAWorldCover2021].
 
+# Declaration of competing interest
+
+The authors declare no competing financial or personal interests, and
+none serves in an editorial capacity for this journal.
+
 # Data availability
 
 All code, all benchmark configurations and every input required to
