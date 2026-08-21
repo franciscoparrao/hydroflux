@@ -1294,13 +1294,17 @@ licence. The Huasco subset rasters (DEM, flow accumulation, land cover)
 and the reference depth field used for the §4.5 cross-validation ship
 with the repository, so no separate download is needed; the script that
 regenerates the subsets from the public SRTM and ESA WorldCover sources
-is included. The third-party inputs are cited at their own DOIs: the
-UK Environment Agency benchmark geometry as redistributed by
-[@Shaw2021] and [@Sharifian2023], and ESA WorldCover
-[@ESAWorldCover2021]. The Río Huasco discharge record is public through
-the CR2 archive (<https://www.cr2.cl/>), station 03820003. An archived
-snapshot of the repository with its own DOI will be deposited at
-acceptance and cited here in proof.
+is included. An archived snapshot of the version described here is
+deposited at Zenodo under doi:10.5281/zenodo.22014346
+[@HydrofluxArchive], which is the citable object should the repository
+move; it excludes the manuscript sources and carries the solver, the
+test suite, the benchmark configurations, the application inputs and
+the figure-generation scripts and data. The third-party inputs are
+cited at their own DOIs: the UK Environment Agency benchmark geometry
+as redistributed by [@Shaw2021] and [@Sharifian2023], and ESA
+WorldCover [@ESAWorldCover2021]. The Río Huasco discharge record is
+public through the CR2 archive (<https://www.cr2.cl/>), station
+03820003.
 
 # Acknowledgements
 

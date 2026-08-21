@@ -49,10 +49,12 @@ Applied to a Semiarid Andean Reach
 **Keywords** (1–7): shallow water equations, finite volume,
 well-balanced, differentiable physics, Rust, flood modelling
 
-**Data statement**: el manuscrito trae sección *Data availability*.
-Declara repositorio público con commit pinneado, insumos de terceros
-citados en sus propios DOI, y depósito archivado con DOI en aceptación —
-que es la salida que las guidelines contemplan para la Option C.
+**Data statement**: el manuscrito trae sección *Data availability*, que
+cumple la Option C de Elsevier con depósito real: el archivo citable
+está publicado en Zenodo bajo **doi:10.5281/zenodo.22014346**
+(v0.1.0, 4.4 MB), citado y enlazado en el artículo. Contiene solver,
+tests, benchmarks, insumos de la aplicación y scripts de figuras;
+excluye las fuentes del manuscrito.
 
 **Declaración de conflicto de interés**: en el manuscrito, sin conflictos.
 
@@ -75,10 +77,9 @@ Roberts, García-Navarro, Shen, Escauriaza).
 
 ## Pendientes que NO bloquean
 
-- Release en Zenodo. La sección *Data availability* ya declara depósito
-  en aceptación, así que se puede someter sin él. Si se hace antes,
-  reponer el DOI real en la entrada `SurtgisRef` del `.bib` (hay un
-  `% TODO` marcándolo) y actualizar la sección.
+- Agregar el DOI del artículo a `related_identifiers` del registro de
+  Zenodo cuando exista. Zenodo permite editar metadata de un registro
+  publicado sin cambiar el DOI, así que es un trámite posterior.
 - Dirección postal completa en las afiliaciones. Hoy llevan
   organización, ciudad y país, que es el formato estándar de
   elsarticle; las guidelines piden calle y código postal.
