@@ -428,9 +428,11 @@ do not claim otherwise; reverse-mode is identified as
 future work (§5). The counterpoint that does favour forward mode is
 memory: it stores no tape, so its footprint is independent of the
 number of time steps, whereas an adjoint must checkpoint or replay a
-trajectory that in these simulations runs to $10^{5}$ steps. The 1D
-companion line [@ParraPaper02] uses the same `Real` trait and the same
-`Dual` type, exposed through the autograd crate. Reproduced by the
+trajectory that in these simulations runs to $10^{5}$ steps. The
+one-dimensional solvers in the same autograd crate (`swe1d`,
+`power_law_swe1d`) are written against the identical `Real` trait and
+dual types, so the machinery described here is not specific to the 2D
+code. Reproduced by the
 `m1_forward_scaling` example.
 
 A cell-mask early-skip optimisation exploits the fact that arid-basin
@@ -958,9 +960,9 @@ gradient can actually be used to recover it depends on the integration
 horizon rather than on the parameter count — over a full simulated day
 the tangent of this configuration is unstable (§2.5), so a gradient
 calibration must work within a short assimilation window or against a
-near-steady target. The companion study [@ParraPaper02] pursues that
-line in one dimension, where the horizons are short enough for the
-tangent to stay bounded.
+near-steady target. We pursue that line in one dimension, where the
+integration horizons are short enough for the tangent to stay bounded;
+those results are not reported here.
 Reproduced by the `huasco_manning_sweep` example.
 
 ## 4.5 Cross-validation against an independent solver
@@ -1089,12 +1091,12 @@ engine, beginning with an Iverson-type debris-flow source
 *Reverse-mode automatic differentiation*, required to calibrate
 spatially distributed fields (per-cell roughness, bathymetry
 corrections) whose parameter count far exceeds the measured
-forward-mode break-even of $P^{*} \approx 2$ (§2.5). The 1D companion line already
-demonstrates forward-mode calibration of Manning and cross-section
-parameters against real gauge data [@ParraPaper02]; the n–shape and
-n–bathymetry confounds it identifies motivate the spatially distributed
-observations (remote-sensing inundation extent, distributed stage) that
-the 2D solver is designed to assimilate. The terminal goal is
+forward-mode break-even of $P^{*} \approx 2$ (§2.5). Calibrating a
+roughness field against depth observations alone is in any case
+confounded — roughness trades against cross-section geometry and
+against bed elevation — which is what motivates the spatially
+distributed observations (remote-sensing inundation extent, distributed
+stage) that the 2D solver is designed to assimilate. The terminal goal is
 continental-scale coupled-hazard simulation across the 15 main Chilean
 basins, reproducible from versioned project files and public data.
 

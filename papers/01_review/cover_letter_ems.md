@@ -41,9 +41,8 @@ The manuscript fits the journal's Aims & Scope on three explicit axes:
    a natural flood: a gauged regulated release is the cleaner forcing for a
    friction-sensitivity experiment, because it removes rainfall,
    routing, and rating-curve uncertainty from the comparison. The
-   result is reported honestly as a one-day-peak sensitivity
-   demonstration (not a calibrated hindcast); the calibration companion
-   is in preparation as a separate submission (see §5).
+   result is reported honestly as a sensitivity demonstration at the
+   peak of the routed release, not a calibrated hindcast.
 
 3. **A generalizable software-engineering insight beyond the specific
    application.** The solver is *generic over the numeric type* through
