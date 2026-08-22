@@ -1287,6 +1287,15 @@ DGA streamflow data are public via the CR2 archive
 the SurtGIS pipeline [@SurtgisRef]; the land cover is ESA WorldCover
 2021 v200 [@ESAWorldCover2021].
 
+# Funding
+
+This work was supported by the Dirección de Investigación Científica y
+Tecnológica (DICYT), Vicerrectoría de Investigación, Innovación y
+Creación, Universidad de Santiago de Chile [project code
+062619MC_POSTDOC]. The funder had no role in study design, in the
+collection, analysis and interpretation of data, in the writing of the
+report, or in the decision to submit the article for publication.
+
 # Declaration of competing interest
 
 The authors declare no competing financial or personal interests, and
@@ -1315,10 +1324,10 @@ public through the CR2 archive (<https://www.cr2.cl/>), station
 
 # Acknowledgements
 
-This work was funded by the DICYT postdoctoral programme, Project code
-062619MC_POSTDOC, Vicerrectoría de Investigación, Innovación y
-Creación, Universidad de Santiago de Chile. The authors thank the
-SurtGIS development team for the DEM-processing pipeline.
+The authors acknowledge Project 062619MC_POSTDOC of the Vicerrectoría
+de Investigación, Innovación y Creación, Universidad de Santiago de
+Chile, and thank the SurtGIS development team for the DEM-processing
+pipeline.
 
 # References
 
