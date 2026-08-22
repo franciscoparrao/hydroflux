@@ -107,6 +107,16 @@ for term in "one-day peak" "Aluvión" "no ergonomic path" "Major Revision"; do
 done
 ok "no retracted phrasing found in the PDF"
 
+# Institutional signature of the postdoctoral programme. Kept out of the
+# pass/fail total above because it answers to the funder's rules rather
+# than the journal's, but a submission that fails it cannot be reported
+# for the fellowship.
+echo
+if [ -f ~/.claude/skills/firma-postdoc/check.py ]; then
+  python3 ~/.claude/skills/firma-postdoc/check.py \
+    papers/01_review/manuscript.md papers/01_review/latex/paper.tex
+fi
+
 echo
 [ $fail -eq 0 ] && echo "PREFLIGHT PASSED" || echo "PREFLIGHT FAILED"
 exit $fail
