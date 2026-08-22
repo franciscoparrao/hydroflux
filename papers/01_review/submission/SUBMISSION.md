@@ -49,6 +49,14 @@ Applied to a Semiarid Andean Reach
 **Keywords** (1–7): shallow water equations, finite volume,
 well-balanced, differentiable physics, Rust, flood modelling
 
+**Grant/contract number**: `062619MC_POSTDOC`
+
+Es el código del proyecto DICYT. El numeral 10.7 de las bases exige que
+los agradecimientos digan "Agradecimientos al Proyecto ___, Código ___,
+Vicerrectoría de Investigación, Innovación y Creación", y que la
+afiliación del postdoctorante sea Universidad de Santiago de Chile en
+exclusiva. Ambos requisitos están cumplidos en el manuscrito.
+
 **Data statement**: el manuscrito trae sección *Data availability*, que
 cumple la Option C de Elsevier con depósito real: el archivo citable
 está publicado en Zenodo bajo **doi:10.5281/zenodo.22014346**

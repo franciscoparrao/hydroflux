@@ -1315,9 +1315,10 @@ public through the CR2 archive (<https://www.cr2.cl/>), station
 
 # Acknowledgements
 
-This work is part of the DICYT postdoctoral fellowship 2026–2027 at
-Universidad de Santiago de Chile, held by F.P. under the sponsorship of
-M.M.
+This work was funded by the DICYT postdoctoral programme, Project code
+062619MC_POSTDOC, Vicerrectoría de Investigación, Innovación y
+Creación, Universidad de Santiago de Chile. The authors thank the
+SurtGIS development team for the DEM-processing pipeline.
 
 # References
 
